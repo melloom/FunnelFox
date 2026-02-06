@@ -13,6 +13,25 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  app.post("/api/seed-admin", async (_req, res) => {
+    try {
+      const bcrypt = await import("bcryptjs");
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const existing = await authStorage.getUserByEmail("Melvin.a.p.cruz@gmail.com");
+      if (existing) return res.json({ message: "Account already exists" });
+      const hashedPassword = await bcrypt.default.hash("Mellow2024!", 10);
+      const user = await authStorage.createUser({
+        email: "Melvin.a.p.cruz@gmail.com",
+        password: hashedPassword,
+        firstName: "Melvin",
+        lastName: "Cruz",
+      });
+      res.json({ message: "Account created", id: user.id });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get("/api/leads", isAuthenticated, async (_req, res) => {
     try {
       const leads = await storage.getLeads();
