@@ -36,7 +36,6 @@ import {
   Star,
   Send,
   Download,
-  CheckSquare,
   ArrowRight,
   Flame,
   Clock,
@@ -778,7 +777,7 @@ export default function LeadsPage() {
       calculateLeadScore(lead).label,
       escapeCSV(lead.notes || ""),
       escapeCSV(lead.source || ""),
-      new Date(lead.createdAt).toLocaleDateString(),
+      lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

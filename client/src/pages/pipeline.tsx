@@ -30,9 +30,7 @@ import {
   Building2,
   Phone,
   Mail,
-  ExternalLink,
   ArrowRight,
-  ChevronRight,
   ChevronDown,
   MoreHorizontal,
   Trash2,
@@ -606,7 +604,7 @@ export default function PipelinePage() {
   const getLeadsForStage = (stageValue: string) => {
     return leads
       .filter((l) => l.status === stageValue)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0));
   };
 
   if (isLoading) {

@@ -75,7 +75,7 @@ export default function Dashboard() {
   };
 
   const recentLeads = [...leads]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0))
     .slice(0, 5);
 
   if (isLoading) {
