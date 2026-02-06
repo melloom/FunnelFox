@@ -104,6 +104,8 @@ export async function searchBusinesses(
     searchFns.push(() => searchDuckDuckGo(query, maxResults, category));
   }
   searchFns.push(() => searchSocialMediaOnly(category, location, maxResults));
+  searchFns.push(() => searchGoogleMaps(category, location, maxResults));
+  searchFns.push(() => searchYellowPages(category, location, maxResults));
 
   const apiFns: (() => Promise<ScrapedBusiness[]>)[] = [];
   apiFns.push(() => searchOpenStreetMap(category, location, maxResults));
@@ -769,6 +771,263 @@ async function searchGooglePlaces(
     }
   } catch (err) {
     console.error("Google Places search error:", err);
+  }
+
+  return results;
+}
+
+async function searchGoogleMaps(
+  category: string,
+  location: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const queries = [
+      `${category} ${location} site:google.com/maps`,
+      `${category} near ${location} google maps`,
+    ];
+
+    for (let qi = 0; qi < queries.length; qi++) {
+      if (qi > 0) await delay(600);
+      if (results.length >= maxResults) break;
+
+      const encodedQuery = encodeURIComponent(queries[qi]);
+      const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      try {
+        const response = await fetch(ddgUrl, {
+          signal: controller.signal,
+          headers: {
+            "User-Agent": getRandomUA(),
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) continue;
+
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        $(".result").each((_i, el) => {
+          if (results.length >= maxResults) return false;
+
+          const title = $(el).find(".result__a").text().trim();
+          const snippet = $(el).find(".result__snippet").text().trim();
+
+          let bizName = title
+            .replace(/\s*[-–—|·]\s*(Google Maps|Maps|Google).*$/i, "")
+            .replace(/\s*·\s*Google Maps$/i, "")
+            .replace(/\s*-\s*Google$/i, "")
+            .trim();
+
+          if (!bizName || bizName.length < 3 || bizName.length > 80) return;
+          if (isListTitle(bizName, category)) return;
+
+          bizName = cleanBusinessName(bizName);
+          if (!bizName || bizName.length < 3) return;
+
+          const existing = results.find((r) => normalizeName(r.name) === normalizeName(bizName));
+
+          const phoneMatch = snippet.match(/(\(\d{3}\)\s*\d{3}[\s-]?\d{4}|\d{3}[\s.-]\d{3}[\s.-]\d{4})/);
+          const addrMatch = snippet.match(/(\d+\s+[A-Z][a-zA-Z\s]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Pl|Hwy)\b[^,]*(?:,\s*[A-Z][a-zA-Z\s]+)?)/i);
+          const websiteMatch = snippet.match(/(?:website|web)\s*:\s*(https?:\/\/[^\s,]+)/i);
+
+          if (existing) {
+            if (!existing.phone && phoneMatch) existing.phone = phoneMatch[1];
+            if (!existing.address && addrMatch) existing.address = addrMatch[1];
+            if (!existing.url && websiteMatch) {
+              const domain = extractDomain(websiteMatch[1]);
+              if (domain && !isExcludedDomain(domain) && !isAggregatorSite(domain)) {
+                existing.url = normalizeUrl(websiteMatch[1]);
+                existing.hasWebsite = true;
+              }
+            }
+            return;
+          }
+
+          let website = "";
+          let hasWebsite = false;
+          if (websiteMatch) {
+            const domain = extractDomain(websiteMatch[1]);
+            if (domain && !isExcludedDomain(domain) && !isAggregatorSite(domain)) {
+              website = normalizeUrl(websiteMatch[1]);
+              hasWebsite = true;
+            }
+          }
+
+          results.push({
+            name: bizName,
+            url: website,
+            hasWebsite,
+            source: "google-maps",
+            phone: phoneMatch ? phoneMatch[1] : undefined,
+            address: addrMatch ? addrMatch[1] : undefined,
+          });
+        });
+      } catch {
+        clearTimeout(timeout);
+      }
+    }
+  } catch (err) {
+    console.error("Google Maps search error:", err);
+  }
+
+  return results;
+}
+
+async function searchYellowPages(
+  category: string,
+  location: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const searchTerm = encodeURIComponent(category);
+    const geoLocation = encodeURIComponent(location);
+    const url = `https://www.yellowpages.com/search?search_terms=${searchTerm}&geo_location_terms=${geoLocation}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getRandomUA(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "identity",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return results;
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    $(".result").each((_i, el) => {
+      if (results.length >= maxResults) return false;
+
+      const name = $(el).find(".business-name a, .business-name span").first().text().trim();
+      if (!name || name.length < 3 || name.length > 80) return;
+
+      const phone = $(el).find(".phones.phone.primary").text().trim();
+      const street = $(el).find(".street-address").text().trim();
+      const locality = $(el).find(".locality").text().trim();
+      const address = [street, locality].filter(Boolean).join(", ");
+
+      const websiteLink = $(el).find("a.track-visit-website").attr("href") || "";
+      let website = "";
+      if (websiteLink && !websiteLink.includes("yellowpages.com")) {
+        website = websiteLink;
+        const domain = extractDomain(website);
+        if (domain && (isExcludedDomain(domain) || isAggregatorSite(domain))) {
+          website = "";
+        }
+      }
+
+      const categories = $(el).find(".categories a").map((_j, catEl) => $(catEl).text().trim()).get().join(", ");
+
+      results.push({
+        name: cleanBusinessName(name),
+        url: website ? normalizeUrl(website) : "",
+        description: categories || address || undefined,
+        hasWebsite: !!website,
+        source: "yellowpages",
+        phone: phone || undefined,
+        address: address || undefined,
+      });
+    });
+
+    if (results.length === 0) {
+      $(".organic .srp-listing, .search-results .v-card").each((_i, el) => {
+        if (results.length >= maxResults) return false;
+
+        const name = $(el).find("a.business-name, h2.n a").first().text().trim();
+        if (!name || name.length < 3) return;
+
+        const phone = $(el).find(".phone, .phones").first().text().trim();
+        const addr = $(el).find(".adr, .address").first().text().trim();
+
+        results.push({
+          name: cleanBusinessName(name),
+          url: "",
+          hasWebsite: false,
+          source: "yellowpages",
+          phone: phone || undefined,
+          address: addr || undefined,
+        });
+      });
+    }
+  } catch (err) {
+    console.error("Yellow Pages search error:", err);
+  }
+
+  if (results.length < maxResults / 2) {
+    try {
+      await delay(600);
+      const ddgQuery = encodeURIComponent(`${category} ${location} site:yellowpages.com`);
+      const ddgUrl = `https://html.duckduckgo.com/html/?q=${ddgQuery}`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(ddgUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": getRandomUA(),
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        $(".result").each((_i, el) => {
+          if (results.length >= maxResults) return false;
+
+          const title = $(".result__a", el).text().trim();
+          const snippet = $(".result__snippet", el).text().trim();
+
+          let bizName = title
+            .replace(/\s*[-–—|]\s*(Yellow\s*Pages|YP|yellowpages\.com).*$/i, "")
+            .replace(/\s*in\s+[A-Z][a-zA-Z\s,]+$/i, "")
+            .trim();
+
+          if (!bizName || bizName.length < 3 || bizName.length > 80) return;
+          if (isListTitle(bizName, category)) return;
+          bizName = cleanBusinessName(bizName);
+
+          const existing = results.find((r) => normalizeName(r.name) === normalizeName(bizName));
+          if (existing) return;
+
+          const phoneMatch = snippet.match(/(\(\d{3}\)\s*\d{3}[\s-]?\d{4}|\d{3}[\s.-]\d{3}[\s.-]\d{4})/);
+          const addrMatch = snippet.match(/(\d+\s+[A-Z][a-zA-Z\s]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Pl|Hwy)\b[^,]*)/i);
+
+          results.push({
+            name: bizName,
+            url: "",
+            hasWebsite: false,
+            source: "yellowpages",
+            phone: phoneMatch ? phoneMatch[1] : undefined,
+            address: addrMatch ? addrMatch[1] : undefined,
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Yellow Pages DDG fallback error:", err);
+    }
   }
 
   return results;

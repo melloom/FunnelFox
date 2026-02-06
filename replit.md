@@ -17,7 +17,7 @@ A lead generation web application designed for web developers to discover, track
 - **Frontend**: React + Vite + Tailwind CSS + Shadcn UI with wouter routing
 - **Backend**: Express.js with PostgreSQL (Drizzle ORM)
 - **Database**: PostgreSQL with leads table and CRM status enum (9 stages)
-- **Data Sources**: Bing search, DuckDuckGo search, OpenStreetMap Overpass API (free, no key), Google Places API (optional, needs GOOGLE_PLACES_API_KEY)
+- **Data Sources**: Bing search, DuckDuckGo search, OpenStreetMap Overpass API (free, no key), Google Maps (no key), Yellow Pages, Google Places API (optional, needs GOOGLE_PLACES_API_KEY)
 - **Web Scraping**: cheerio for HTML parsing, server-side fetch for search engines and website analysis
 - **Key Features**:
   - Dashboard with pipeline overview stats

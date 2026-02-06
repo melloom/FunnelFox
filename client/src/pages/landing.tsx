@@ -101,7 +101,7 @@ export default function LandingPage() {
             </div>
             <div className="w-px h-8 bg-border" />
             <div className="text-center">
-              <div className="text-xl sm:text-2xl font-bold text-foreground">4</div>
+              <div className="text-xl sm:text-2xl font-bold text-foreground">6</div>
               <div className="text-xs mt-0.5">Data Sources</div>
             </div>
           </div>
@@ -116,7 +116,7 @@ export default function LandingPage() {
             <FeatureCard
               icon={Search}
               title="Smart Discovery"
-              description="Search Bing, DuckDuckGo, OpenStreetMap, and Google Places to find businesses in any category and location."
+              description="Search Bing, DuckDuckGo, OpenStreetMap, Google Maps, Yellow Pages, and more to find businesses in any category and location."
             />
             <FeatureCard
               icon={Globe}
