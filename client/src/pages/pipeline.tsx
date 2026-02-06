@@ -344,23 +344,24 @@ function PipelineLeadDetailDialog({
           {lead.socialMedia && lead.socialMedia.length > 0 && (
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2">Social Media</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {parseSocialMedia(lead.socialMedia).map(({ platform, url }) => {
                   const Icon = SOCIAL_ICONS[platform];
                   if (!Icon) return null;
                   return (
-                    <a
-                      key={platform}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      data-testid={`link-social-detail-${platform}`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span className="capitalize">{platform}</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                    <div key={platform} className="flex items-center gap-2 min-w-0">
+                      <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary underline underline-offset-2 truncate flex-1"
+                        data-testid={`link-social-detail-${platform}`}
+                      >
+                        {url}
+                      </a>
+                      <CopyButton value={url} label={platform} />
+                    </div>
                   );
                 })}
               </div>
