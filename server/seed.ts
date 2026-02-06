@@ -1,0 +1,112 @@
+import { db } from "./db";
+import { leads } from "@shared/schema";
+import { sql } from "drizzle-orm";
+
+export async function seedDatabase() {
+  const existing = await db.select({ count: sql<number>`count(*)` }).from(leads);
+  if (Number(existing[0].count) > 0) return;
+
+  const seedLeads = [
+    {
+      companyName: "Rosario's Italian Kitchen",
+      websiteUrl: "www.rosariositalian.com",
+      contactName: "Maria Rosario",
+      contactEmail: "maria@rosariositalian.com",
+      contactPhone: "(555) 234-5678",
+      industry: "Restaurant",
+      location: "Austin, TX",
+      status: "new" as const,
+      websiteScore: 35,
+      websiteIssues: ["Not mobile-responsive", "No HTTPS", "Missing meta description", "No analytics found"],
+      notes: "Family restaurant with outdated website. Great candidate for a modern redesign.",
+      source: "manual",
+    },
+    {
+      companyName: "Summit Peak Fitness",
+      websiteUrl: "www.summitpeakfit.com",
+      contactName: "Jake Thompson",
+      contactEmail: "jake@summitpeakfit.com",
+      contactPhone: "(555) 345-6789",
+      industry: "Fitness",
+      location: "Denver, CO",
+      status: "contacted" as const,
+      websiteScore: 52,
+      websiteIssues: ["Not mobile-responsive", "No structured data", "Large page size"],
+      notes: "Owner seemed interested in a new website when we spoke briefly. Follow up next week.",
+      source: "manual",
+    },
+    {
+      companyName: "Greenfield Law Associates",
+      websiteUrl: "www.greenfieldlaw.net",
+      contactName: "Sarah Greenfield",
+      contactEmail: "sarah@greenfieldlaw.net",
+      contactPhone: "(555) 456-7890",
+      industry: "Legal",
+      location: "Chicago, IL",
+      status: "interested" as const,
+      websiteScore: 28,
+      websiteIssues: ["Not mobile-responsive", "No HTTPS", "Missing meta description", "No modern framework detected", "Images missing alt text"],
+      notes: "Very interested in a complete rebrand and website overhaul. Scheduled call for next Monday.",
+      source: "manual",
+    },
+    {
+      companyName: "Harbor View Realty",
+      websiteUrl: "www.harborviewrealty.com",
+      contactName: "Michael Chen",
+      contactEmail: "mchen@harborviewrealty.com",
+      contactPhone: "(555) 567-8901",
+      industry: "Real Estate",
+      location: "San Diego, CA",
+      status: "new" as const,
+      websiteScore: 45,
+      websiteIssues: ["No structured data", "No analytics found", "No custom typography"],
+      notes: "Growing real estate agency. Current site looks dated and doesn't showcase listings well.",
+      source: "manual",
+    },
+    {
+      companyName: "Bright Smile Dental",
+      websiteUrl: "www.brightsmile-dental.com",
+      contactName: "Dr. Lisa Park",
+      contactEmail: "info@brightsmile-dental.com",
+      contactPhone: "(555) 678-9012",
+      industry: "Healthcare",
+      location: "Portland, OR",
+      status: "converted" as const,
+      websiteScore: 22,
+      websiteIssues: ["Not mobile-responsive", "No HTTPS", "Missing meta description", "No modern framework detected", "No analytics found", "No structured data"],
+      notes: "Signed a contract for full website redesign with online booking integration. Project starts next month.",
+      source: "manual",
+    },
+    {
+      companyName: "Precision Auto Works",
+      websiteUrl: "www.precisionautoworks.com",
+      contactName: "Dave Martinez",
+      contactEmail: "dave@precisionautoworks.com",
+      contactPhone: "(555) 789-0123",
+      industry: "Automotive",
+      location: "Phoenix, AZ",
+      status: "not_interested" as const,
+      websiteScore: 58,
+      websiteIssues: ["No structured data", "No custom typography"],
+      notes: "Said they just had their site updated last year. Maybe revisit in 12 months.",
+      source: "manual",
+    },
+    {
+      companyName: "Luxe Beauty Lounge",
+      websiteUrl: "www.luxebeautylounge.com",
+      contactName: "Aisha Williams",
+      contactEmail: "aisha@luxebeautylounge.com",
+      contactPhone: "(555) 890-1234",
+      industry: "Beauty & Salon",
+      location: "Atlanta, GA",
+      status: "contacted" as const,
+      websiteScore: 40,
+      websiteIssues: ["Not mobile-responsive", "Missing meta description", "No analytics found", "Images missing alt text"],
+      notes: "Left a voicemail. Website has no online booking which is a big missed opportunity.",
+      source: "manual",
+    },
+  ];
+
+  await db.insert(leads).values(seedLeads);
+  console.log("Seeded database with sample leads");
+}
