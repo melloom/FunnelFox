@@ -192,8 +192,15 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-base">Recent Leads</CardTitle>
+            {recentLeads.length > 2 && (
+              <Link href="/leads">
+                <Button variant="ghost" size="sm" className="text-xs" data-testid="button-see-all-leads">
+                  See all
+                </Button>
+              </Link>
+            )}
           </CardHeader>
           <CardContent>
             {recentLeads.length === 0 ? (
@@ -206,7 +213,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-2">
-                {recentLeads.map((lead) => {
+                {recentLeads.map((lead, index) => {
                   const stage = PIPELINE_STAGES.find((s) => s.value === lead.status);
                   const textColor = stage ? (STAGE_TEXT_COLORS[stage.color] || "") : "";
                   const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
@@ -214,7 +221,7 @@ export default function Dashboard() {
                   return (
                     <Link href="/pipeline" key={lead.id}>
                       <div
-                        className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer"
+                        className={`flex items-center justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer ${index >= 2 ? "hidden sm:flex" : ""}`}
                         data-testid={`card-recent-lead-${lead.id}`}
                       >
                         <div className="min-w-0 flex-1">
