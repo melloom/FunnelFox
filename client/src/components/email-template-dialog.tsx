@@ -70,6 +70,18 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
       `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI came across ${lead.companyName}${lead.location ? ` in ${lead.location}` : ""} and noticed you don't currently have a website. In today's market, over 80% of customers search online before visiting a business.\n\nI help local businesses get online quickly and affordably. Here's what I can do for you:\n  - Professional website that looks great on phones and computers\n  - Show up in Google when people search for ${lead.industry || "businesses"} in your area\n  - Easy contact forms so customers can reach you 24/7\n  - Fast turnaround - you could be live in as little as 2 weeks\n\nI'd love to show you some examples of similar businesses I've helped. Can we chat for 10 minutes this week?\n\nLooking forward to hearing from you,\n[Your Name]\n[Your Phone]\n[Your Website]`,
   },
   {
+    id: "proposal",
+    name: "Proposal",
+    subject: (lead) => `Website Project Proposal for ${lead.companyName}`,
+    body: (lead) => {
+      const noSite = !lead.websiteUrl || lead.websiteUrl === "none";
+      const scope = noSite
+        ? "  - Custom website design and development\n  - Mobile-responsive layout\n  - SEO-optimized structure\n  - Contact forms and call-to-action elements\n  - Google Maps integration\n  - Social media integration"
+        : "  - Website redesign with modern, clean aesthetics\n  - Mobile responsiveness improvements\n  - Performance and speed optimization\n  - SEO enhancements\n  - Updated content and imagery\n  - Analytics and tracking setup";
+      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nThank you for your interest in improving ${lead.companyName}'s online presence. As discussed, I've put together a proposal for your review.\n\nProject Scope:\n${scope}\n\nTimeline: [X weeks]\nInvestment: $[Amount]\n\nWhat's Included:\n  - Initial discovery and strategy session\n  - Design mockups for your approval\n  - Development and testing\n  - Content migration and setup\n  - 30 days of post-launch support\n  - Training on how to update your site\n\nI'm confident this project will help ${lead.companyName} attract more customers and grow your business online. I'd be happy to walk through the details on a quick call.\n\nLooking forward to working together,\n[Your Name]\n[Your Phone]\n[Your Website]`;
+    },
+  },
+  {
     id: "social_media",
     name: "Social to Website",
     subject: (lead) => `Turn Your Social Following into a Website - ${lead.companyName}`,

@@ -41,6 +41,8 @@ import {
   Flame,
   Clock,
   History,
+  Copy,
+  Check,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -200,6 +202,26 @@ function ActivityTimeline({ leadId }: { leadId: number }) {
   );
 }
 
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      toast({ title: `${label} copied` });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Could not copy", variant: "destructive" });
+    }
+  };
+  return (
+    <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCopy(); }} data-testid={`button-copy-${label.toLowerCase().replace(/\s/g, "-")}`}>
+      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+    </Button>
+  );
+}
+
 function LeadDetailDialog({
   lead,
   open,
@@ -323,20 +345,22 @@ function LeadDetailDialog({
                 <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
                 <button
                   onClick={() => setEmailDialogOpen(true)}
-                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0"
+                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate"
                   data-testid="link-contact-email"
                 >
                   {lead.contactEmail}
                 </button>
+                <CopyButton value={lead.contactEmail} label="Email" />
               </div>
             )}
 
             {lead.contactPhone && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2" data-testid="link-contact-phone">
+                <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2 flex-1" data-testid="link-contact-phone">
                   {lead.contactPhone}
                 </a>
+                <CopyButton value={lead.contactPhone} label="Phone" />
               </div>
             )}
 
