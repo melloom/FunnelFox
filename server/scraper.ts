@@ -25,17 +25,26 @@ export async function searchBusinesses(
 ): Promise<ScrapedBusiness[]> {
   const businesses: ScrapedBusiness[] = [];
 
-  const queries = [
+  const bingQueries = [
     `${category} ${location}`,
-    `${category} shop ${location}`,
-    `${category} ${location} local business`,
+    `${category} near ${location}`,
+    `best ${category} ${location}`,
+    `${category} business ${location}`,
+  ];
+
+  const ddgQueries = [
+    `${category} ${location}`,
+    `${category} near ${location}`,
   ];
 
   const searches: Promise<ScrapedBusiness[]>[] = [];
-  for (const query of queries) {
+
+  for (const query of bingQueries) {
     searches.push(searchBing(query, maxResults, category));
   }
-  searches.push(searchDuckDuckGo(`${category} ${location}`, maxResults, category));
+  for (const query of ddgQueries) {
+    searches.push(searchDuckDuckGo(query, maxResults, category));
+  }
   searches.push(searchOpenStreetMap(category, location, maxResults));
 
   const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
@@ -50,19 +59,27 @@ export async function searchBusinesses(
     }
   }
 
-  const seen = new Set<string>();
-  const unique: ScrapedBusiness[] = [];
+  const seen = new Map<string, ScrapedBusiness>();
   for (const biz of businesses) {
-    const key = biz.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
-    if (!key || key.length < 3) continue;
+    const nameKey = biz.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+    if (!nameKey || nameKey.length < 3) continue;
     const domain = biz.url ? extractDomain(biz.url) : null;
-    const dedupeKey = domain || key;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    unique.push(biz);
+    const dedupeKey = domain || nameKey;
+
+    const existing = seen.get(dedupeKey);
+    if (existing) {
+      if (!existing.phone && biz.phone) existing.phone = biz.phone;
+      if (!existing.address && biz.address) existing.address = biz.address;
+      if (!existing.url && biz.url) {
+        existing.url = biz.url;
+        existing.hasWebsite = true;
+      }
+      continue;
+    }
+    seen.set(dedupeKey, biz);
   }
 
-  return unique.slice(0, maxResults);
+  return Array.from(seen.values()).slice(0, maxResults);
 }
 
 function processSearchResult(
@@ -120,7 +137,7 @@ async function searchDuckDuckGo(
     const $ = cheerio.load(html);
 
     $(".result").each((_i, el) => {
-      if (results.length >= maxResults) return false;
+      if (results.length >= maxResults * 2) return false;
 
       const linkEl = $(el).find(".result__a");
       const href = linkEl.attr("href") || "";
@@ -157,7 +174,7 @@ async function searchBing(
 
   try {
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://www.bing.com/search?q=${encodedQuery}&count=${maxResults}`;
+    const url = `https://www.bing.com/search?q=${encodedQuery}&count=${Math.max(maxResults, 20)}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
@@ -180,7 +197,7 @@ async function searchBing(
     const $ = cheerio.load(html);
 
     $("li.b_algo").each((_i, el) => {
-      if (results.length >= maxResults) return false;
+      if (results.length >= maxResults * 2) return false;
 
       const title = $(el).find("h2 a").text().trim();
       const snippet = $(el).find(".b_caption p, .b_lineclamp2").text().trim();
@@ -192,6 +209,29 @@ async function searchBing(
         const biz = processSearchResult(title, actualUrl, snippet, category);
         if (biz) results.push(biz);
       }
+    });
+
+    $(".b_localList .b_scard, .b_ans .b_entityTP, [data-tag='BizRslt.Item']").each((_i, el) => {
+      const name = $(el).find(".b_factrow a, .lc_content h2, .b_entityTitle").first().text().trim()
+        || $(el).find("h2, h3, .title").first().text().trim();
+      if (!name || name.length < 3) return;
+
+      const addr = $(el).find(".b_address, .b_factrow:has(.b_vList)").first().text().trim()
+        || $(el).find("[aria-label*='Address'], .lc_content .b_factrow").first().text().trim();
+      const phone = $(el).find("a[href^='tel:']").first().text().trim();
+      const link = $(el).find("a[href^='http']").first().attr("href") || "";
+      const linkDomain = link ? extractDomain(link) : null;
+      const isAgg = linkDomain && (isExcludedDomain(linkDomain) || isAggregatorSite(linkDomain));
+
+      results.push({
+        name: cleanBusinessName(name),
+        url: isAgg ? "" : (link ? normalizeUrl(link) : ""),
+        description: addr || undefined,
+        hasWebsite: !!link && !isAgg,
+        source: "bing-local",
+        phone: phone || undefined,
+        address: addr || undefined,
+      });
     });
 
   } catch (err) {
@@ -319,7 +359,7 @@ async function searchOpenStreetMap(
         }
       }
     }
-    const radius = 15000;
+    const radius = 25000;
     let tagFilters: string;
 
     if (!osmTags) {
@@ -334,7 +374,7 @@ async function searchOpenStreetMap(
       }).filter(Boolean).join("\n");
     }
 
-    const query = `[out:json][timeout:15];(\n${tagFilters}\n);out body ${maxResults * 2};`;
+    const query = `[out:json][timeout:25];(\n${tagFilters}\n);out body ${maxResults * 3};`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
@@ -531,6 +571,10 @@ function isExcludedDomain(domain: string): boolean {
     "google.com", "bing.com", "duckduckgo.com",
     "amazon.com", "ebay.com", "craigslist.org", "indeed.com",
     "glassdoor.com", "apple.com", "microsoft.com",
+    "stackexchange.com", "stackoverflow.com", "quora.com",
+    "medium.com", "wordpress.com", "blogspot.com",
+    "stitcher.com", "spotify.com", "soundcloud.com",
+    "github.com", "gitlab.com", "bitbucket.org",
   ];
   if (domain.endsWith(".gov")) return true;
   return excluded.some((ex) => domain.includes(ex));

@@ -104,7 +104,7 @@ export default function DiscoverPage() {
   const [category, setCategory] = useState("");
   const [customCategory, setCustomCategory] = useState("");
   const [location, setLocationValue] = useState("");
-  const [maxResults, setMaxResults] = useState("15");
+  const [maxResults, setMaxResults] = useState("20");
   const [results, setResults] = useState<DiscoverResult | null>(null);
 
   const discoverMutation = useMutation({
@@ -208,11 +208,10 @@ export default function DiscoverPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
                     <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="15">15</SelectItem>
                     <SelectItem value="20">20</SelectItem>
                     <SelectItem value="30">30</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
