@@ -103,6 +103,7 @@ export async function registerRoutes(
       const existingLeads = await storage.getLeads();
       const existingDomains = new Set<string>();
       const existingNames = new Set<string>();
+      const existingPhones = new Set<string>();
       for (const l of existingLeads) {
         if (l.websiteUrl && l.websiteUrl !== "none") {
           try {
@@ -111,24 +112,57 @@ export async function registerRoutes(
             existingDomains.add(new URL(u).hostname.replace(/^www\./, ""));
           } catch {}
         }
-        existingNames.add(l.companyName.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30));
+        const normalized = l.companyName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, "")
+          .replace(/\b(the|and|of|in|at|by|for|llc|inc|corp|co|ltd)\b/g, "")
+          .replace(/\s+/g, "")
+          .slice(0, 40);
+        existingNames.add(normalized);
+        if (l.contactPhone) {
+          existingPhones.add(l.contactPhone.replace(/[^0-9]/g, "").slice(-10));
+        }
+      }
+
+      function isDuplicate(name: string, url: string | undefined, phone: string | undefined): boolean {
+        const nameKey = name
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, "")
+          .replace(/\b(the|and|of|in|at|by|for|llc|inc|corp|co|ltd)\b/g, "")
+          .replace(/\s+/g, "")
+          .slice(0, 40);
+
+        if (existingNames.has(nameKey)) return true;
+
+        for (const existing of existingNames) {
+          if (nameKey.length >= 5 && existing.length >= 5) {
+            if (existing.includes(nameKey) || nameKey.includes(existing)) {
+              const shorter = Math.min(nameKey.length, existing.length);
+              const longer = Math.max(nameKey.length, existing.length);
+              if (shorter / longer >= 0.75) return true;
+            }
+          }
+        }
+
+        if (url) {
+          try {
+            let u = url;
+            if (!u.startsWith("http")) u = `https://${u}`;
+            const domain = new URL(u).hostname.replace(/^www\./, "");
+            if (existingDomains.has(domain)) return true;
+          } catch {}
+        }
+
+        if (phone) {
+          const phoneKey = phone.replace(/[^0-9]/g, "").slice(-10);
+          if (phoneKey.length >= 7 && existingPhones.has(phoneKey)) return true;
+        }
+
+        return false;
       }
 
       const newBusinesses = businesses.filter((biz) => {
-        const nameKey = biz.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
-        if (existingNames.has(nameKey)) return false;
-
-        if (biz.hasWebsite && biz.url) {
-          try {
-            let u = biz.url;
-            if (!u.startsWith("http")) u = `https://${u}`;
-            const domain = new URL(u).hostname.replace(/^www\./, "");
-            return !existingDomains.has(domain);
-          } catch {
-            return true;
-          }
-        }
-        return true;
+        return !isDuplicate(biz.name, biz.url, biz.phone);
       });
 
       const results = [];
@@ -188,6 +222,19 @@ export async function registerRoutes(
             const allSocials = [...(biz.socialMedia || []), ...(analysis.socialMedia || [])];
             const uniqueSocials = allSocials.length ? [...new Map(allSocials.map(s => [s.split(":")[0], s])).values()] : null;
 
+            const contactEmail = analysis.contactInfo?.emails?.[0] || null;
+            const contactPhone = biz.phone || analysis.contactInfo?.phones?.[0] || null;
+
+            if (analysis.contactInfo?.emails && analysis.contactInfo.emails.length > 1) {
+              notesParts.push(`Other emails: ${analysis.contactInfo.emails.slice(1).join(", ")}`);
+            }
+            if (analysis.contactInfo?.phones && analysis.contactInfo.phones.length > 1) {
+              notesParts.push(`Other phones: ${analysis.contactInfo.phones.slice(1).join(", ")}`);
+            }
+            if (analysis.contactInfo?.contactPageUrl) {
+              notesParts.push(`Contact page: ${analysis.contactInfo.contactPageUrl}`);
+            }
+
             return storage.createLead({
               companyName: biz.name,
               websiteUrl: biz.url,
@@ -199,8 +246,8 @@ export async function registerRoutes(
               notes: notesParts.join(" | ") || null,
               source: "auto-discover",
               contactName: null,
-              contactEmail: null,
-              contactPhone: biz.phone || null,
+              contactEmail,
+              contactPhone,
               socialMedia: uniqueSocials,
             });
           })

@@ -102,37 +102,118 @@ export async function searchBusinesses(
     }
   }
 
-  const seen = new Map<string, ScrapedBusiness>();
+  const byDomain = new Map<string, ScrapedBusiness>();
+  const byName = new Map<string, ScrapedBusiness>();
+  const byPhone = new Map<string, ScrapedBusiness>();
+  const dedupedList: ScrapedBusiness[] = [];
+
   for (const biz of businesses) {
-    const nameKey = biz.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+    const nameKey = normalizeName(biz.name);
     if (!nameKey || nameKey.length < 3) continue;
     const domain = biz.url ? extractDomain(biz.url) : null;
-    const dedupeKey = domain || nameKey;
+    const phoneKey = biz.phone ? normalizePhone(biz.phone) : null;
 
-    const existing = seen.get(dedupeKey);
+    let existing: ScrapedBusiness | undefined;
+    if (domain) existing = byDomain.get(domain);
+    if (!existing && phoneKey) existing = byPhone.get(phoneKey);
+    if (!existing) existing = byName.get(nameKey);
+    if (!existing) {
+      const fuzzyMatch = findFuzzyNameMatch(nameKey, byName);
+      if (fuzzyMatch) existing = fuzzyMatch;
+    }
+
     if (existing) {
-      if (!existing.phone && biz.phone) existing.phone = biz.phone;
-      if (!existing.address && biz.address) existing.address = biz.address;
-      if (!existing.url && biz.url) {
-        existing.url = biz.url;
-        existing.hasWebsite = true;
-      }
-      if (biz.socialMedia?.length) {
-        if (!existing.socialMedia) existing.socialMedia = [];
-        const platforms = new Set(existing.socialMedia.map(s => s.split(":")[0]));
-        for (const s of biz.socialMedia) {
-          if (!platforms.has(s.split(":")[0])) {
-            existing.socialMedia.push(s);
-            platforms.add(s.split(":")[0]);
-          }
-        }
-      }
+      mergeBusinessData(existing, biz);
       continue;
     }
-    seen.set(dedupeKey, biz);
+
+    dedupedList.push(biz);
+    byName.set(nameKey, biz);
+    if (domain) byDomain.set(domain, biz);
+    if (phoneKey) byPhone.set(phoneKey, biz);
   }
 
-  return Array.from(seen.values()).slice(0, maxResults);
+  return dedupedList.slice(0, maxResults);
+}
+
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\b(the|and|of|in|at|by|for|llc|inc|corp|co|ltd)\b/g, "")
+    .replace(/\s+/g, "")
+    .slice(0, 40);
+}
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^0-9]/g, "").slice(-10);
+}
+
+function findFuzzyNameMatch(nameKey: string, byName: Map<string, ScrapedBusiness>): ScrapedBusiness | undefined {
+  if (nameKey.length < 5) return undefined;
+  for (const [existingKey, biz] of byName) {
+    if (existingKey.length < 5) continue;
+    if (existingKey.includes(nameKey) || nameKey.includes(existingKey)) {
+      const shorter = Math.min(nameKey.length, existingKey.length);
+      const longer = Math.max(nameKey.length, existingKey.length);
+      if (shorter / longer >= 0.75) {
+        return biz;
+      }
+    }
+    const similarity = calculateSimilarity(nameKey, existingKey);
+    if (similarity > 0.85) {
+      return biz;
+    }
+  }
+  return undefined;
+}
+
+function calculateSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  if (longer.length === 0) return 1;
+
+  const costs: number[] = [];
+  for (let i = 0; i <= longer.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= shorter.length; j++) {
+      if (i === 0) {
+        costs[j] = j;
+      } else if (j > 0) {
+        let newValue = costs[j - 1];
+        if (longer[i - 1] !== shorter[j - 1]) {
+          newValue = Math.min(newValue, lastValue, costs[j]) + 1;
+        }
+        costs[j - 1] = lastValue;
+        lastValue = newValue;
+      }
+    }
+    if (i > 0) costs[shorter.length] = lastValue;
+  }
+  return (longer.length - costs[shorter.length]) / longer.length;
+}
+
+function mergeBusinessData(existing: ScrapedBusiness, incoming: ScrapedBusiness): void {
+  if (!existing.phone && incoming.phone) existing.phone = incoming.phone;
+  if (!existing.address && incoming.address) existing.address = incoming.address;
+  if ((!existing.description || existing.description.length < 20) && incoming.description && incoming.description.length > (existing.description?.length || 0)) {
+    existing.description = incoming.description;
+  }
+  if (!existing.url && incoming.url) {
+    existing.url = incoming.url;
+    existing.hasWebsite = true;
+  }
+  if (incoming.socialMedia?.length) {
+    if (!existing.socialMedia) existing.socialMedia = [];
+    const platforms = new Set(existing.socialMedia.map(s => s.split(":")[0]));
+    for (const s of incoming.socialMedia) {
+      if (!platforms.has(s.split(":")[0])) {
+        existing.socialMedia.push(s);
+        platforms.add(s.split(":")[0]);
+      }
+    }
+  }
 }
 
 async function searchSocialMediaOnly(
@@ -734,7 +815,157 @@ function isExcludedDomain(domain: string): boolean {
   return excluded.some((ex) => domain.includes(ex));
 }
 
-export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis & { socialMedia?: string[] }> {
+interface ExtractedContact {
+  emails: string[];
+  phones: string[];
+  contactPageUrl?: string;
+  hasContactForm?: boolean;
+}
+
+function extractContactInfo(html: string, $: cheerio.CheerioAPI, baseUrl: string): ExtractedContact {
+  const emails = new Set<string>();
+  const phones = new Set<string>();
+  let contactPageUrl: string | undefined;
+
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+  const emailMatches = html.match(emailRegex) || [];
+  for (const email of emailMatches) {
+    const lower = email.toLowerCase();
+    if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".gif") || lower.endsWith(".svg")) continue;
+    if (lower.includes("example.com") || lower.includes("yoursite") || lower.includes("domain.com")) continue;
+    if (lower.includes("wixpress") || lower.includes("sentry") || lower.includes("webpack")) continue;
+    if (lower.startsWith("noreply@") || lower.startsWith("no-reply@")) continue;
+    emails.add(lower);
+  }
+
+  $('a[href^="mailto:"]').each((_i, el) => {
+    const href = $(el).attr("href") || "";
+    const email = href.replace("mailto:", "").split("?")[0].trim().toLowerCase();
+    if (email && email.includes("@") && !email.includes("example.com")) {
+      emails.add(email);
+    }
+  });
+
+  const phoneRegex = /(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
+  const textContent = $("body").text();
+  const phoneMatches = textContent.match(phoneRegex) || [];
+  for (const phone of phoneMatches) {
+    const digits = phone.replace(/[^0-9]/g, "");
+    if (digits.length >= 10 && digits.length <= 11) {
+      phones.add(phone.trim());
+    }
+  }
+
+  $('a[href^="tel:"]').each((_i, el) => {
+    const href = $(el).attr("href") || "";
+    const phone = href.replace("tel:", "").trim();
+    if (phone) {
+      const digits = phone.replace(/[^0-9]/g, "");
+      if (digits.length >= 10) {
+        phones.add(phone);
+      }
+    }
+  });
+
+  $('a[href]').each((_i, el) => {
+    const href = $(el).attr("href") || "";
+    const text = $(el).text().toLowerCase().trim();
+    if (
+      text.includes("contact") ||
+      href.toLowerCase().includes("/contact") ||
+      href.toLowerCase().includes("/get-in-touch") ||
+      href.toLowerCase().includes("/reach-us")
+    ) {
+      try {
+        const resolved = new URL(href, baseUrl).href;
+        if (!contactPageUrl) contactPageUrl = resolved;
+      } catch {}
+    }
+  });
+
+  let hasContactForm = false;
+  $("form").each((_i, el) => {
+    const formHtml = $(el).html()?.toLowerCase() || "";
+    const formAction = ($(el).attr("action") || "").toLowerCase();
+    if (
+      formHtml.includes("email") ||
+      formHtml.includes("message") ||
+      formHtml.includes("name") ||
+      formAction.includes("contact") ||
+      formAction.includes("inquiry") ||
+      formAction.includes("message")
+    ) {
+      hasContactForm = true;
+      return false;
+    }
+  });
+
+  return {
+    emails: [...emails].slice(0, 5),
+    phones: [...phones].slice(0, 3),
+    contactPageUrl,
+    hasContactForm: hasContactForm || undefined,
+  };
+}
+
+async function scrapeContactPage(url: string): Promise<{ emails: string[]; phones: string[] }> {
+  const emails = new Set<string>();
+  const phones = new Set<string>();
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": SAFARI_UA, Accept: "text/html" },
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return { emails: [], phones: [] };
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+    const emailMatches = html.match(emailRegex) || [];
+    for (const email of emailMatches) {
+      const lower = email.toLowerCase();
+      if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".gif")) continue;
+      if (lower.includes("example.com") || lower.includes("wixpress") || lower.includes("sentry")) continue;
+      if (lower.startsWith("noreply@") || lower.startsWith("no-reply@")) continue;
+      emails.add(lower);
+    }
+
+    $('a[href^="mailto:"]').each((_i, el) => {
+      const href = $(el).attr("href") || "";
+      const email = href.replace("mailto:", "").split("?")[0].trim().toLowerCase();
+      if (email && email.includes("@") && !email.includes("example.com")) {
+        emails.add(email);
+      }
+    });
+
+    const textContent = $("body").text();
+    const phoneRegex = /(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
+    const phoneMatches = textContent.match(phoneRegex) || [];
+    for (const phone of phoneMatches) {
+      const digits = phone.replace(/[^0-9]/g, "");
+      if (digits.length >= 10 && digits.length <= 11) phones.add(phone.trim());
+    }
+
+    $('a[href^="tel:"]').each((_i, el) => {
+      const href = $(el).attr("href") || "";
+      const phone = href.replace("tel:", "").trim();
+      if (phone) {
+        const digits = phone.replace(/[^0-9]/g, "");
+        if (digits.length >= 10) phones.add(phone);
+      }
+    });
+  } catch {}
+
+  return { emails: [...emails].slice(0, 5), phones: [...phones].slice(0, 3) };
+}
+
+export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis & { socialMedia?: string[]; contactInfo?: ExtractedContact }> {
   const issues: string[] = [];
   let score = 100;
 
@@ -917,7 +1148,32 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
     }
 
     const socialMedia = extractSocialLinksFromHtml(html, $);
-    return { score: Math.max(0, Math.min(100, score)), issues, hasWebsite: true, socialMedia: socialMedia.length ? socialMedia : undefined };
+
+    const contactInfo = extractContactInfo(html, $, fullUrl);
+
+    if (contactInfo.contactPageUrl && (contactInfo.emails.length === 0 || contactInfo.phones.length === 0)) {
+      try {
+        const contactPage = await scrapeContactPage(contactInfo.contactPageUrl);
+        for (const email of contactPage.emails) {
+          if (!contactInfo.emails.includes(email)) contactInfo.emails.push(email);
+        }
+        for (const phone of contactPage.phones) {
+          const digits = phone.replace(/[^0-9]/g, "");
+          const existingDigits = contactInfo.phones.map(p => p.replace(/[^0-9]/g, ""));
+          if (!existingDigits.includes(digits)) contactInfo.phones.push(phone);
+        }
+      } catch {}
+    }
+
+    const hasContact = contactInfo.emails.length > 0 || contactInfo.phones.length > 0;
+
+    return {
+      score: Math.max(0, Math.min(100, score)),
+      issues,
+      hasWebsite: true,
+      socialMedia: socialMedia.length ? socialMedia : undefined,
+      contactInfo: hasContact ? contactInfo : undefined,
+    };
 
   } catch (err: any) {
     if (err.name === "AbortError") {
