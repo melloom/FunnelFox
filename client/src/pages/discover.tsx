@@ -23,6 +23,7 @@ import {
   ArrowRight,
   Phone,
   MapPinned,
+  LocateFixed,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -106,6 +107,44 @@ export default function DiscoverPage() {
   const [location, setLocationValue] = useState("");
   const [maxResults, setMaxResults] = useState("20");
   const [results, setResults] = useState<DiscoverResult | null>(null);
+  const [geolocating, setGeolocating] = useState(false);
+
+  const handleGeolocate = () => {
+    if (!navigator.geolocation) {
+      toast({ title: "Geolocation not supported", description: "Your browser doesn't support location detection", variant: "destructive" });
+      return;
+    }
+    setGeolocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&zoom=10`,
+            { headers: { "User-Agent": "LeadHunter/1.0" } }
+          );
+          const data = await res.json();
+          const addr = data.address || {};
+          const city = addr.city || addr.town || addr.village || addr.county || "";
+          const state = addr.state || "";
+          const locationStr = [city, state].filter(Boolean).join(", ");
+          if (locationStr) {
+            setLocationValue(locationStr);
+            toast({ title: "Location found", description: locationStr });
+          } else {
+            toast({ title: "Couldn't determine city", description: "Try entering your location manually", variant: "destructive" });
+          }
+        } catch {
+          toast({ title: "Location lookup failed", description: "Try entering your location manually", variant: "destructive" });
+        }
+        setGeolocating(false);
+      },
+      () => {
+        toast({ title: "Location access denied", description: "Allow location access or enter it manually", variant: "destructive" });
+        setGeolocating(false);
+      },
+      { timeout: 10000 }
+    );
+  };
 
   const discoverMutation = useMutation({
     mutationFn: async () => {
@@ -186,15 +225,31 @@ export default function DiscoverPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Location</label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="e.g. Austin, TX or Miami, FL"
-                    value={location}
-                    onChange={(e) => setLocationValue(e.target.value)}
-                    className="pl-9"
-                    data-testid="input-discover-location"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="e.g. Austin, TX or Miami, FL"
+                      value={location}
+                      onChange={(e) => setLocationValue(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-discover-location"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleGeolocate}
+                    disabled={geolocating}
+                    data-testid="button-geolocate"
+                  >
+                    {geolocating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <LocateFixed className="w-4 h-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
