@@ -401,6 +401,17 @@ async function searchOpenStreetMap(
       const name = tags.name;
       if (!name || name.length < 3) continue;
 
+      if (osmTags) {
+        const hasMatchingTag = osmTags.some((tag) => {
+          const eqIdx = tag.indexOf("=");
+          if (eqIdx < 0) return false;
+          const k = tag.slice(0, eqIdx);
+          const v = tag.slice(eqIdx + 1);
+          return tags[k] === v;
+        });
+        if (!hasMatchingTag) continue;
+      }
+
       const website = tags.website || tags["contact:website"] || "";
       const phone = tags.phone || tags["contact:phone"] || "";
       const street = tags["addr:street"] || "";

@@ -93,7 +93,7 @@ export async function registerRoutes(
       const businesses = await searchBusinesses(
         category,
         location,
-        Math.min(maxResults || 15, 30)
+        Math.min(maxResults || 20, 50)
       );
 
       const existingLeads = await storage.getLeads();
