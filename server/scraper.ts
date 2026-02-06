@@ -151,6 +151,8 @@ export async function searchBusinesses(
   searchFns.push(() => searchSocialMediaOnly(category, location, maxResults));
   searchFns.push(() => searchGoogleMaps(category, location, maxResults));
   searchFns.push(() => searchYellowPages(category, location, maxResults));
+  searchFns.push(() => searchYelp(category, location, maxResults));
+  searchFns.push(() => searchFacebookPages(category, location, maxResults));
 
   const apiFns: (() => Promise<ScrapedBusiness[]>)[] = [];
   apiFns.push(() => searchOpenStreetMap(category, location, maxResults));
@@ -1084,6 +1086,306 @@ async function searchYellowPages(
   return results;
 }
 
+async function searchYelp(
+  category: string,
+  location: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const encodedLoc = encodeURIComponent(location);
+    const yelpUrl = `https://www.yelp.com/search?find_desc=${encodeURIComponent(category)}&find_loc=${encodedLoc}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
+    const response = await fetch(yelpUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getRandomUA(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) throw new Error(`Yelp returned ${response.status}`);
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    $('[data-testid="serp-ia-card"], .container__09f24__FeTO6, .arrange-unit__09f24__rqHTg').each((_i, el) => {
+      if (results.length >= maxResults) return false;
+
+      const nameEl = $(el).find('a[href*="/biz/"], h3 a, .css-19v1rkv').first();
+      const name = nameEl.text().trim().replace(/^\d+\.\s*/, "");
+      if (!name || name.length < 3) return;
+
+      const phone = $(el).find('a[href^="tel:"]').first().text().trim() ||
+        $(el).find('.css-chan6m, [class*="phone"]').first().text().trim();
+      const addr = $(el).find('.css-qyp8bo, [class*="address"], .raw__09f24__T4Ezm').first().text().trim();
+      const ratingText = $(el).find('[aria-label*="star"], .css-gutk1c').first().attr("aria-label") || "";
+      const reviewCount = $(el).find('.css-chan6m').last().text().trim();
+
+      let websiteUrl = "";
+      $(el).find('a[href]').each((_j, linkEl) => {
+        const href = $(linkEl).attr("href") || "";
+        if (href.includes("biz_redir") && href.includes("website")) {
+          try {
+            const urlParam = new URL(href, "https://www.yelp.com").searchParams.get("url");
+            if (urlParam) websiteUrl = urlParam;
+          } catch {}
+        }
+      });
+
+      const description = [
+        ratingText ? ratingText.replace(/\s+/g, " ").trim() : "",
+        reviewCount && reviewCount.includes("review") ? reviewCount : "",
+        addr || "",
+      ].filter(Boolean).join(" - ");
+
+      results.push({
+        name: cleanBusinessName(name),
+        url: websiteUrl || "",
+        hasWebsite: !!websiteUrl,
+        source: "yelp",
+        phone: phone || undefined,
+        address: addr || undefined,
+        description: description || undefined,
+      });
+    });
+
+    if (results.length === 0) {
+      const scriptTags = $('script[type="application/json"]');
+      scriptTags.each((_i, el) => {
+        if (results.length >= maxResults) return false;
+        try {
+          const jsonText = $(el).html() || "";
+          if (!jsonText.includes("searchPageProps") && !jsonText.includes("bizName")) return;
+          const data = JSON.parse(jsonText);
+          const businesses = extractYelpJsonBusinesses(data);
+          for (const biz of businesses) {
+            if (results.length >= maxResults) break;
+            results.push(biz);
+          }
+        } catch {}
+      });
+    }
+  } catch (err) {
+    console.error("Yelp direct search error:", err);
+  }
+
+  if (results.length < maxResults / 2) {
+    try {
+      await delay(600);
+      const ddgQuery = encodeURIComponent(`${category} ${location} site:yelp.com`);
+      const ddgUrl = `https://html.duckduckgo.com/html/?q=${ddgQuery}`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(ddgUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": getRandomUA(),
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        $(".result").each((_i, el) => {
+          if (results.length >= maxResults) return false;
+
+          const title = $(".result__a", el).text().trim();
+          const snippet = $(".result__snippet", el).text().trim();
+
+          let bizName = title
+            .replace(/\s*[-–—|]\s*(Yelp|yelp\.com).*$/i, "")
+            .replace(/\s*-\s*Updated\s+\d{4}.*$/i, "")
+            .replace(/\s*in\s+[A-Z][a-zA-Z\s,]+$/i, "")
+            .trim();
+
+          if (!bizName || bizName.length < 3 || bizName.length > 80) return;
+          if (isListTitle(bizName, category)) return;
+          bizName = cleanBusinessName(bizName);
+
+          const existing = results.find((r) => normalizeName(r.name) === normalizeName(bizName));
+          if (existing) return;
+
+          const phoneMatch = snippet.match(/(\(\d{3}\)\s*\d{3}[\s-]?\d{4}|\d{3}[\s.-]\d{3}[\s.-]\d{4})/);
+          const addrMatch = snippet.match(/(\d+\s+[A-Z][a-zA-Z\s]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Pl|Hwy)\b[^,]*)/i);
+
+          results.push({
+            name: bizName,
+            url: "",
+            hasWebsite: false,
+            source: "yelp",
+            phone: phoneMatch ? phoneMatch[1] : undefined,
+            address: addrMatch ? addrMatch[1] : undefined,
+            description: snippet.slice(0, 200) || undefined,
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Yelp DDG fallback error:", err);
+    }
+  }
+
+  return results;
+}
+
+function extractYelpJsonBusinesses(data: any): ScrapedBusiness[] {
+  const results: ScrapedBusiness[] = [];
+  const seenNames = new Set<string>();
+  try {
+    const search = (obj: any, depth: number): void => {
+      if (!obj || typeof obj !== "object" || depth > 8) return;
+      if (obj.bizName || (obj.name && (obj.phone || obj.displayPhone || obj.addressLines || obj.rating || obj.reviewCount))) {
+        const name = obj.bizName || obj.name;
+        if (typeof name === "string" && name.length >= 3 && name.length <= 80) {
+          const normalized = normalizeName(name);
+          if (seenNames.has(normalized)) return;
+          const hasContactInfo = obj.phone || obj.displayPhone || obj.addressLines || obj.address;
+          if (!hasContactInfo && !obj.rating && !obj.reviewCount) return;
+          seenNames.add(normalized);
+          results.push({
+            name: cleanBusinessName(name),
+            url: obj.website || "",
+            hasWebsite: !!obj.website,
+            source: "yelp",
+            phone: obj.phone || obj.displayPhone || undefined,
+            address: obj.addressLines?.join(", ") || obj.address || undefined,
+            description: obj.categories?.map((c: any) => c.title || c).join(", ") || undefined,
+          });
+        }
+      }
+      if (Array.isArray(obj)) {
+        for (const item of obj) search(item, depth + 1);
+      } else {
+        for (const val of Object.values(obj)) search(val, depth + 1);
+      }
+    };
+    search(data, 0);
+  } catch {}
+  return results;
+}
+
+async function searchFacebookPages(
+  category: string,
+  location: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const queries = [
+      `${category} ${location} site:facebook.com -"log in" -"sign up"`,
+      `${category} ${location} site:instagram.com`,
+    ];
+
+    for (let qi = 0; qi < queries.length; qi++) {
+      if (qi > 0) await delay(600);
+
+      const encodedQuery = encodeURIComponent(queries[qi]);
+      const url = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": getRandomUA(),
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (response.status !== 200 && response.status !== 202) continue;
+
+      const html = await response.text();
+      const $ = cheerio.load(html);
+
+      $(".result").each((_i, el) => {
+        if (results.length >= maxResults) return false;
+
+        const linkEl = $(el).find(".result__a");
+        let href = linkEl.attr("href") || "";
+        const title = linkEl.text().trim();
+        const snippet = $(el).find(".result__snippet").text().trim();
+
+        if (href.includes("uddg=")) {
+          try {
+            const urlParam = new URL(href, "https://duckduckgo.com").searchParams.get("uddg");
+            if (urlParam) href = urlParam;
+          } catch {}
+        }
+
+        const isFacebook = href.includes("facebook.com");
+        const isInstagram = href.includes("instagram.com");
+        if (!isFacebook && !isInstagram) return;
+
+        if (href.includes("/login") || href.includes("/signup") || href.includes("/help") ||
+            href.includes("/watch") || href.includes("/groups") || href.includes("/events") ||
+            href.includes("/marketplace") || href.includes("/pages/category") ||
+            href.includes("/reel/") || href.includes("/stories/")) return;
+
+        let bizName = title
+          .replace(/\s*[-|–—]\s*(Facebook|Instagram|Meta|Home|About|Photos|Videos|Posts|Reels).*$/i, "")
+          .replace(/\s*\|\s*(Facebook|Instagram).*$/i, "")
+          .replace(/\s*on\s+(Facebook|Instagram)$/i, "")
+          .replace(/^(Facebook|Instagram)\s*[-–—|]\s*/i, "")
+          .replace(/@\w+\s*[-·]\s*/i, "")
+          .trim();
+
+        if (!bizName || bizName.length < 3 || bizName.length > 80) return;
+        if (isListTitle(bizName, category)) return;
+        if (/^(log\s*in|sign\s*up|facebook|instagram|meta)\s*$/i.test(bizName)) return;
+
+        const social = detectSocialMediaUrl(href);
+        if (!social) return;
+
+        const existing = results.find(r =>
+          normalizeName(r.name) === normalizeName(bizName)
+        );
+        if (existing) {
+          if (!existing.socialMedia) existing.socialMedia = [];
+          const platforms = new Set(existing.socialMedia.map(s => s.split(":")[0]));
+          if (!platforms.has(social.split(":")[0])) {
+            existing.socialMedia.push(social);
+          }
+          return;
+        }
+
+        const phoneMatch = snippet.match(/(\(\d{3}\)\s*\d{3}[\s-]?\d{4}|\d{3}[\s.-]\d{3}[\s.-]\d{4})/);
+        const addrMatch = snippet.match(/(\d+\s+[A-Z][a-zA-Z\s]+(?:St|Ave|Blvd|Dr|Rd|Ln|Way|Ct|Pl|Hwy)\b[^,]*)/i);
+
+        results.push({
+          name: cleanBusinessName(bizName),
+          url: "",
+          description: snippet.slice(0, 200) || undefined,
+          hasWebsite: false,
+          source: isFacebook ? "facebook" : "instagram",
+          socialMedia: [social],
+          phone: phoneMatch ? phoneMatch[1] : undefined,
+          address: addrMatch ? addrMatch[1] : undefined,
+        });
+      });
+    }
+  } catch (err) {
+    console.error("Facebook/Instagram search error:", err);
+  }
+
+  return results;
+}
+
 function isListTitle(title: string, category: string): boolean {
   const lower = title.toLowerCase();
 
@@ -1165,7 +1467,11 @@ interface ExtractedContact {
   hasContactForm?: boolean;
 }
 
-function extractContactInfo(html: string, $: cheerio.CheerioAPI, baseUrl: string): ExtractedContact {
+interface InternalContactResult extends ExtractedContact {
+  discoveredPages: string[];
+}
+
+function extractContactInfo(html: string, $: cheerio.CheerioAPI, baseUrl: string): InternalContactResult {
   const emails = new Set<string>();
   const phones = new Set<string>();
   let contactPageUrl: string | undefined;
@@ -1210,18 +1516,41 @@ function extractContactInfo(html: string, $: cheerio.CheerioAPI, baseUrl: string
     }
   });
 
+  const contactPages: string[] = [];
   $('a[href]').each((_i, el) => {
     const href = $(el).attr("href") || "";
     const text = $(el).text().toLowerCase().trim();
-    if (
+    const hrefLower = href.toLowerCase();
+    const isContactLink =
       text.includes("contact") ||
-      href.toLowerCase().includes("/contact") ||
-      href.toLowerCase().includes("/get-in-touch") ||
-      href.toLowerCase().includes("/reach-us")
-    ) {
+      text.includes("about") ||
+      text.includes("team") ||
+      text.includes("staff") ||
+      text.includes("our people") ||
+      text.includes("meet us") ||
+      text.includes("get in touch") ||
+      hrefLower.includes("/contact") ||
+      hrefLower.includes("/about") ||
+      hrefLower.includes("/team") ||
+      hrefLower.includes("/staff") ||
+      hrefLower.includes("/get-in-touch") ||
+      hrefLower.includes("/reach-us") ||
+      hrefLower.includes("/our-team") ||
+      hrefLower.includes("/meet-the-team") ||
+      hrefLower.includes("/people");
+    if (isContactLink) {
       try {
         const resolved = new URL(href, baseUrl).href;
-        if (!contactPageUrl) contactPageUrl = resolved;
+        if (!contactPages.includes(resolved) && contactPages.length < 5) {
+          contactPages.push(resolved);
+        }
+        if (!contactPageUrl && (
+          hrefLower.includes("/contact") || text.includes("contact") ||
+          hrefLower.includes("/get-in-touch") || text.includes("get in touch") ||
+          hrefLower.includes("/reach-us") || text.includes("reach us")
+        )) {
+          contactPageUrl = resolved;
+        }
       } catch {}
     }
   });
@@ -1248,6 +1577,7 @@ function extractContactInfo(html: string, $: cheerio.CheerioAPI, baseUrl: string
     phones: [...phones].slice(0, 3),
     contactPageUrl,
     hasContactForm: hasContactForm || undefined,
+    discoveredPages: contactPages,
   };
 }
 
@@ -1494,19 +1824,36 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
 
     const contactInfo = extractContactInfo(html, $, fullUrl);
 
-    if (contactInfo.contactPageUrl && (contactInfo.emails.length === 0 || contactInfo.phones.length === 0)) {
-      try {
-        const contactPage = await scrapeContactPage(contactInfo.contactPageUrl);
-        for (const email of contactPage.emails) {
-          if (!contactInfo.emails.includes(email)) contactInfo.emails.push(email);
-        }
-        for (const phone of contactPage.phones) {
-          const digits = phone.replace(/[^0-9]/g, "");
-          const existingDigits = contactInfo.phones.map(p => p.replace(/[^0-9]/g, ""));
-          if (!existingDigits.includes(digits)) contactInfo.phones.push(phone);
-        }
-      } catch {}
+    const pagesToScrape = [...contactInfo.discoveredPages];
+    if (contactInfo.contactPageUrl && !pagesToScrape.includes(contactInfo.contactPageUrl)) {
+      pagesToScrape.unshift(contactInfo.contactPageUrl);
     }
+    if (pagesToScrape.length > 0 && (contactInfo.emails.length === 0 || contactInfo.phones.length === 0)) {
+      const scrapePromises = pagesToScrape.slice(0, 4).map(pageUrl => scrapeContactPage(pageUrl));
+      const pageResults = await Promise.allSettled(scrapePromises);
+      for (const result of pageResults) {
+        if (result.status === "fulfilled") {
+          for (const email of result.value.emails) {
+            if (!contactInfo.emails.includes(email) && contactInfo.emails.length < 5) {
+              contactInfo.emails.push(email);
+            }
+          }
+          for (const phone of result.value.phones) {
+            const digits = phone.replace(/[^0-9]/g, "");
+            const existingDigits = contactInfo.phones.map(p => p.replace(/[^0-9]/g, ""));
+            if (!existingDigits.includes(digits) && contactInfo.phones.length < 3) {
+              contactInfo.phones.push(phone);
+            }
+          }
+        }
+      }
+    }
+    const cleanedContactInfo: ExtractedContact = {
+      emails: contactInfo.emails,
+      phones: contactInfo.phones,
+      contactPageUrl: contactInfo.contactPageUrl,
+      hasContactForm: contactInfo.hasContactForm,
+    };
 
     const hasContact = contactInfo.emails.length > 0 || contactInfo.phones.length > 0;
 
@@ -1515,7 +1862,7 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       issues,
       hasWebsite: true,
       socialMedia: socialMedia.length ? socialMedia : undefined,
-      contactInfo: hasContact ? contactInfo : undefined,
+      contactInfo: hasContact ? cleanedContactInfo : undefined,
     };
 
   } catch (err: any) {
