@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema } from "@shared/schema";
 import { z } from "zod";
-import { searchBusinesses, analyzeWebsite } from "./scraper";
+import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 export async function registerRoutes(
@@ -76,6 +76,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/cache/stats", isAuthenticated, async (_req, res) => {
+    res.json(getSearchCacheStats());
+  });
+
+  app.post("/api/cache/clear", isAuthenticated, async (_req, res) => {
+    clearSearchCache();
+    res.json({ success: true });
+  });
+
   app.post("/api/analyze-website", isAuthenticated, async (req, res) => {
     try {
       const { url } = req.body;
@@ -94,11 +103,14 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Category and location are required" });
       }
 
+      const searchStart = Date.now();
       const businesses = await searchBusinesses(
         category,
         location,
         Math.min(maxResults || 20, 50)
       );
+      const searchMs = Date.now() - searchStart;
+      const cached = searchMs < 500;
 
       const existingLeads = await storage.getLeads();
       const existingDomains = new Set<string>();
@@ -265,6 +277,7 @@ export async function registerRoutes(
         new: results.length,
         skipped: businesses.length - newBusinesses.length,
         leads: results,
+        cached,
       });
     } catch (err) {
       console.error("Discover error:", err);

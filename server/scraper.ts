@@ -76,11 +76,56 @@ function extractSocialLinksFromHtml(html: string, $: cheerio.CheerioAPI): string
   return socials;
 }
 
+interface CacheEntry {
+  results: ScrapedBusiness[];
+  timestamp: number;
+}
+
+const searchCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 3 * 60 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 200;
+
+function getCacheKey(category: string, location: string, maxResults: number): string {
+  return `${category.toLowerCase().trim()}|${location.toLowerCase().trim()}|${maxResults}`;
+}
+
+function pruneCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of searchCache) {
+    if (now - entry.timestamp > CACHE_TTL_MS) {
+      searchCache.delete(key);
+    }
+  }
+  if (searchCache.size > MAX_CACHE_ENTRIES) {
+    const entries = [...searchCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toRemove = entries.slice(0, entries.length - MAX_CACHE_ENTRIES);
+    for (const [key] of toRemove) {
+      searchCache.delete(key);
+    }
+  }
+}
+
+export function clearSearchCache(): void {
+  searchCache.clear();
+}
+
+export function getSearchCacheStats(): { size: number; maxSize: number; ttlHours: number } {
+  pruneCache();
+  return { size: searchCache.size, maxSize: MAX_CACHE_ENTRIES, ttlHours: CACHE_TTL_MS / (60 * 60 * 1000) };
+}
+
 export async function searchBusinesses(
   category: string,
   location: string,
   maxResults: number = 20
 ): Promise<ScrapedBusiness[]> {
+  const cacheKey = getCacheKey(category, location, maxResults);
+  const cached = searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    console.log(`[Cache HIT] "${category}" in "${location}" — returning ${cached.results.length} cached results`);
+    return cached.results;
+  }
+
   const businesses: ScrapedBusiness[] = [];
 
   const bingQueries = [
@@ -167,7 +212,13 @@ export async function searchBusinesses(
     if (phoneKey) byPhone.set(phoneKey, biz);
   }
 
-  return dedupedList.slice(0, maxResults);
+  const finalResults = dedupedList.slice(0, maxResults);
+
+  searchCache.set(cacheKey, { results: finalResults, timestamp: Date.now() });
+  pruneCache();
+  console.log(`[Cache STORE] "${category}" in "${location}" — cached ${finalResults.length} results`);
+
+  return finalResults;
 }
 
 function normalizeName(name: string): string {

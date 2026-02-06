@@ -78,6 +78,7 @@ interface DiscoverResult {
   new: number;
   skipped: number;
   leads: Lead[];
+  cached?: boolean;
 }
 
 function ScoreBadge({ score }: { score: number | null }) {
@@ -164,7 +165,9 @@ export default function DiscoverPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({
         title: `Found ${data.new} new leads`,
-        description: `${data.found} businesses searched, ${data.skipped} already in pipeline`,
+        description: data.cached
+          ? `${data.found} businesses from cache, ${data.skipped} already in pipeline`
+          : `${data.found} businesses searched, ${data.skipped} already in pipeline`,
       });
     },
     onError: (err: Error) => {
@@ -338,6 +341,12 @@ export default function DiscoverPage() {
                     <strong>{results.skipped}</strong> already in pipeline
                   </span>
                 </div>
+              )}
+              {results.cached && (
+                <Badge variant="secondary" data-testid="badge-cached">
+                  <Zap className="w-3 h-3 mr-1" />
+                  From cache
+                </Badge>
               )}
             </div>
             {results.new > 0 && (
