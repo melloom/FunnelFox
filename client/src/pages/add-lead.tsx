@@ -29,9 +29,19 @@ import { insertLeadSchema } from "@shared/schema";
 import type { Lead } from "@shared/schema";
 import { useState } from "react";
 
-const formSchema = insertLeadSchema.extend({
+const formSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
   websiteUrl: z.string().min(1, "Website URL is required"),
+  contactName: z.string().nullable().optional(),
+  contactEmail: z.string().nullable().optional(),
+  contactPhone: z.string().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  status: z.enum(["new", "contacted", "interested", "not_interested", "converted"]).default("new"),
+  notes: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  websiteScore: z.number().nullable().optional(),
+  websiteIssues: z.array(z.string()).nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
