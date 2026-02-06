@@ -4,6 +4,7 @@
 A lead generation web application designed for web developers to discover, track, and manage potential clients. The app searches the web for businesses, analyzes their websites for quality issues, and provides a CRM-style pipeline to manage outreach from discovery through conversion.
 
 ## Recent Changes
+- 2026-02-06: Made app a PWA with manifest, service worker, and app icons. Added safe-area-inset handling for phone notches (viewport-fit=cover, safe-area CSS classes). Uses 100dvh for proper mobile height. Added apple-mobile-web-app meta tags.
 - 2026-02-06: Added OpenStreetMap Overpass API and Google Places API (optional) as additional data sources. OSM provides structured business data with addresses, phone numbers, and cuisine info. Google Places requires GOOGLE_PLACES_API_KEY env var. Added 30+ OSM category mappings, geocoding via Nominatim, and improved address/phone propagation to leads.
 - 2026-02-06: Rewrote scraper to fix search engine blocking (switched to Safari UA), extract real URLs from Bing cite elements instead of redirect URLs, added 50+ aggregator site filters, list-title pattern detection, and improved business name cleaning. Cleaned junk data from database.
 - 2026-02-06: Added CRM pipeline with 8 stages (New Lead, Contacted, Interested, Demo, Proposal, Negotiation, Won, Lost). Built Kanban-style pipeline board page. Updated all pages to use new pipeline stages with move-to-stage functionality.

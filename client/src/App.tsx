@@ -38,14 +38,14 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
+            <div className="flex h-[100dvh] w-full safe-area-wrapper">
               <AppSidebar />
               <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center justify-between gap-2 p-2 border-b sticky top-0 z-50 bg-background">
+                <header className="flex items-center justify-between gap-2 p-2 border-b sticky top-0 z-50 bg-background safe-area-top">
                   <SidebarTrigger data-testid="button-sidebar-toggle" />
                   <ThemeToggle />
                 </header>
-                <main className="flex-1 overflow-auto">
+                <main className="flex-1 overflow-auto safe-area-bottom safe-area-x">
                   <Router />
                 </main>
               </div>
