@@ -17,7 +17,24 @@ interface WebsiteAnalysis {
   hasWebsite: boolean;
 }
 
-const SAFARI_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+const USER_AGENTS = [
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:125.0) Gecko/20100101 Firefox/125.0",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+];
+
+function getRandomUA(): string {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const SOCIAL_MEDIA_DOMAINS: Record<string, string> = {
   "facebook.com": "facebook",
@@ -78,27 +95,42 @@ export async function searchBusinesses(
     `${category} near ${location}`,
   ];
 
-  const searches: Promise<ScrapedBusiness[]>[] = [];
+  const searchFns: (() => Promise<ScrapedBusiness[]>)[] = [];
 
   for (const query of bingQueries) {
-    searches.push(searchBing(query, maxResults, category));
+    searchFns.push(() => searchBing(query, maxResults, category));
   }
   for (const query of ddgQueries) {
-    searches.push(searchDuckDuckGo(query, maxResults, category));
+    searchFns.push(() => searchDuckDuckGo(query, maxResults, category));
   }
-  searches.push(searchOpenStreetMap(category, location, maxResults));
+  searchFns.push(() => searchSocialMediaOnly(category, location, maxResults));
 
-  searches.push(searchSocialMediaOnly(category, location, maxResults));
-
+  const apiFns: (() => Promise<ScrapedBusiness[]>)[] = [];
+  apiFns.push(() => searchOpenStreetMap(category, location, maxResults));
   const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (googleApiKey) {
-    searches.push(searchGooglePlaces(category, location, maxResults, googleApiKey));
+    apiFns.push(() => searchGooglePlaces(category, location, maxResults, googleApiKey));
   }
 
-  const results = await Promise.allSettled(searches);
-  for (const result of results) {
+  const apiResults = await Promise.allSettled(apiFns.map((fn) => fn()));
+  for (const result of apiResults) {
     if (result.status === "fulfilled") {
       businesses.push(...result.value);
+    }
+  }
+
+  const BATCH_SIZE = 2;
+  const THROTTLE_MS = 800;
+  for (let i = 0; i < searchFns.length; i += BATCH_SIZE) {
+    const batch = searchFns.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(batch.map((fn) => fn()));
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        businesses.push(...result.value);
+      }
+    }
+    if (i + BATCH_SIZE < searchFns.length) {
+      await delay(THROTTLE_MS);
     }
   }
 
@@ -229,8 +261,9 @@ async function searchSocialMediaOnly(
       `${category} ${location} instagram.com`,
     ];
 
-    for (const query of queries) {
-      const encodedQuery = encodeURIComponent(query);
+    for (let qi = 0; qi < queries.length; qi++) {
+      if (qi > 0) await delay(600);
+      const encodedQuery = encodeURIComponent(queries[qi]);
       const url = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
 
       const controller = new AbortController();
@@ -239,7 +272,7 @@ async function searchSocialMediaOnly(
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          "User-Agent": SAFARI_UA,
+          "User-Agent": getRandomUA(),
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9",
         },
@@ -347,7 +380,7 @@ async function searchDuckDuckGo(
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": SAFARI_UA,
+        "User-Agent": getRandomUA(),
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
       },
@@ -406,7 +439,7 @@ async function searchBing(
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": SAFARI_UA,
+        "User-Agent": getRandomUA(),
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "identity",
@@ -917,7 +950,7 @@ async function scrapeContactPage(url: string): Promise<{ emails: string[]; phone
     const timeout = setTimeout(() => controller.abort(), 8000);
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: { "User-Agent": SAFARI_UA, Accept: "text/html" },
+      headers: { "User-Agent": getRandomUA(), Accept: "text/html" },
       redirect: "follow",
     });
     clearTimeout(timeout);
@@ -990,7 +1023,7 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
     const response = await fetch(fullUrl, {
       signal: controller.signal,
       headers: {
-        "User-Agent": SAFARI_UA,
+        "User-Agent": getRandomUA(),
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",
