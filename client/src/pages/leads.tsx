@@ -34,6 +34,7 @@ import {
   Trash2,
   Star,
   Send,
+  Download,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -434,6 +435,42 @@ export default function LeadsPage() {
 
   const hasFilters = search || statusFilter !== "all" || industryFilter !== "all";
 
+  function exportToCSV() {
+    const stageLabel = (val: string) => PIPELINE_STAGES.find((s) => s.value === val)?.label || val;
+    const escapeCSV = (val: string) => {
+      if (!val) return "";
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+    const headers = ["Company Name", "Website", "Contact Name", "Email", "Phone", "Industry", "Location", "Stage", "Website Score", "Website Issues", "Social Media", "Notes", "Source", "Date Added"];
+    const rows = sorted.map((lead) => [
+      escapeCSV(lead.companyName),
+      escapeCSV(lead.websiteUrl === "none" ? "" : lead.websiteUrl),
+      escapeCSV(lead.contactName || ""),
+      escapeCSV(lead.contactEmail || ""),
+      escapeCSV(lead.contactPhone || ""),
+      escapeCSV(lead.industry || ""),
+      escapeCSV(lead.location || ""),
+      escapeCSV(stageLabel(lead.status)),
+      lead.websiteScore != null ? String(lead.websiteScore) : "",
+      escapeCSV((lead.websiteIssues || []).join("; ")),
+      escapeCSV((lead.socialMedia || []).map((s) => { const i = s.indexOf(":"); return i > -1 ? s.slice(i + 1) : s; }).join("; ")),
+      escapeCSV(lead.notes || ""),
+      escapeCSV(lead.source || ""),
+      new Date(lead.createdAt).toLocaleDateString(),
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4 max-w-7xl mx-auto">
@@ -518,6 +555,16 @@ export default function LeadsPage() {
               Clear
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToCSV}
+            disabled={sorted.length === 0}
+            data-testid="button-export-csv"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5" />
+            Export CSV
+          </Button>
         </div>
       </div>
 
