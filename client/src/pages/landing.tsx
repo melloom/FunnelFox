@@ -83,7 +83,7 @@ export default function LandingPage() {
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/auth">
               <Button size="lg" className="w-full sm:w-auto" data-testid="button-login-nav">
-                Get started
+                Log in
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
@@ -181,7 +181,7 @@ export default function LandingPage() {
               </div>
               <Link href="/auth">
                 <Button size="lg" className="w-full" data-testid="button-login-cta">
-                  Get started for free
+                  Log in
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
