@@ -1,4 +1,4 @@
-const CACHE_NAME = 'leadhunter-v1';
+const CACHE_NAME = 'leadhunter-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
