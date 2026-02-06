@@ -4,12 +4,16 @@ import { storage } from "./storage";
 import { insertLeadSchema } from "@shared/schema";
 import { z } from "zod";
 import { searchBusinesses, analyzeWebsite } from "./scraper";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  app.get("/api/leads", async (_req, res) => {
+  await setupAuth(app);
+  registerAuthRoutes(app);
+
+  app.get("/api/leads", isAuthenticated, async (_req, res) => {
     try {
       const leads = await storage.getLeads();
       res.json(leads);
@@ -18,7 +22,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/leads/:id", async (req, res) => {
+  app.get("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -30,7 +34,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/leads", async (req, res) => {
+  app.post("/api/leads", isAuthenticated, async (req, res) => {
     try {
       const parsed = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(parsed);
@@ -43,7 +47,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/leads/:id", async (req, res) => {
+  app.patch("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -60,7 +64,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/leads/:id", async (req, res) => {
+  app.delete("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -72,7 +76,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/analyze-website", async (req, res) => {
+  app.post("/api/analyze-website", isAuthenticated, async (req, res) => {
     try {
       const { url } = req.body;
       if (!url) return res.status(400).json({ error: "URL is required" });
@@ -83,7 +87,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/discover", async (req, res) => {
+  app.post("/api/discover", isAuthenticated, async (req, res) => {
     try {
       const { category, location, maxResults } = req.body;
       if (!category || !location) {
