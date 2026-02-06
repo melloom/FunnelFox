@@ -31,7 +31,7 @@ import { useState } from "react";
 
 const formSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
-  websiteUrl: z.string().min(1, "Website URL is required"),
+  websiteUrl: z.string().optional().default(""),
   contactName: z.string().nullable().optional(),
   contactEmail: z.string().nullable().optional(),
   contactPhone: z.string().nullable().optional(),
@@ -111,7 +111,11 @@ export default function AddLeadPage() {
   });
 
   const onSubmit = (values: FormValues) => {
-    createMutation.mutate(values);
+    const submitValues = {
+      ...values,
+      websiteUrl: values.websiteUrl?.trim() || "none",
+    };
+    createMutation.mutate(submitValues);
   };
 
   return (
@@ -151,11 +155,11 @@ export default function AddLeadPage() {
                   name="websiteUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Website URL *</FormLabel>
+                      <FormLabel>Website URL</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
                           <Input
-                            placeholder="www.example.com"
+                            placeholder="www.example.com (or leave blank)"
                             {...field}
                             data-testid="input-website-url"
                           />
@@ -178,6 +182,7 @@ export default function AddLeadPage() {
                           )}
                         </Button>
                       </div>
+                      <p className="text-xs text-muted-foreground">Leave blank if they don't have one — that's a great lead</p>
                       <FormMessage />
                     </FormItem>
                   )}
