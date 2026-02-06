@@ -13,20 +13,6 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
-  app.post("/api/update-pwd-temp", async (_req, res) => {
-    try {
-      const bcrypt = await import("bcryptjs");
-      const { db } = await import("./db");
-      const { users } = await import("@shared/schema");
-      const { eq } = await import("drizzle-orm");
-      const hashed = await bcrypt.default.hash("Mel1747-", 10);
-      await db.update(users).set({ password: hashed }).where(eq(users.email, "Melvin.a.p.cruz@gmail.com"));
-      res.json({ message: "Password updated" });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
   app.get("/api/leads", isAuthenticated, async (_req, res) => {
     try {
       const leads = await storage.getLeads();
