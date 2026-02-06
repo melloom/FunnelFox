@@ -36,7 +36,9 @@ import {
   ChevronDown,
   MoreHorizontal,
   Trash2,
+  Star,
 } from "lucide-react";
+import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
 import { PIPELINE_STAGES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -61,6 +63,54 @@ const STAGE_TEXT_COLORS: Record<string, string> = {
   "primary": "text-primary",
   "destructive": "text-destructive",
 };
+
+const SOCIAL_ICONS: Record<string, typeof SiFacebook> = {
+  facebook: SiFacebook,
+  instagram: SiInstagram,
+  twitter: SiX,
+  tiktok: SiTiktok,
+  linkedin: SiLinkedin,
+  youtube: SiYoutube,
+  pinterest: SiPinterest,
+};
+
+function parseSocialMedia(socialMedia: string[] | null | undefined): { platform: string; url: string }[] {
+  if (!socialMedia?.length) return [];
+  return socialMedia.map((s) => {
+    const colonIdx = s.indexOf(":");
+    if (colonIdx === -1) return { platform: s, url: "" };
+    return { platform: s.slice(0, colonIdx), url: s.slice(colonIdx + 1) };
+  });
+}
+
+function SocialMediaIcons({ socialMedia, size = "sm" }: { socialMedia: string[] | null | undefined; size?: "sm" | "md" }) {
+  const parsed = parseSocialMedia(socialMedia);
+  if (!parsed.length) return null;
+  const iconSize = size === "sm" ? "w-3 h-3" : "w-4 h-4";
+  return (
+    <div className="flex items-center gap-1.5">
+      {parsed.map(({ platform, url }) => {
+        const Icon = SOCIAL_ICONS[platform];
+        if (!Icon) return null;
+        return url ? (
+          <a
+            key={platform}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            data-testid={`link-social-${platform}`}
+          >
+            <Icon className={iconSize} />
+          </a>
+        ) : (
+          <Icon key={platform} className={`${iconSize} text-muted-foreground`} />
+        );
+      })}
+    </div>
+  );
+}
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null || score === undefined) return null;
@@ -98,11 +148,20 @@ function LeadCard({
             </h4>
             <ScoreBadge score={lead.websiteScore} />
           </div>
-          {noWebsite && (
-            <Badge variant="secondary" className="text-[10px]">
-              No website
-            </Badge>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {noWebsite && (
+              <Badge variant="secondary" className="text-[10px]">
+                No website
+              </Badge>
+            )}
+            {noWebsite && lead.socialMedia && lead.socialMedia.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] text-chart-4">
+                <Star className="w-2.5 h-2.5 mr-0.5" />
+                High value
+              </Badge>
+            )}
+            <SocialMediaIcons socialMedia={lead.socialMedia} size="sm" />
+          </div>
           {lead.websiteIssues && lead.websiteIssues.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {lead.websiteIssues.slice(0, 2).map((issue, i) => (
@@ -248,6 +307,39 @@ function LeadDetailDialog({
               </div>
             )}
           </div>
+
+          {lead.socialMedia && lead.socialMedia.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Social Media</p>
+              <div className="flex flex-wrap gap-2">
+                {parseSocialMedia(lead.socialMedia).map(({ platform, url }) => {
+                  const Icon = SOCIAL_ICONS[platform];
+                  if (!Icon) return null;
+                  return (
+                    <a
+                      key={platform}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid={`link-social-detail-${platform}`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="capitalize">{platform}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {noWebsite && lead.socialMedia && lead.socialMedia.length > 0 && (
+            <div className="flex items-center gap-2 p-2.5 rounded-md bg-chart-4/10">
+              <Star className="w-4 h-4 text-chart-4 shrink-0" />
+              <span className="text-xs font-medium text-chart-4">High-value lead: Has social media but no website</span>
+            </div>
+          )}
 
           {lead.websiteIssues && lead.websiteIssues.length > 0 && (
             <div>

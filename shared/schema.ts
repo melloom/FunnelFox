@@ -42,6 +42,7 @@ export const leads = pgTable("leads", {
   websiteIssues: text("website_issues").array(),
   notes: text("notes"),
   source: text("source").default("manual"),
+  socialMedia: text("social_media").array(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

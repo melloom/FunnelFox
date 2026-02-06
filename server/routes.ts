@@ -142,8 +142,17 @@ export async function registerRoutes(
           const notesParts: string[] = [];
           if (biz.description) notesParts.push(biz.description);
           if (biz.address) notesParts.push(`Address: ${biz.address}`);
-          notesParts.push("No website detected - needs a website built");
+          if (biz.socialMedia?.length) {
+            notesParts.push(`Has social media but no website - great lead`);
+          } else {
+            notesParts.push("No website detected - needs a website built");
+          }
           if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
+
+          const issues = ["No website found", "Business needs a website built from scratch"];
+          if (biz.socialMedia?.length) {
+            issues.push(`Active on social media (${biz.socialMedia.map(s => s.split(":")[0]).join(", ")}) but no website`);
+          }
 
           const lead = await storage.createLead({
             companyName: biz.name,
@@ -152,12 +161,13 @@ export async function registerRoutes(
             location: biz.address || location,
             status: "new",
             websiteScore: 0,
-            websiteIssues: ["No website found", "Business needs a website built from scratch"],
+            websiteIssues: issues,
             notes: notesParts.join(" | ") || null,
             source: "auto-discover",
             contactName: null,
             contactEmail: null,
             contactPhone: biz.phone || null,
+            socialMedia: biz.socialMedia || null,
           });
           results.push(lead);
         } catch (err) {
@@ -175,6 +185,9 @@ export async function registerRoutes(
             if (biz.address) notesParts.push(`Address: ${biz.address}`);
             if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
 
+            const allSocials = [...(biz.socialMedia || []), ...(analysis.socialMedia || [])];
+            const uniqueSocials = allSocials.length ? [...new Map(allSocials.map(s => [s.split(":")[0], s])).values()] : null;
+
             return storage.createLead({
               companyName: biz.name,
               websiteUrl: biz.url,
@@ -188,6 +201,7 @@ export async function registerRoutes(
               contactName: null,
               contactEmail: null,
               contactPhone: biz.phone || null,
+              socialMedia: uniqueSocials,
             });
           })
         );

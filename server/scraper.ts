@@ -8,6 +8,7 @@ interface ScrapedBusiness {
   source?: string;
   phone?: string;
   address?: string;
+  socialMedia?: string[];
 }
 
 interface WebsiteAnalysis {
@@ -17,6 +18,46 @@ interface WebsiteAnalysis {
 }
 
 const SAFARI_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+
+const SOCIAL_MEDIA_DOMAINS: Record<string, string> = {
+  "facebook.com": "facebook",
+  "fb.com": "facebook",
+  "instagram.com": "instagram",
+  "twitter.com": "twitter",
+  "x.com": "twitter",
+  "tiktok.com": "tiktok",
+  "linkedin.com": "linkedin",
+  "youtube.com": "youtube",
+  "pinterest.com": "pinterest",
+  "nextdoor.com": "nextdoor",
+};
+
+function detectSocialMediaUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const host = parsed.hostname.replace(/^www\./, "").replace(/^m\./, "");
+    for (const [domain, platform] of Object.entries(SOCIAL_MEDIA_DOMAINS)) {
+      if (host === domain || host.endsWith(`.${domain}`)) {
+        return `${platform}:${parsed.href}`;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function extractSocialLinksFromHtml(html: string, $: cheerio.CheerioAPI): string[] {
+  const socials: string[] = [];
+  const seen = new Set<string>();
+  $('a[href]').each((_i, el) => {
+    const href = $(el).attr("href") || "";
+    const social = detectSocialMediaUrl(href);
+    if (social && !seen.has(social.split(":")[0])) {
+      seen.add(social.split(":")[0]);
+      socials.push(social);
+    }
+  });
+  return socials;
+}
 
 export async function searchBusinesses(
   category: string,
@@ -47,6 +88,8 @@ export async function searchBusinesses(
   }
   searches.push(searchOpenStreetMap(category, location, maxResults));
 
+  searches.push(searchSocialMediaOnly(category, location, maxResults));
+
   const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (googleApiKey) {
     searches.push(searchGooglePlaces(category, location, maxResults, googleApiKey));
@@ -74,12 +117,112 @@ export async function searchBusinesses(
         existing.url = biz.url;
         existing.hasWebsite = true;
       }
+      if (biz.socialMedia?.length) {
+        if (!existing.socialMedia) existing.socialMedia = [];
+        const platforms = new Set(existing.socialMedia.map(s => s.split(":")[0]));
+        for (const s of biz.socialMedia) {
+          if (!platforms.has(s.split(":")[0])) {
+            existing.socialMedia.push(s);
+            platforms.add(s.split(":")[0]);
+          }
+        }
+      }
       continue;
     }
     seen.set(dedupeKey, biz);
   }
 
   return Array.from(seen.values()).slice(0, maxResults);
+}
+
+async function searchSocialMediaOnly(
+  category: string,
+  location: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const queries = [
+      `${category} ${location} facebook.com`,
+      `${category} ${location} instagram.com`,
+    ];
+
+    for (const query of queries) {
+      const encodedQuery = encodeURIComponent(query);
+      const url = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": SAFARI_UA,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (response.status !== 200 && response.status !== 202) continue;
+
+      const html = await response.text();
+      const $ = cheerio.load(html);
+
+      $(".result").each((_i, el) => {
+        if (results.length >= maxResults) return false;
+
+        const linkEl = $(el).find(".result__a");
+        let href = linkEl.attr("href") || "";
+        const title = linkEl.text().trim();
+
+        if (href.includes("uddg=")) {
+          try {
+            const urlParam = new URL(href, "https://duckduckgo.com").searchParams.get("uddg");
+            if (urlParam) href = urlParam;
+          } catch {}
+        }
+
+        const social = detectSocialMediaUrl(href);
+        if (!social) return;
+
+        let bizName = title
+          .replace(/\s*[-|–—]\s*(Facebook|Instagram|Twitter|TikTok|LinkedIn|YouTube).*$/i, "")
+          .replace(/\s*\|\s*(Facebook|Instagram|Twitter|TikTok|LinkedIn|YouTube).*$/i, "")
+          .replace(/\s*on\s+(Facebook|Instagram|Twitter|TikTok)$/i, "")
+          .trim();
+
+        if (!bizName || bizName.length < 3 || bizName.length > 80) return;
+        if (isListTitle(bizName, category)) return;
+
+        const snippet = $(el).find(".result__snippet").text().trim();
+
+        const existing = results.find(r => r.name.toLowerCase().replace(/[^a-z0-9]/g, "") === bizName.toLowerCase().replace(/[^a-z0-9]/g, ""));
+        if (existing) {
+          if (!existing.socialMedia) existing.socialMedia = [];
+          const platforms = new Set(existing.socialMedia.map(s => s.split(":")[0]));
+          if (!platforms.has(social.split(":")[0])) {
+            existing.socialMedia.push(social);
+          }
+          return;
+        }
+
+        results.push({
+          name: bizName,
+          url: "",
+          description: snippet || undefined,
+          hasWebsite: false,
+          source: "social-search",
+          socialMedia: [social],
+        });
+      });
+    }
+  } catch (err) {
+    console.error("Social media search error:", err);
+  }
+
+  return results;
 }
 
 function processSearchResult(
@@ -591,7 +734,7 @@ function isExcludedDomain(domain: string): boolean {
   return excluded.some((ex) => domain.includes(ex));
 }
 
-export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis> {
+export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis & { socialMedia?: string[] }> {
   const issues: string[] = [];
   let score = 100;
 
@@ -772,6 +915,9 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       issues.push("Uses basic website builder (not custom)");
       score -= 5;
     }
+
+    const socialMedia = extractSocialLinksFromHtml(html, $);
+    return { score: Math.max(0, Math.min(100, score)), issues, hasWebsite: true, socialMedia: socialMedia.length ? socialMedia : undefined };
 
   } catch (err: any) {
     if (err.name === "AbortError") {
