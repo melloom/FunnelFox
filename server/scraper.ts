@@ -6,6 +6,8 @@ interface ScrapedBusiness {
   description?: string;
   hasWebsite: boolean;
   source?: string;
+  phone?: string;
+  address?: string;
 }
 
 interface WebsiteAnalysis {
@@ -34,6 +36,12 @@ export async function searchBusinesses(
     searches.push(searchBing(query, maxResults, category));
   }
   searches.push(searchDuckDuckGo(`${category} ${location}`, maxResults, category));
+  searches.push(searchOpenStreetMap(category, location, maxResults));
+
+  const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (googleApiKey) {
+    searches.push(searchGooglePlaces(category, location, maxResults, googleApiKey));
+  }
 
   const results = await Promise.allSettled(searches);
   for (const result of results) {
@@ -212,6 +220,241 @@ function extractUrlFromCite(cite: string): string {
   }
 }
 
+const OSM_CATEGORY_MAP: Record<string, string[]> = {
+  restaurant: ['amenity=restaurant'],
+  cafe: ['amenity=cafe'],
+  "coffee shop": ['amenity=cafe'],
+  bar: ['amenity=bar', 'amenity=pub'],
+  bakery: ['shop=bakery'],
+  "hair salon": ['shop=hairdresser'],
+  barber: ['shop=hairdresser'],
+  gym: ['leisure=fitness_centre'],
+  "dental office": ['amenity=dentist'],
+  dentist: ['amenity=dentist'],
+  "law firm": ['office=lawyer'],
+  lawyer: ['office=lawyer'],
+  "real estate agency": ['office=estate_agent'],
+  "auto repair shop": ['shop=car_repair'],
+  "auto repair": ['shop=car_repair'],
+  mechanic: ['shop=car_repair'],
+  plumber: ['craft=plumber'],
+  electrician: ['craft=electrician'],
+  "hvac company": ['craft=hvac'],
+  hvac: ['craft=hvac'],
+  "landscaping company": ['craft=gardener'],
+  landscaping: ['craft=gardener'],
+  "accounting firm": ['office=accountant'],
+  accountant: ['office=accountant'],
+  "veterinary clinic": ['amenity=veterinary'],
+  veterinarian: ['amenity=veterinary'],
+  "chiropractic office": ['amenity=doctors'],
+  chiropractor: ['amenity=doctors'],
+  florist: ['shop=florist'],
+  "photography studio": ['craft=photographer'],
+  photographer: ['craft=photographer'],
+  "cleaning service": ['shop=dry_cleaning'],
+  "retail store": ['shop=yes'],
+  pharmacy: ['amenity=pharmacy'],
+  bank: ['amenity=bank'],
+  hotel: ['tourism=hotel'],
+  "insurance agency": ['office=insurance'],
+};
+
+async function geocodeLocation(location: string): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const encodedLoc = encodeURIComponent(location);
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodedLoc}&format=json&limit=1`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "LeadHunter/1.0 (lead-discovery-app)",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as any[];
+    if (data.length === 0) return null;
+
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
+async function searchOpenStreetMap(
+  category: string,
+  location: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const coords = await geocodeLocation(location);
+    if (!coords) return results;
+
+    const catLower = category.toLowerCase();
+    let osmTags = OSM_CATEGORY_MAP[catLower];
+    if (!osmTags) {
+      for (const [key, tags] of Object.entries(OSM_CATEGORY_MAP)) {
+        if (catLower.includes(key) || key.includes(catLower)) {
+          osmTags = tags;
+          break;
+        }
+      }
+    }
+    const radius = 15000;
+    let tagFilters: string;
+
+    if (!osmTags) {
+      tagFilters = `node["name"~"${category}",i](around:${radius},${coords.lat},${coords.lon});\nway["name"~"${category}",i](around:${radius},${coords.lat},${coords.lon});`;
+    } else {
+      tagFilters = osmTags.map((tag) => {
+        const eqIdx = tag.indexOf("=");
+        if (eqIdx < 0) return "";
+        const key = tag.slice(0, eqIdx);
+        const val = tag.slice(eqIdx + 1);
+        return `node["${key}"="${val}"](around:${radius},${coords.lat},${coords.lon});\nway["${key}"="${val}"](around:${radius},${coords.lat},${coords.lon});`;
+      }).filter(Boolean).join("\n");
+    }
+
+    const query = `[out:json][timeout:15];(\n${tagFilters}\n);out body ${maxResults * 2};`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    const response = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "LeadHunter/1.0 (lead-discovery-app)",
+      },
+      body: `data=${encodeURIComponent(query)}`,
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return results;
+
+    const data = await response.json() as any;
+    const elements = data.elements || [];
+
+    for (const el of elements) {
+      if (results.length >= maxResults) break;
+      const tags = el.tags || {};
+      const name = tags.name;
+      if (!name || name.length < 3) continue;
+
+      const website = tags.website || tags["contact:website"] || "";
+      const phone = tags.phone || tags["contact:phone"] || "";
+      const street = tags["addr:street"] || "";
+      const houseNum = tags["addr:housenumber"] || "";
+      const city = tags["addr:city"] || "";
+      const state = tags["addr:state"] || "";
+
+      let address = "";
+      if (street) {
+        address = houseNum ? `${houseNum} ${street}` : street;
+        if (city) address += `, ${city}`;
+        if (state) address += `, ${state}`;
+      } else if (city) {
+        address = state ? `${city}, ${state}` : city;
+      }
+
+      const cuisine = tags.cuisine ? `Cuisine: ${tags.cuisine}` : "";
+
+      results.push({
+        name,
+        url: website ? normalizeUrl(website) : "",
+        description: [address, cuisine].filter(Boolean).join(" | ") || undefined,
+        hasWebsite: !!website,
+        source: "openstreetmap",
+        phone: phone || undefined,
+        address: address || undefined,
+      });
+    }
+  } catch (err) {
+    console.error("OpenStreetMap search error:", err);
+  }
+
+  return results;
+}
+
+async function searchGooglePlaces(
+  category: string,
+  location: string,
+  maxResults: number,
+  apiKey: string
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const textQuery = `${category} in ${location}`;
+    const url = `https://places.googleapis.com/v1/places:searchText`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.primaryType",
+      },
+      body: JSON.stringify({
+        textQuery,
+        maxResultCount: Math.min(maxResults, 20),
+        languageCode: "en",
+      }),
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.error("Google Places API error:", response.status, await response.text());
+      return results;
+    }
+
+    const data = await response.json() as any;
+    const places = data.places || [];
+
+    for (const place of places) {
+      if (results.length >= maxResults) break;
+      const name = place.displayName?.text;
+      if (!name || name.length < 3) continue;
+
+      const website = place.websiteUri || "";
+      const phone = place.nationalPhoneNumber || "";
+      const address = place.formattedAddress || "";
+
+      if (website) {
+        const domain = extractDomain(website);
+        if (domain && (isExcludedDomain(domain) || isAggregatorSite(domain))) continue;
+      }
+
+      results.push({
+        name,
+        url: website ? normalizeUrl(website) : "",
+        description: address || undefined,
+        hasWebsite: !!website,
+        source: "google-places",
+        phone: phone || undefined,
+        address: address || undefined,
+      });
+    }
+  } catch (err) {
+    console.error("Google Places search error:", err);
+  }
+
+  return results;
+}
+
 function isListTitle(title: string, category: string): boolean {
   const lower = title.toLowerCase();
 
@@ -263,6 +506,8 @@ function isAggregatorSite(domain: string): boolean {
     "niche.com", "greatschools.org",
     "whitepages.com", "spokeo.com",
     "patch.com", "newsbreak.com",
+    "guide.michelin.com", "michelin.com",
+    "timeout.com", "eater.com", "infatuation.com", "thrillist.com",
   ];
   return aggregators.some((ex) => domain.includes(ex));
 }

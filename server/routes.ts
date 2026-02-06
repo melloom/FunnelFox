@@ -137,14 +137,15 @@ export async function registerRoutes(
         try {
           const notesParts: string[] = [];
           if (biz.description) notesParts.push(biz.description);
-          notesParts.push("Found on directory listing - no website detected");
+          if (biz.address) notesParts.push(`Address: ${biz.address}`);
+          notesParts.push("No website detected - needs a website built");
           if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
 
           const lead = await storage.createLead({
             companyName: biz.name,
             websiteUrl: "none",
             industry: category,
-            location: location,
+            location: biz.address || location,
             status: "new",
             websiteScore: 0,
             websiteIssues: ["No website found", "Business needs a website built from scratch"],
@@ -152,7 +153,7 @@ export async function registerRoutes(
             source: "auto-discover",
             contactName: null,
             contactEmail: null,
-            contactPhone: null,
+            contactPhone: biz.phone || null,
           });
           results.push(lead);
         } catch (err) {
@@ -167,13 +168,14 @@ export async function registerRoutes(
             const analysis = await analyzeWebsite(biz.url);
             const notesParts: string[] = [];
             if (biz.description) notesParts.push(biz.description);
+            if (biz.address) notesParts.push(`Address: ${biz.address}`);
             if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
 
             return storage.createLead({
               companyName: biz.name,
               websiteUrl: biz.url,
               industry: category,
-              location: location,
+              location: biz.address || location,
               status: "new",
               websiteScore: analysis.score,
               websiteIssues: analysis.issues,
@@ -181,7 +183,7 @@ export async function registerRoutes(
               source: "auto-discover",
               contactName: null,
               contactEmail: null,
-              contactPhone: null,
+              contactPhone: biz.phone || null,
             });
           })
         );

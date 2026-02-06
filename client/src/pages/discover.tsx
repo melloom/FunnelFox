@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
+  Phone,
+  MapPinned,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -122,8 +124,8 @@ export default function DiscoverPage() {
           Discover Leads
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Search for businesses by category and location. We'll find their websites, analyze
-          them, and add the best prospects to your pipeline automatically.
+          Search for businesses by category and location using multiple sources (Bing, DuckDuckGo,
+          OpenStreetMap, and more). We'll analyze their websites and add prospects to your pipeline automatically.
         </p>
       </div>
 
@@ -307,10 +309,29 @@ export default function DiscoverPage() {
                             New
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                          <Globe className="w-3 h-3 shrink-0" />
-                          {lead.websiteUrl}
-                        </p>
+                        {lead.websiteUrl && lead.websiteUrl !== "none" ? (
+                          <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                            <Globe className="w-3 h-3 shrink-0" />
+                            {lead.websiteUrl}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-destructive flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            No website - high value lead
+                          </p>
+                        )}
+                        {lead.contactPhone && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3 shrink-0" />
+                            {lead.contactPhone}
+                          </p>
+                        )}
+                        {lead.location && lead.location !== location && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <MapPinned className="w-3 h-3 shrink-0" />
+                            {lead.location}
+                          </p>
+                        )}
                         {lead.websiteIssues && lead.websiteIssues.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {lead.websiteIssues.slice(0, 3).map((issue, i) => (

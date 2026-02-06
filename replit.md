@@ -4,15 +4,17 @@
 A lead generation web application designed for web developers to discover, track, and manage potential clients. The app searches the web for businesses, analyzes their websites for quality issues, and provides a CRM-style pipeline to manage outreach from discovery through conversion.
 
 ## Recent Changes
+- 2026-02-06: Added OpenStreetMap Overpass API and Google Places API (optional) as additional data sources. OSM provides structured business data with addresses, phone numbers, and cuisine info. Google Places requires GOOGLE_PLACES_API_KEY env var. Added 30+ OSM category mappings, geocoding via Nominatim, and improved address/phone propagation to leads.
 - 2026-02-06: Rewrote scraper to fix search engine blocking (switched to Safari UA), extract real URLs from Bing cite elements instead of redirect URLs, added 50+ aggregator site filters, list-title pattern detection, and improved business name cleaning. Cleaned junk data from database.
-- 2026-02-06: Added CRM pipeline with 8 stages (New Lead, Contacted, Interested, Demo, Proposal, Negotiation, Won, Lost). Built Kanban-style pipeline board page. Improved scraper to find businesses without websites via directory listings. Updated all pages to use new pipeline stages with move-to-stage functionality.
-- 2026-02-06: Built automated lead discovery with real web scraping (DuckDuckGo + Bing), website quality analysis using cheerio, discover page with category/location search, manual lead entry, and lead pipeline management. Removed all mock/seed data.
+- 2026-02-06: Added CRM pipeline with 8 stages (New Lead, Contacted, Interested, Demo, Proposal, Negotiation, Won, Lost). Built Kanban-style pipeline board page. Updated all pages to use new pipeline stages with move-to-stage functionality.
+- 2026-02-06: Built automated lead discovery with real web scraping (DuckDuckGo + Bing), website quality analysis using cheerio, discover page with category/location search, manual lead entry, and lead pipeline management.
 
 ## Architecture
 - **Frontend**: React + Vite + Tailwind CSS + Shadcn UI with wouter routing
 - **Backend**: Express.js with PostgreSQL (Drizzle ORM)
 - **Database**: PostgreSQL with leads table and CRM status enum (9 stages)
-- **Web Scraping**: cheerio for HTML parsing, server-side fetch for DuckDuckGo/Bing search and website analysis
+- **Data Sources**: Bing search, DuckDuckGo search, OpenStreetMap Overpass API (free, no key), Google Places API (optional, needs GOOGLE_PLACES_API_KEY)
+- **Web Scraping**: cheerio for HTML parsing, server-side fetch for search engines and website analysis
 - **Key Features**:
   - Dashboard with pipeline overview stats
   - **Pipeline** page - Kanban board with columns for each CRM stage, move leads between stages
