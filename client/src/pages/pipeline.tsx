@@ -43,6 +43,7 @@ import type { Lead } from "@shared/schema";
 import { PIPELINE_STAGES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { EmailTemplateDialog } from "@/components/email-template-dialog";
 
 const STAGE_COLORS: Record<string, string> = {
   "chart-1": "bg-chart-1",
@@ -199,7 +200,7 @@ function LeadCard({
   );
 }
 
-function LeadDetailDialog({
+function PipelineLeadDetailDialog({
   lead,
   open,
   onClose,
@@ -231,6 +232,8 @@ function LeadDetailDialog({
     },
   });
 
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+
   if (!lead) return null;
 
   const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
@@ -238,6 +241,7 @@ function LeadDetailDialog({
   const currentStage = PIPELINE_STAGES[currentStageIndex];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -287,9 +291,13 @@ function LeadDetailDialog({
             {lead.contactEmail && (
               <div className="flex items-center gap-2 text-sm min-w-0">
                 <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                <a href={`mailto:${lead.contactEmail}`} className="text-primary underline underline-offset-2 truncate">
+                <button
+                  onClick={() => setEmailDialogOpen(true)}
+                  className="text-primary underline underline-offset-2 truncate text-left bg-transparent border-0 cursor-pointer p-0"
+                  data-testid="link-pipeline-contact-email"
+                >
                   {lead.contactEmail}
-                </a>
+                </button>
               </div>
             )}
             {lead.contactPhone && (
@@ -380,7 +388,17 @@ function LeadDetailDialog({
             </div>
           </div>
 
-          <div className="flex justify-end pt-2 border-t">
+          <div className="flex items-center justify-between gap-2 pt-2 border-t flex-wrap">
+            {lead.contactEmail && (
+              <Button
+                size="sm"
+                onClick={() => setEmailDialogOpen(true)}
+                data-testid="button-pipeline-email-lead"
+              >
+                <Mail className="w-3.5 h-3.5 mr-1" />
+                Email Lead
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -396,6 +414,15 @@ function LeadDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+    {lead.contactEmail && (
+      <EmailTemplateDialog
+        key={lead.id}
+        lead={lead}
+        open={emailDialogOpen}
+        onClose={() => setEmailDialogOpen(false)}
+      />
+    )}
+    </>
   );
 }
 
@@ -605,7 +632,7 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      <LeadDetailDialog
+      <PipelineLeadDetailDialog
         lead={selectedLead}
         open={!!selectedLead}
         onClose={() => setSelectedLead(null)}
