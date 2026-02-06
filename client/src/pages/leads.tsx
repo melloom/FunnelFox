@@ -49,6 +49,12 @@ import {
   Zap,
   Eye,
   SearchCode,
+  Server,
+  BarChart3,
+  ShoppingCart,
+  Cloud,
+  Layout,
+  Wrench,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -134,15 +140,21 @@ function SocialMediaIcons({ socialMedia, size = "sm" }: { socialMedia: string[] 
   );
 }
 
+function getGrade(score: number): { letter: string; color: string; bg: string } {
+  if (score >= 90) return { letter: "A", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/30" };
+  if (score >= 80) return { letter: "B", color: "text-green-600 dark:text-green-400", bg: "bg-green-100 dark:bg-green-900/30" };
+  if (score >= 70) return { letter: "C", color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-100 dark:bg-yellow-900/30" };
+  if (score >= 50) return { letter: "D", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/30" };
+  return { letter: "F", color: "text-red-600 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/30" };
+}
+
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null || score === undefined) return null;
-  let color = "text-chart-5";
-  if (score >= 70) color = "text-chart-2";
-  else if (score >= 40) color = "text-chart-4";
+  const grade = getGrade(score);
   return (
-    <div className="flex items-center gap-1">
-      <div className={`text-xs font-bold ${color}`}>{score}</div>
-      <div className="text-xs text-muted-foreground">/100</div>
+    <div className="flex items-center gap-1.5" data-testid="badge-website-score">
+      <div className={`text-sm font-bold rounded-md px-1.5 py-0.5 ${grade.color} ${grade.bg}`}>{grade.letter}</div>
+      <div className="text-xs text-muted-foreground">{score}/100</div>
     </div>
   );
 }
@@ -414,41 +426,65 @@ function LeadDetailDialog({
 
           {lead.websiteIssues && lead.websiteIssues.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Website Analysis</p>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-xs font-medium text-muted-foreground">Website Analysis</p>
+                {lead.websiteScore !== null && lead.websiteScore !== undefined && (
+                  <ScoreBadge score={lead.websiteScore} />
+                )}
+              </div>
               {(() => {
-                const categories: Record<string, { icon: typeof Globe; issues: string[] }> = {
-                  "Performance": { icon: Zap, issues: [] },
-                  "SEO": { icon: SearchCode, issues: [] },
-                  "Accessibility": { icon: Eye, issues: [] },
-                  "Security": { icon: Shield, issues: [] },
-                  "Other": { icon: Globe, issues: [] },
+                const catConfig = [
+                  { key: "Performance", icon: Zap, maxDeductions: 40 },
+                  { key: "SEO", icon: SearchCode, maxDeductions: 25 },
+                  { key: "Accessibility", icon: Eye, maxDeductions: 25 },
+                  { key: "Security", icon: Shield, maxDeductions: 30 },
+                  { key: "Other", icon: Globe, maxDeductions: 20 },
+                ] as const;
+                const categories: Record<string, string[]> = {
+                  "Performance": [], "SEO": [], "Accessibility": [], "Security": [], "Other": [],
                 };
                 for (const issue of lead.websiteIssues) {
                   const lower = issue.toLowerCase();
-                  if (lower.includes("performance") || lower.includes("load time") || lower.includes("page size") || lower.includes("lazy") || lower.includes("minif") || lower.includes("resources") || lower.includes("slow")) {
-                    categories["Performance"].issues.push(issue);
-                  } else if (lower.includes("seo") || lower.includes("meta") || lower.includes("title") || lower.includes("canonical") || lower.includes("structured data") || lower.includes("h1") || lower.includes("heading") || lower.includes("open graph") || lower.includes("sitemap") || lower.includes("favicon")) {
-                    categories["SEO"].issues.push(issue);
-                  } else if (lower.includes("accessibility") || lower.includes("aria") || lower.includes("alt text") || lower.includes("label") || lower.includes("lang")) {
-                    categories["Accessibility"].issues.push(issue);
-                  } else if (lower.includes("https") || lower.includes("security")) {
-                    categories["Security"].issues.push(issue);
+                  if (lower.includes("performance") || lower.includes("load time") || lower.includes("page size") || lower.includes("lazy") || lower.includes("minif") || lower.includes("resources") || lower.includes("slow") || lower.includes("render-blocking") || lower.includes("first paint") || lower.includes("inline css") || lower.includes("inline javascript") || lower.includes("layout shift") || lower.includes("preload") || lower.includes("preconnect") || lower.includes("image format") || lower.includes("webp") || lower.includes("font-display") || lower.includes("width/height")) {
+                    categories["Performance"].push(issue);
+                  } else if (lower.includes("seo") || lower.includes("meta") || lower.includes("title") || lower.includes("canonical") || lower.includes("structured data") || lower.includes("h1") || lower.includes("heading") || lower.includes("open graph") || lower.includes("sitemap") || lower.includes("favicon") || lower.includes("social sharing") || lower.includes("crawlability") || lower.includes("twitter")) {
+                    categories["SEO"].push(issue);
+                  } else if (lower.includes("accessibility") || lower.includes("aria") || lower.includes("alt text") || lower.includes("label") || lower.includes("lang") || lower.includes("focus") || lower.includes("tabindex") || lower.includes("screen reader") || lower.includes("keyboard") || lower.includes("iframe")) {
+                    categories["Accessibility"].push(issue);
+                  } else if (lower.includes("https") || lower.includes("security") || lower.includes("csp") || lower.includes("x-frame") || lower.includes("x-content") || lower.includes("hsts") || lower.includes("mixed content") || lower.includes("clickjacking")) {
+                    categories["Security"].push(issue);
                   } else {
-                    categories["Other"].issues.push(issue);
+                    categories["Other"].push(issue);
                   }
                 }
+
+                function getCategoryScore(issueCount: number, maxDeductions: number): number {
+                  const deductionPerIssue = maxDeductions / 8;
+                  return Math.max(0, Math.round(100 - issueCount * deductionPerIssue));
+                }
+
                 return (
-                  <div className="space-y-2">
-                    {Object.entries(categories).map(([cat, { icon: Icon, issues }]) => {
+                  <div className="space-y-3">
+                    {catConfig.map(({ key, icon: Icon, maxDeductions }) => {
+                      const issues = categories[key];
                       if (issues.length === 0) return null;
+                      const catScore = getCategoryScore(issues.length, maxDeductions);
+                      const grade = getGrade(catScore);
                       return (
-                        <div key={cat}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <Icon className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs font-medium">{cat}</span>
-                            <Badge variant="secondary" className="text-[10px]">{issues.length}</Badge>
+                        <div key={key}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-xs font-medium flex-1">{key}</span>
+                            <span className={`text-[10px] font-bold ${grade.color}`}>{grade.letter}</span>
+                            <span className="text-[10px] text-muted-foreground">{issues.length} {issues.length === 1 ? "issue" : "issues"}</span>
                           </div>
-                          <div className="flex flex-wrap gap-1 ml-4.5">
+                          <div className="w-full h-1.5 rounded-full bg-muted mb-2 ml-5.5">
+                            <div
+                              className={`h-full rounded-full transition-all ${catScore >= 80 ? "bg-emerald-500" : catScore >= 60 ? "bg-yellow-500" : catScore >= 40 ? "bg-orange-500" : "bg-red-500"}`}
+                              style={{ width: `${catScore}%` }}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-1 ml-5.5">
                             {issues.map((issue, i) => (
                               <Badge key={i} variant="secondary" className="text-[10px]">
                                 {issue}
@@ -470,9 +506,20 @@ function LeadDetailDialog({
               <div className="flex flex-wrap gap-1.5">
                 {lead.detectedTechnologies.map((tech, i) => {
                   const [category, value] = tech.includes(": ") ? tech.split(": ", 2) : ["Tech", tech];
+                  const techIcons: Record<string, typeof Cpu> = {
+                    "CMS": Layout,
+                    "Framework": Cpu,
+                    "UI": Layout,
+                    "Server": Server,
+                    "Hosting": Cloud,
+                    "E-commerce": ShoppingCart,
+                    "Analytics": BarChart3,
+                    "Tool": Wrench,
+                  };
+                  const TechIcon = techIcons[category] || Cpu;
                   return (
                     <Badge key={i} variant="outline" className="text-[10px] gap-1" data-testid={`badge-tech-${i}`}>
-                      <Cpu className="w-2.5 h-2.5" />
+                      <TechIcon className="w-2.5 h-2.5" />
                       <span className="text-muted-foreground">{category}:</span> {value}
                     </Badge>
                   );

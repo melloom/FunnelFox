@@ -1646,6 +1646,7 @@ interface TechnologyDetection {
   marketing: string[];
   ecommerce?: string;
   hosting?: string;
+  uiLibraries?: string[];
 }
 
 function detectTechnologies(html: string, $: cheerio.CheerioAPI, headers: Headers): TechnologyDetection {
@@ -1717,14 +1718,36 @@ function detectTechnologies(html: string, $: cheerio.CheerioAPI, headers: Header
   else if (html.includes("paypal.com")) tech.ecommerce = "PayPal";
   else if (html.includes("square.com") || html.includes("squareup.com")) tech.ecommerce = "Square";
 
-  if (html.includes("vercel") || headers.get("x-vercel-id")) tech.hosting = "Vercel";
-  else if (html.includes("netlify") || headers.get("x-nf-request-id")) tech.hosting = "Netlify";
-  else if (headers.get("server")?.includes("cloudflare")) tech.hosting = "Cloudflare";
-  else if (headers.get("server")?.includes("AmazonS3") || headers.get("x-amz-request-id")) tech.hosting = "AWS";
+  if (headers.get("x-vercel-id") || html.includes("vercel-insights")) tech.hosting = "Vercel";
+  else if (headers.get("x-nf-request-id") || html.includes("netlify-identity")) tech.hosting = "Netlify";
+  else if (headers.get("server")?.includes("cloudflare") || headers.get("cf-ray")) tech.hosting = "Cloudflare";
+  else if (headers.get("server")?.includes("AmazonS3") || headers.get("x-amz-request-id") || headers.get("x-amz-cf-id")) tech.hosting = "AWS";
   else if (html.includes("firebase") || html.includes("firebaseapp.com")) tech.hosting = "Firebase";
   else if (html.includes("herokuapp.com")) tech.hosting = "Heroku";
-  else if (html.includes("github.io")) tech.hosting = "GitHub Pages";
+  else if (html.includes("github.io") || html.includes("github.dev")) tech.hosting = "GitHub Pages";
   else if (html.includes("render.com")) tech.hosting = "Render";
+  else if (html.includes("fly.io") || headers.get("fly-request-id")) tech.hosting = "Fly.io";
+  else if (html.includes("digitalocean") || headers.get("x-do-app-origin")) tech.hosting = "DigitalOcean";
+  else if (html.includes("azurewebsites.net") || headers.get("x-azure-ref")) tech.hosting = "Azure";
+  else if (html.includes("pages.dev") || html.includes("workers.dev")) tech.hosting = "Cloudflare Pages";
+
+  const hasjQuery = html.includes("jquery") || html.includes("jQuery");
+  const hasBootstrap = html.includes("bootstrap") || html.includes("Bootstrap");
+  const hasTailwind = html.includes("tailwindcss") || html.includes("tailwind");
+
+  tech.uiLibraries = [];
+  if (hasjQuery) tech.uiLibraries.push("jQuery");
+  if (hasBootstrap) tech.uiLibraries.push("Bootstrap");
+  if (hasTailwind) tech.uiLibraries.push("Tailwind CSS");
+  if (html.includes("material-ui") || html.includes("@mui")) tech.uiLibraries.push("Material UI");
+  if (html.includes("ant-design") || html.includes("antd")) tech.uiLibraries.push("Ant Design");
+  if (html.includes("chakra-ui")) tech.uiLibraries.push("Chakra UI");
+
+  if (html.includes("recaptcha") || html.includes("hcaptcha")) tech.marketing.push("CAPTCHA");
+  if (html.includes("cookieconsent") || html.includes("cookie-consent") || html.includes("cookie-banner") || html.includes("gdpr")) tech.marketing.push("Cookie Consent");
+  if (html.includes("fbq(") || html.includes("facebook.com/tr")) tech.analytics.push("Facebook Pixel");
+  if (html.includes("snap.licdn.com") || html.includes("linkedin.com/insight")) tech.analytics.push("LinkedIn Insight");
+  if (html.includes("tiktok.com/i18n") || html.includes("analytics.tiktok.com")) tech.analytics.push("TikTok Pixel");
 
   return tech;
 }
@@ -1733,6 +1756,9 @@ function formatTechnologies(tech: TechnologyDetection): string[] {
   const result: string[] = [];
   if (tech.cms) result.push(`CMS: ${tech.cms}`);
   if (tech.framework) result.push(`Framework: ${tech.framework}`);
+  if (tech.uiLibraries) {
+    for (const lib of tech.uiLibraries) result.push(`UI: ${lib}`);
+  }
   if (tech.server) result.push(`Server: ${tech.server}`);
   if (tech.hosting) result.push(`Hosting: ${tech.hosting}`);
   if (tech.ecommerce) result.push(`E-commerce: ${tech.ecommerce}`);
@@ -1947,7 +1973,7 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
 
     const hasOgTags = $('meta[property^="og:"]').length > 0;
     if (!hasOgTags) {
-      issues.push("Missing Open Graph tags (social sharing)");
+      issues.push("Missing Open Graph tags (social sharing/SEO)");
       score -= 3;
     }
 
@@ -1959,7 +1985,7 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
 
     const hasFavicon = $('link[rel="icon"], link[rel="shortcut icon"]').length > 0;
     if (!hasFavicon) {
-      issues.push("Missing favicon");
+      issues.push("Missing favicon (SEO)");
       score -= 2;
     }
 
@@ -1969,7 +1995,189 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
     const scriptCount = $("script[src]").length;
     const stylesheetCount = $('link[rel="stylesheet"]').length;
     if (scriptCount + stylesheetCount > 30) {
-      issues.push(`Too many resources (${scriptCount + stylesheetCount} scripts/styles)`);
+      issues.push(`Too many resources loaded: ${scriptCount + stylesheetCount} scripts/styles (performance)`);
+      score -= 5;
+    } else if (scriptCount + stylesheetCount > 20) {
+      issues.push(`High resource count: ${scriptCount + stylesheetCount} scripts/styles (performance)`);
+      score -= 3;
+    }
+
+    // --- Core Web Vitals proxy checks ---
+
+    const renderBlockingCSS = $('link[rel="stylesheet"]').filter((_i, el) => {
+      const media = $(el).attr("media");
+      return !media || media === "all" || media === "screen";
+    });
+    const renderBlockingScripts = $('script[src]').filter((_i, el) => {
+      return !$(el).attr("async") && !$(el).attr("defer") && !$(el).attr("type")?.includes("module");
+    });
+    if (renderBlockingScripts.length > 5) {
+      issues.push(`${renderBlockingScripts.length} render-blocking scripts — delays first paint (performance)`);
+      score -= 5;
+    } else if (renderBlockingScripts.length > 2) {
+      issues.push(`${renderBlockingScripts.length} render-blocking scripts (performance)`);
+      score -= 3;
+    }
+
+    if (renderBlockingCSS.length > 4) {
+      issues.push(`${renderBlockingCSS.length} render-blocking stylesheets — delays first paint (performance)`);
+      score -= 3;
+    }
+
+    const hasPreconnect = $('link[rel="preconnect"], link[rel="dns-prefetch"]').length > 0;
+    const hasPreload = $('link[rel="preload"]').length > 0;
+    if (!hasPreconnect && !hasPreload && scriptCount > 3) {
+      issues.push("No resource preloading or preconnect hints (performance)");
+      score -= 2;
+    }
+
+    const inlineStyleLength = $("style").text().length;
+    const inlineScriptLength = $("script:not([src])").text().length;
+    if (inlineStyleLength > 50000) {
+      issues.push("Excessive inline CSS (>50KB) — hurts first paint (performance)");
+      score -= 3;
+    }
+    if (inlineScriptLength > 100000) {
+      issues.push("Excessive inline JavaScript (>100KB) — blocks rendering (performance)");
+      score -= 3;
+    }
+
+    const imagesWithoutDimensions = $("img").filter((_i, el) => {
+      return !$(el).attr("width") && !$(el).attr("height") && !$(el).attr("style")?.includes("width");
+    });
+    if (imagesWithoutDimensions.length > 3) {
+      issues.push(`${imagesWithoutDimensions.length} images without width/height — causes layout shifts (performance)`);
+      score -= 4;
+    }
+
+    const hasWebpOrAvif = $('img[src*=".webp"], img[src*=".avif"], source[type="image/webp"], source[type="image/avif"]').length > 0;
+    if (images.length > 3 && !hasWebpOrAvif) {
+      issues.push("No next-gen image formats (WebP/AVIF) — larger file sizes (performance)");
+      score -= 3;
+    }
+
+    const hasFontDisplay = html.includes("font-display:") || html.includes("font-display:");
+    const hasGoogleFontsDisplay = html.includes("display=swap") || html.includes("display=optional");
+    if (hasCustomFonts && !hasFontDisplay && !hasGoogleFontsDisplay) {
+      issues.push("Custom fonts missing font-display — causes text flash (performance)");
+      score -= 2;
+    }
+
+    // --- Deeper Accessibility checks ---
+
+    const hasColorContrast = html.includes("contrast") || html.includes("a11y") || html.includes("accessibility");
+    const focusStyles = html.includes(":focus") || html.includes("focus-visible") || html.includes("outline");
+    if (!focusStyles) {
+      issues.push("No visible focus indicators detected (accessibility)");
+      score -= 3;
+    }
+
+    const tabindex = $("[tabindex]").filter((_i, el) => {
+      const val = parseInt($(el).attr("tabindex") || "0");
+      return val > 0;
+    });
+    if (tabindex.length > 0) {
+      issues.push(`${tabindex.length} elements with positive tabindex — disrupts keyboard navigation (accessibility)`);
+      score -= 3;
+    }
+
+    const linksWithoutText = $("a").filter((_i, el) => {
+      const text = $(el).text().trim();
+      const ariaLabel = $(el).attr("aria-label");
+      const title = $(el).attr("title");
+      const img = $(el).find("img[alt]");
+      return !text && !ariaLabel && !title && img.length === 0;
+    });
+    if (linksWithoutText.length > 2) {
+      issues.push(`${linksWithoutText.length} links without accessible text (accessibility)`);
+      score -= 3;
+    }
+
+    const buttonsWithoutText = $("button").filter((_i, el) => {
+      const text = $(el).text().trim();
+      const ariaLabel = $(el).attr("aria-label");
+      return !text && !ariaLabel;
+    });
+    if (buttonsWithoutText.length > 0) {
+      issues.push(`${buttonsWithoutText.length} buttons without accessible labels (accessibility)`);
+      score -= 3;
+    }
+
+    const iframes = $("iframe");
+    const iframesWithoutTitle = iframes.filter((_i, el) => !$(el).attr("title"));
+    if (iframesWithoutTitle.length > 0) {
+      issues.push(`${iframesWithoutTitle.length} iframes missing title attribute (accessibility)`);
+      score -= 2;
+    }
+
+    // --- Deeper SEO checks ---
+
+    const titleLength = pageTitle?.length || 0;
+    if (titleLength > 60) {
+      issues.push(`Title tag too long (${titleLength} chars, recommended <60) (SEO)`);
+      score -= 2;
+    }
+
+    const metaDescLength = metaDesc?.length || 0;
+    if (metaDesc && metaDescLength > 160) {
+      issues.push(`Meta description too long (${metaDescLength} chars, recommended <160) (SEO)`);
+      score -= 2;
+    }
+
+    if (!hasSitemapLink && !hasRobotsMeta) {
+      issues.push("No sitemap reference or robots meta — poor crawlability (SEO)");
+      score -= 3;
+    }
+
+    const hasTwitterCards = $('meta[name^="twitter:"]').length > 0;
+    if (!hasOgTags && !hasTwitterCards) {
+      issues.push("No social media meta tags (Twitter Cards or OG) (SEO)");
+      score -= 2;
+    }
+
+    const headingOrder: number[] = [];
+    $("h1, h2, h3, h4, h5, h6").each((_i, el) => {
+      headingOrder.push(parseInt(el.tagName.replace("h", "")));
+    });
+    let headingSkipped = false;
+    for (let i = 1; i < headingOrder.length; i++) {
+      if (headingOrder[i] - headingOrder[i - 1] > 1) {
+        headingSkipped = true;
+        break;
+      }
+    }
+    if (headingSkipped) {
+      issues.push("Heading levels skipped (e.g. H1 to H3) — bad for screen readers (accessibility/SEO)");
+      score -= 2;
+    }
+
+    // --- Security checks ---
+
+    const csp = response.headers.get("content-security-policy");
+    const xFrame = response.headers.get("x-frame-options");
+    const xContent = response.headers.get("x-content-type-options");
+    const hsts = response.headers.get("strict-transport-security");
+
+    if (!csp) {
+      issues.push("No Content Security Policy header (security)");
+      score -= 3;
+    }
+    if (!xFrame) {
+      issues.push("No X-Frame-Options header — clickjacking risk (security)");
+      score -= 2;
+    }
+    if (!xContent) {
+      issues.push("No X-Content-Type-Options header (security)");
+      score -= 2;
+    }
+    if (!hsts && finalUrl.startsWith("https://")) {
+      issues.push("No HSTS header — HTTPS downgrade risk (security)");
+      score -= 2;
+    }
+
+    const hasMixedContent = html.includes('src="http://') || html.includes("src='http://");
+    if (hasMixedContent) {
+      issues.push("Mixed content detected (HTTP resources on HTTPS page) (security)");
       score -= 5;
     }
 

@@ -116,15 +116,21 @@ function SocialMediaIcons({ socialMedia, size = "sm" }: { socialMedia: string[] 
   );
 }
 
+function getGrade(score: number): { letter: string; color: string; bg: string } {
+  if (score >= 90) return { letter: "A", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/30" };
+  if (score >= 80) return { letter: "B", color: "text-green-600 dark:text-green-400", bg: "bg-green-100 dark:bg-green-900/30" };
+  if (score >= 70) return { letter: "C", color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-100 dark:bg-yellow-900/30" };
+  if (score >= 50) return { letter: "D", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/30" };
+  return { letter: "F", color: "text-red-600 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/30" };
+}
+
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null || score === undefined) return null;
-  let color = "text-chart-5";
-  if (score >= 70) color = "text-chart-2";
-  else if (score >= 40) color = "text-chart-4";
+  const grade = getGrade(score);
   return (
-    <div className="flex items-center gap-1">
-      <span className={`text-[11px] font-bold ${color}`}>{score}</span>
-      <span className="text-[10px] text-muted-foreground">/100</span>
+    <div className="flex items-center gap-1.5">
+      <div className={`text-[11px] font-bold rounded px-1 py-0.5 ${grade.color} ${grade.bg}`}>{grade.letter}</div>
+      <span className="text-[10px] text-muted-foreground">{score}</span>
     </div>
   );
 }
@@ -166,6 +172,23 @@ function LeadCard({
             )}
             <SocialMediaIcons socialMedia={lead.socialMedia} size="sm" />
           </div>
+          {lead.detectedTechnologies && lead.detectedTechnologies.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {lead.detectedTechnologies.slice(0, 3).map((tech, i) => {
+                const value = tech.includes(": ") ? tech.split(": ", 2)[1] : tech;
+                return (
+                  <Badge key={i} variant="outline" className="text-[9px] px-1 py-0">
+                    {value}
+                  </Badge>
+                );
+              })}
+              {lead.detectedTechnologies.length > 3 && (
+                <span className="text-[9px] text-muted-foreground">
+                  +{lead.detectedTechnologies.length - 3}
+                </span>
+              )}
+            </div>
+          )}
           {lead.websiteIssues && lead.websiteIssues.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {lead.websiteIssues.slice(0, 2).map((issue, i) => (
@@ -377,13 +400,50 @@ function PipelineLeadDetailDialog({
 
           {lead.websiteIssues && lead.websiteIssues.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Website Issues</p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs font-medium text-muted-foreground">Website Issues</p>
+                {lead.websiteScore !== null && lead.websiteScore !== undefined && (
+                  <ScoreBadge score={lead.websiteScore} />
+                )}
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {lead.websiteIssues.map((issue, i) => (
                   <Badge key={i} variant="secondary" className="text-xs">
                     {issue}
                   </Badge>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {lead.detectedTechnologies && lead.detectedTechnologies.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Technologies</p>
+              <div className="flex flex-wrap gap-1.5">
+                {lead.detectedTechnologies.map((tech, i) => {
+                  const [category, value] = tech.includes(": ") ? tech.split(": ", 2) : ["Tech", tech];
+                  return (
+                    <Badge key={i} variant="outline" className="text-[10px] gap-1" data-testid={`badge-pipeline-tech-${i}`}>
+                      <span className="text-muted-foreground">{category}:</span> {value}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!noWebsite && lead.screenshotUrl && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Screenshot</p>
+              <div className="rounded-md border overflow-hidden">
+                <img
+                  src={lead.screenshotUrl}
+                  alt={`Screenshot of ${lead.companyName}'s website`}
+                  className="w-full h-auto"
+                  loading="lazy"
+                  data-testid="img-pipeline-screenshot"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
               </div>
             </div>
           )}

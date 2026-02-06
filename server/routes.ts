@@ -302,6 +302,8 @@ export async function registerRoutes(
             contactEmail: null,
             contactPhone: biz.phone || null,
             socialMedia: biz.socialMedia || null,
+            detectedTechnologies: null,
+            screenshotUrl: null,
           });
           results.push(lead);
         } catch (err) {
