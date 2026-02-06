@@ -43,6 +43,8 @@ export const leads = pgTable("leads", {
   notes: text("notes"),
   source: text("source").default("manual"),
   socialMedia: text("social_media").array(),
+  detectedTechnologies: text("detected_technologies").array(),
+  screenshotUrl: text("screenshot_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

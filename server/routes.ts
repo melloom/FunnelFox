@@ -349,6 +349,8 @@ export async function registerRoutes(
               contactEmail,
               contactPhone,
               socialMedia: uniqueSocials,
+              detectedTechnologies: analysis.technologies || null,
+              screenshotUrl: analysis.screenshotUrl || null,
             });
           })
         );

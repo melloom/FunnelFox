@@ -1638,7 +1638,116 @@ async function scrapeContactPage(url: string): Promise<{ emails: string[]; phone
   return { emails: [...emails].slice(0, 5), phones: [...phones].slice(0, 3) };
 }
 
-export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis & { socialMedia?: string[]; contactInfo?: ExtractedContact }> {
+interface TechnologyDetection {
+  cms?: string;
+  framework?: string;
+  server?: string;
+  analytics: string[];
+  marketing: string[];
+  ecommerce?: string;
+  hosting?: string;
+}
+
+function detectTechnologies(html: string, $: cheerio.CheerioAPI, headers: Headers): TechnologyDetection {
+  const tech: TechnologyDetection = { analytics: [], marketing: [] };
+
+  if (html.includes("wp-content") || html.includes("wp-includes") || html.includes("wordpress")) tech.cms = "WordPress";
+  else if (html.includes("wix.com") || html.includes("X-Wix-")) tech.cms = "Wix";
+  else if (html.includes("squarespace.com") || html.includes("squarespace-cdn")) tech.cms = "Squarespace";
+  else if (html.includes("shopify") || html.includes("myshopify.com") || html.includes("Shopify.theme")) tech.cms = "Shopify";
+  else if (html.includes("webflow.com") || html.includes("wf-page")) tech.cms = "Webflow";
+  else if (html.includes("weebly.com")) tech.cms = "Weebly";
+  else if (html.includes("godaddy.com/website-builder") || html.includes("godaddy-dns")) tech.cms = "GoDaddy Builder";
+  else if (html.includes("site123.com")) tech.cms = "Site123";
+  else if (html.includes("jimdo.com")) tech.cms = "Jimdo";
+  else if (html.includes("duda.co") || html.includes("dudaone")) tech.cms = "Duda";
+  else if (html.includes("ghost.org") || html.includes("ghost-")) tech.cms = "Ghost";
+  else if (html.includes("drupal") || html.includes("Drupal.settings")) tech.cms = "Drupal";
+  else if (html.includes("joomla") || html.includes("/media/jui/")) tech.cms = "Joomla";
+  else if (html.includes("hubspot") && html.includes("hs-scripts")) tech.cms = "HubSpot CMS";
+  else if (html.includes("cargo.site") || html.includes("cargocollective")) tech.cms = "Cargo";
+  else if ($('meta[name="generator"]').attr("content")?.toLowerCase().includes("wordpress")) tech.cms = "WordPress";
+  else if ($('meta[name="generator"]').attr("content")?.toLowerCase().includes("drupal")) tech.cms = "Drupal";
+
+  if (html.includes("__NEXT_DATA__") || html.includes("_next/")) tech.framework = "Next.js";
+  else if (html.includes("__NUXT__") || html.includes("_nuxt/")) tech.framework = "Nuxt.js";
+  else if (html.includes("reactroot") || html.includes("react-root") || html.includes("__react")) tech.framework = "React";
+  else if (html.includes("ng-app") || html.includes("ng-version")) tech.framework = "Angular";
+  else if (html.includes("data-v-") || html.includes("vue-")) tech.framework = "Vue.js";
+  else if (html.includes("__svelte") || html.includes("svelte-")) tech.framework = "Svelte";
+  else if (html.includes("gatsby")) tech.framework = "Gatsby";
+  else if (html.includes("astro-")) tech.framework = "Astro";
+  else if (html.includes("ember") || html.includes("data-ember")) tech.framework = "Ember.js";
+
+  const serverHeader = headers.get("server") || headers.get("x-powered-by") || "";
+  if (serverHeader.toLowerCase().includes("nginx")) tech.server = "Nginx";
+  else if (serverHeader.toLowerCase().includes("apache")) tech.server = "Apache";
+  else if (serverHeader.toLowerCase().includes("cloudflare")) tech.server = "Cloudflare";
+  else if (serverHeader.toLowerCase().includes("netlify")) tech.server = "Netlify";
+  else if (serverHeader.toLowerCase().includes("vercel")) tech.server = "Vercel";
+  else if (serverHeader.toLowerCase().includes("iis")) tech.server = "IIS";
+
+  if (html.includes("google-analytics") || html.includes("gtag") || html.includes("analytics.js") || html.includes("ga.js")) tech.analytics.push("Google Analytics");
+  if (html.includes("googletagmanager.com")) tech.analytics.push("Google Tag Manager");
+  if (html.includes("hotjar.com")) tech.analytics.push("Hotjar");
+  if (html.includes("segment.com") || html.includes("analytics.min.js")) tech.analytics.push("Segment");
+  if (html.includes("mixpanel.com")) tech.analytics.push("Mixpanel");
+  if (html.includes("plausible.io")) tech.analytics.push("Plausible");
+  if (html.includes("fathom")) tech.analytics.push("Fathom");
+  if (html.includes("clarity.ms")) tech.analytics.push("Microsoft Clarity");
+  if (html.includes("heap") && html.includes("heap-")) tech.analytics.push("Heap");
+
+  if (html.includes("mailchimp.com")) tech.marketing.push("Mailchimp");
+  if (html.includes("hubspot.com") || html.includes("hs-scripts")) tech.marketing.push("HubSpot");
+  if (html.includes("intercom.com") || html.includes("intercomSettings")) tech.marketing.push("Intercom");
+  if (html.includes("drift.com")) tech.marketing.push("Drift");
+  if (html.includes("crisp.chat")) tech.marketing.push("Crisp");
+  if (html.includes("tawk.to")) tech.marketing.push("Tawk.to");
+  if (html.includes("zendesk.com")) tech.marketing.push("Zendesk");
+  if (html.includes("livechat")) tech.marketing.push("LiveChat");
+  if (html.includes("calendly.com")) tech.marketing.push("Calendly");
+  if (html.includes("convertkit")) tech.marketing.push("ConvertKit");
+  if (html.includes("activecampaign")) tech.marketing.push("ActiveCampaign");
+
+  if (html.includes("shopify") || html.includes("myshopify")) tech.ecommerce = "Shopify";
+  else if (html.includes("woocommerce") || html.includes("wc-")) tech.ecommerce = "WooCommerce";
+  else if (html.includes("bigcommerce")) tech.ecommerce = "BigCommerce";
+  else if (html.includes("magento")) tech.ecommerce = "Magento";
+  else if (html.includes("stripe.com") || html.includes("stripe.js")) tech.ecommerce = "Stripe";
+  else if (html.includes("paypal.com")) tech.ecommerce = "PayPal";
+  else if (html.includes("square.com") || html.includes("squareup.com")) tech.ecommerce = "Square";
+
+  if (html.includes("vercel") || headers.get("x-vercel-id")) tech.hosting = "Vercel";
+  else if (html.includes("netlify") || headers.get("x-nf-request-id")) tech.hosting = "Netlify";
+  else if (headers.get("server")?.includes("cloudflare")) tech.hosting = "Cloudflare";
+  else if (headers.get("server")?.includes("AmazonS3") || headers.get("x-amz-request-id")) tech.hosting = "AWS";
+  else if (html.includes("firebase") || html.includes("firebaseapp.com")) tech.hosting = "Firebase";
+  else if (html.includes("herokuapp.com")) tech.hosting = "Heroku";
+  else if (html.includes("github.io")) tech.hosting = "GitHub Pages";
+  else if (html.includes("render.com")) tech.hosting = "Render";
+
+  return tech;
+}
+
+function formatTechnologies(tech: TechnologyDetection): string[] {
+  const result: string[] = [];
+  if (tech.cms) result.push(`CMS: ${tech.cms}`);
+  if (tech.framework) result.push(`Framework: ${tech.framework}`);
+  if (tech.server) result.push(`Server: ${tech.server}`);
+  if (tech.hosting) result.push(`Hosting: ${tech.hosting}`);
+  if (tech.ecommerce) result.push(`E-commerce: ${tech.ecommerce}`);
+  for (const a of tech.analytics) result.push(`Analytics: ${a}`);
+  for (const m of tech.marketing) result.push(`Tool: ${m}`);
+  return result;
+}
+
+function generateScreenshotUrl(targetUrl: string): string {
+  let url = targetUrl;
+  if (!url.startsWith("http")) url = `https://${url}`;
+  return `https://image.thum.io/get/width/1280/crop/800/noanimate/${encodeURIComponent(url)}`;
+}
+
+export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis & { socialMedia?: string[]; contactInfo?: ExtractedContact; technologies?: string[]; screenshotUrl?: string }> {
   const issues: string[] = [];
   let score = 100;
 
@@ -1719,22 +1828,6 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       score -= 10;
     }
 
-    const hasModernFramework =
-      html.includes("__NEXT_DATA__") ||
-      html.includes("__NUXT__") ||
-      html.includes("reactroot") ||
-      html.includes("react-root") ||
-      html.includes("ng-app") ||
-      html.includes("data-v-") ||
-      html.includes("_app.js") ||
-      html.includes("webpack") ||
-      html.includes("vite");
-
-    if (!hasModernFramework) {
-      issues.push("No modern framework detected");
-      score -= 10;
-    }
-
     const hasStructuredData =
       html.includes("schema.org") ||
       html.includes("application/ld+json") ||
@@ -1756,34 +1849,18 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       score -= 5;
     }
 
-    const hasAnalytics =
-      html.includes("google-analytics") ||
-      html.includes("gtag") ||
-      html.includes("analytics.js") ||
-      html.includes("ga.js") ||
-      html.includes("hotjar") ||
-      html.includes("segment") ||
-      html.includes("mixpanel") ||
-      html.includes("plausible") ||
-      html.includes("fathom");
-
-    if (!hasAnalytics) {
-      issues.push("No analytics found");
-      score -= 5;
-    }
-
     const images = $("img");
     const imagesWithAlt = $("img[alt]").filter((_i, el) => {
       const alt = $(el).attr("alt");
       return !!alt && alt.trim().length > 0;
     });
     if (images.length > 0 && imagesWithAlt.length < images.length * 0.5) {
-      issues.push("Images missing alt text");
+      issues.push("Images missing alt text (accessibility)");
       score -= 5;
     }
 
     if (html.length > 500000) {
-      issues.push("Excessive page size");
+      issues.push("Excessive page size (performance)");
       score -= 10;
     }
 
@@ -1806,17 +1883,93 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       }
     }
 
-    const isTemplateSite =
-      html.includes("wix.com") ||
-      html.includes("squarespace.com") ||
-      html.includes("weebly.com") ||
-      html.includes("godaddy.com/website-builder") ||
-      html.includes("wordpress.com") ||
-      html.includes("site123.com") ||
-      html.includes("jimdo.com");
+    const technologies = detectTechnologies(html, $, response.headers);
 
-    if (isTemplateSite) {
-      issues.push("Uses basic website builder (not custom)");
+    if (!technologies.framework && !technologies.cms) {
+      issues.push("No modern framework detected");
+      score -= 10;
+    }
+
+    if (technologies.cms && ["Wix", "Weebly", "GoDaddy Builder", "Site123", "Jimdo"].includes(technologies.cms)) {
+      issues.push(`Uses basic website builder (${technologies.cms})`);
+      score -= 5;
+    } else if (technologies.cms === "Squarespace" || technologies.cms === "WordPress") {
+      issues.push(`Built with ${technologies.cms} template`);
+      score -= 3;
+    }
+
+    if (technologies.analytics.length === 0) {
+      issues.push("No analytics tracking");
+      score -= 5;
+    }
+
+    const h1Count = $("h1").length;
+    if (h1Count === 0) {
+      issues.push("Missing H1 heading (accessibility/SEO)");
+      score -= 5;
+    } else if (h1Count > 1) {
+      issues.push("Multiple H1 headings (SEO issue)");
+      score -= 3;
+    }
+
+    const hasSkipLink = $('a[href="#main"], a[href="#content"], a.skip-link, a.skip-to-content').length > 0;
+    const hasAriaLandmarks = $('[role="main"], [role="navigation"], [role="banner"], main, nav, header').length > 0;
+    if (!hasAriaLandmarks && !hasSkipLink) {
+      issues.push("No ARIA landmarks (accessibility)");
+      score -= 5;
+    }
+
+    const formInputs = $("input, textarea, select");
+    const formLabels = $("label");
+    if (formInputs.length > 0 && formLabels.length < formInputs.length * 0.5) {
+      issues.push("Form inputs missing labels (accessibility)");
+      score -= 5;
+    }
+
+    const htmlLang = $("html").attr("lang");
+    if (!htmlLang) {
+      issues.push("Missing lang attribute on HTML (accessibility)");
+      score -= 3;
+    }
+
+    const hasLazyLoading = $('img[loading="lazy"]').length > 0 || html.includes("lazyload") || html.includes("lazy-load");
+    if (images.length > 5 && !hasLazyLoading) {
+      issues.push("No lazy loading for images (performance)");
+      score -= 3;
+    }
+
+    const hasMinifiedCSS = $('link[rel="stylesheet"]').length > 0 && (html.includes(".min.css") || html.includes("chunk"));
+    const hasMinifiedJS = html.includes(".min.js") || html.includes("chunk") || html.includes("bundle");
+    if (!hasMinifiedCSS && !hasMinifiedJS && $('link[rel="stylesheet"]').length > 0) {
+      issues.push("Resources may not be minified (performance)");
+      score -= 3;
+    }
+
+    const hasOgTags = $('meta[property^="og:"]').length > 0;
+    if (!hasOgTags) {
+      issues.push("Missing Open Graph tags (social sharing)");
+      score -= 3;
+    }
+
+    const hasCanonical = $('link[rel="canonical"]').length > 0;
+    if (!hasCanonical) {
+      issues.push("Missing canonical URL (SEO)");
+      score -= 3;
+    }
+
+    const hasFavicon = $('link[rel="icon"], link[rel="shortcut icon"]').length > 0;
+    if (!hasFavicon) {
+      issues.push("Missing favicon");
+      score -= 2;
+    }
+
+    const hasRobotsMeta = $('meta[name="robots"]').length > 0;
+    const hasSitemapLink = html.includes("sitemap.xml") || html.includes("sitemap");
+
+    const scriptCount = $("script[src]").length;
+    const stylesheetCount = $('link[rel="stylesheet"]').length;
+    if (scriptCount + stylesheetCount > 30) {
+      issues.push(`Too many resources (${scriptCount + stylesheetCount} scripts/styles)`);
       score -= 5;
     }
 
@@ -1856,6 +2009,8 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
     };
 
     const hasContact = contactInfo.emails.length > 0 || contactInfo.phones.length > 0;
+    const techList = formatTechnologies(technologies);
+    const screenshotUrl = generateScreenshotUrl(fullUrl);
 
     return {
       score: Math.max(0, Math.min(100, score)),
@@ -1863,6 +2018,8 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       hasWebsite: true,
       socialMedia: socialMedia.length ? socialMedia : undefined,
       contactInfo: hasContact ? cleanedContactInfo : undefined,
+      technologies: techList.length ? techList : undefined,
+      screenshotUrl,
     };
 
   } catch (err: any) {

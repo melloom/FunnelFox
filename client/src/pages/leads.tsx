@@ -43,6 +43,12 @@ import {
   History,
   Copy,
   Check,
+  Camera,
+  Cpu,
+  Shield,
+  Zap,
+  Eye,
+  SearchCode,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -408,13 +414,88 @@ function LeadDetailDialog({
 
           {lead.websiteIssues && lead.websiteIssues.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Website Issues</p>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Website Analysis</p>
+              {(() => {
+                const categories: Record<string, { icon: typeof Globe; issues: string[] }> = {
+                  "Performance": { icon: Zap, issues: [] },
+                  "SEO": { icon: SearchCode, issues: [] },
+                  "Accessibility": { icon: Eye, issues: [] },
+                  "Security": { icon: Shield, issues: [] },
+                  "Other": { icon: Globe, issues: [] },
+                };
+                for (const issue of lead.websiteIssues) {
+                  const lower = issue.toLowerCase();
+                  if (lower.includes("performance") || lower.includes("load time") || lower.includes("page size") || lower.includes("lazy") || lower.includes("minif") || lower.includes("resources") || lower.includes("slow")) {
+                    categories["Performance"].issues.push(issue);
+                  } else if (lower.includes("seo") || lower.includes("meta") || lower.includes("title") || lower.includes("canonical") || lower.includes("structured data") || lower.includes("h1") || lower.includes("heading") || lower.includes("open graph") || lower.includes("sitemap") || lower.includes("favicon")) {
+                    categories["SEO"].issues.push(issue);
+                  } else if (lower.includes("accessibility") || lower.includes("aria") || lower.includes("alt text") || lower.includes("label") || lower.includes("lang")) {
+                    categories["Accessibility"].issues.push(issue);
+                  } else if (lower.includes("https") || lower.includes("security")) {
+                    categories["Security"].issues.push(issue);
+                  } else {
+                    categories["Other"].issues.push(issue);
+                  }
+                }
+                return (
+                  <div className="space-y-2">
+                    {Object.entries(categories).map(([cat, { icon: Icon, issues }]) => {
+                      if (issues.length === 0) return null;
+                      return (
+                        <div key={cat}>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Icon className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs font-medium">{cat}</span>
+                            <Badge variant="secondary" className="text-[10px]">{issues.length}</Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1 ml-4.5">
+                            {issues.map((issue, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px]">
+                                {issue}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {lead.detectedTechnologies && lead.detectedTechnologies.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Detected Technologies</p>
               <div className="flex flex-wrap gap-1.5">
-                {lead.websiteIssues.map((issue, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {issue}
-                  </Badge>
-                ))}
+                {lead.detectedTechnologies.map((tech, i) => {
+                  const [category, value] = tech.includes(": ") ? tech.split(": ", 2) : ["Tech", tech];
+                  return (
+                    <Badge key={i} variant="outline" className="text-[10px] gap-1" data-testid={`badge-tech-${i}`}>
+                      <Cpu className="w-2.5 h-2.5" />
+                      <span className="text-muted-foreground">{category}:</span> {value}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!noWebsite && lead.screenshotUrl && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-xs font-medium text-muted-foreground">Website Screenshot</p>
+              </div>
+              <div className="rounded-md border overflow-hidden">
+                <img
+                  src={lead.screenshotUrl}
+                  alt={`Screenshot of ${lead.companyName}'s website`}
+                  className="w-full h-auto"
+                  loading="lazy"
+                  data-testid="img-website-screenshot"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
               </div>
             </div>
           )}
