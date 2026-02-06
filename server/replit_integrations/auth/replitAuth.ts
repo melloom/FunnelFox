@@ -2,6 +2,8 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import { authStorage } from "./storage";
 import { loginSchema, registerSchema } from "@shared/models/auth";
 import { z } from "zod";
@@ -11,6 +13,30 @@ declare module "express-session" {
     userId?: string;
   }
 }
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: "Too many login attempts. Try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { message: "Too many accounts created. Try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 100,
+  message: { message: "Too many requests. Slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -29,6 +55,7 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: sessionTtl,
     },
   });
@@ -36,9 +63,17 @@ export function getSession() {
 
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
+
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }));
+
   app.use(getSession());
 
-  app.post("/api/register", async (req, res) => {
+  app.use("/api/", apiLimiter);
+
+  app.post("/api/register", registerLimiter, async (req, res) => {
     try {
       const data = registerSchema.parse(req.body);
 
@@ -68,7 +103,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", async (req, res) => {
+  app.post("/api/login", loginLimiter, async (req, res) => {
     try {
       const data = loginSchema.parse(req.body);
 
