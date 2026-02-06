@@ -91,13 +91,15 @@ function getCacheKey(category: string, location: string, maxResults: number): st
 
 function pruneCache(): void {
   const now = Date.now();
-  for (const [key, entry] of searchCache) {
-    if (now - entry.timestamp > CACHE_TTL_MS) {
+  const keys = Array.from(searchCache.keys());
+  for (const key of keys) {
+    const entry = searchCache.get(key);
+    if (entry && now - entry.timestamp > CACHE_TTL_MS) {
       searchCache.delete(key);
     }
   }
   if (searchCache.size > MAX_CACHE_ENTRIES) {
-    const entries = [...searchCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const entries = Array.from(searchCache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp);
     const toRemove = entries.slice(0, entries.length - MAX_CACHE_ENTRIES);
     for (const [key] of toRemove) {
       searchCache.delete(key);
@@ -238,7 +240,7 @@ function normalizePhone(phone: string): string {
 
 function findFuzzyNameMatch(nameKey: string, byName: Map<string, ScrapedBusiness>): ScrapedBusiness | undefined {
   if (nameKey.length < 5) return undefined;
-  for (const [existingKey, biz] of byName) {
+  for (const [existingKey, biz] of Array.from(byName.entries())) {
     if (existingKey.length < 5) continue;
     if (existingKey.includes(nameKey) || nameKey.includes(existingKey)) {
       const shorter = Math.min(nameKey.length, existingKey.length);
@@ -1573,8 +1575,8 @@ function extractContactInfo(html: string, $: cheerio.CheerioAPI, baseUrl: string
   });
 
   return {
-    emails: [...emails].slice(0, 5),
-    phones: [...phones].slice(0, 3),
+    emails: Array.from(emails).slice(0, 5),
+    phones: Array.from(phones).slice(0, 3),
     contactPageUrl,
     hasContactForm: hasContactForm || undefined,
     discoveredPages: contactPages,
@@ -1635,7 +1637,7 @@ async function scrapeContactPage(url: string): Promise<{ emails: string[]; phone
     });
   } catch {}
 
-  return { emails: [...emails].slice(0, 5), phones: [...phones].slice(0, 3) };
+  return { emails: Array.from(emails).slice(0, 5), phones: Array.from(phones).slice(0, 3) };
 }
 
 interface TechnologyDetection {
