@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, UserX, Star, TrendingUp, Globe, Search } from "lucide-react";
+import { Users, UserCheck, Star, TrendingUp, Globe, Search, Kanban, AlertCircle } from "lucide-react";
 import type { Lead } from "@shared/schema";
+import { PIPELINE_STAGES } from "@shared/schema";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -34,44 +35,43 @@ function StatCard({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, string> = {
-    new: "bg-chart-1/15 text-chart-1",
-    contacted: "bg-chart-4/15 text-chart-4",
-    interested: "bg-chart-2/15 text-chart-2",
-    not_interested: "bg-chart-5/15 text-chart-5",
-    converted: "bg-primary/15 text-primary",
-  };
-  const labels: Record<string, string> = {
-    new: "New",
-    contacted: "Contacted",
-    interested: "Interested",
-    not_interested: "Not Interested",
-    converted: "Converted",
-  };
-  return (
-    <Badge variant="outline" className={`${variants[status] || ""} border-0`}>
-      {labels[status] || status}
-    </Badge>
-  );
-}
+const STAGE_COLORS: Record<string, string> = {
+  "chart-1": "bg-chart-1",
+  "chart-2": "bg-chart-2",
+  "chart-3": "bg-chart-3",
+  "chart-4": "bg-chart-4",
+  "chart-5": "bg-chart-5",
+  "primary": "bg-primary",
+  "destructive": "bg-destructive",
+};
+
+const STAGE_TEXT_COLORS: Record<string, string> = {
+  "chart-1": "text-chart-1",
+  "chart-2": "text-chart-2",
+  "chart-3": "text-chart-3",
+  "chart-4": "text-chart-4",
+  "chart-5": "text-chart-5",
+  "primary": "text-primary",
+  "destructive": "text-destructive",
+};
 
 export default function Dashboard() {
   const { data: leads = [], isLoading } = useQuery<Lead[]>({
     queryKey: ["/api/leads"],
   });
 
+  const activeLeads = leads.filter((l) => l.status !== "lost" && l.status !== "not_interested");
+  const noWebsiteLeads = leads.filter((l) => !l.websiteUrl || l.websiteUrl === "none");
+
   const stats = {
     total: leads.length,
+    active: activeLeads.length,
     new: leads.filter((l) => l.status === "new").length,
-    contacted: leads.filter((l) => l.status === "contacted").length,
-    interested: leads.filter((l) => l.status === "interested").length,
+    inProgress: leads.filter((l) =>
+      ["contacted", "interested", "demo_scheduled", "proposal_sent", "negotiation"].includes(l.status)
+    ).length,
     converted: leads.filter((l) => l.status === "converted").length,
-    avgScore: leads.length
-      ? Math.round(
-          leads.reduce((acc, l) => acc + (l.websiteScore || 0), 0) / leads.length
-        )
-      : 0,
+    noWebsite: noWebsiteLeads.length,
   };
 
   const recentLeads = [...leads]
@@ -118,10 +118,10 @@ export default function Dashboard() {
               Discover Leads
             </Button>
           </Link>
-          <Link href="/add">
-            <Button variant="outline" data-testid="button-add-lead-hero">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Add Manually
+          <Link href="/pipeline">
+            <Button variant="outline" data-testid="button-pipeline-hero">
+              <Kanban className="w-4 h-4 mr-2" />
+              Pipeline
             </Button>
           </Link>
         </div>
@@ -143,14 +143,14 @@ export default function Dashboard() {
           testId="stat-new-leads"
         />
         <StatCard
-          title="Interested"
-          value={stats.interested}
+          title="In Progress"
+          value={stats.inProgress}
           icon={UserCheck}
-          description="Potential clients"
-          testId="stat-interested"
+          description="Actively in pipeline"
+          testId="stat-in-progress"
         />
         <StatCard
-          title="Converted"
+          title="Won"
           value={stats.converted}
           icon={Star}
           description="Successful conversions"
@@ -161,6 +161,38 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
+            <CardTitle className="text-base">Pipeline Overview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {PIPELINE_STAGES.map((stage) => {
+                const count = leads.filter((l) => l.status === stage.value).length;
+                const color = STAGE_COLORS[stage.color] || "bg-muted";
+                return (
+                  <div key={stage.value} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-muted-foreground">{stage.label}</span>
+                      <span className="text-sm font-medium">{count}</span>
+                    </div>
+                    <div className="h-2 rounded-md bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-md ${color} transition-all duration-500`}
+                        style={{
+                          width: stats.total > 0
+                            ? `${(count / stats.total) * 100}%`
+                            : "0%",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle className="text-base">Recent Leads</CardTitle>
           </CardHeader>
           <CardContent>
@@ -169,60 +201,46 @@ export default function Dashboard() {
                 <Users className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">No leads yet</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add your first lead to get started
+                  Discover leads to start building your pipeline
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {recentLeads.map((lead) => (
-                  <Link href={`/leads`} key={lead.id}>
-                    <div
-                      className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer"
-                      data-testid={`card-recent-lead-${lead.id}`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{lead.companyName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{lead.websiteUrl}</p>
+              <div className="space-y-2">
+                {recentLeads.map((lead) => {
+                  const stage = PIPELINE_STAGES.find((s) => s.value === lead.status);
+                  const textColor = stage ? (STAGE_TEXT_COLORS[stage.color] || "") : "";
+                  const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
+
+                  return (
+                    <Link href="/pipeline" key={lead.id}>
+                      <div
+                        className="flex items-center justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer"
+                        data-testid={`card-recent-lead-${lead.id}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium truncate">{lead.companyName}</p>
+                            {noWebsite && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                No site
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {noWebsite ? (lead.location || lead.industry || "No website") : lead.websiteUrl}
+                          </p>
+                        </div>
+                        {stage && (
+                          <Badge variant="outline" className={`${textColor} border-0 bg-muted text-xs shrink-0`}>
+                            {stage.label}
+                          </Badge>
+                        )}
                       </div>
-                      <StatusBadge status={lead.status} />
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Pipeline Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { label: "New", count: stats.new, color: "bg-chart-1" },
-                { label: "Contacted", count: stats.contacted, color: "bg-chart-4" },
-                { label: "Interested", count: stats.interested, color: "bg-chart-2" },
-                { label: "Converted", count: stats.converted, color: "bg-primary" },
-              ].map((item) => (
-                <div key={item.label} className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-muted-foreground">{item.label}</span>
-                    <span className="text-sm font-medium">{item.count}</span>
-                  </div>
-                  <div className="h-2 rounded-md bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-md ${item.color} transition-all duration-500`}
-                      style={{
-                        width: stats.total > 0
-                          ? `${(item.count / stats.total) * 100}%`
-                          : "0%",
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
           </CardContent>
         </Card>
       </div>

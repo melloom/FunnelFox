@@ -9,7 +9,24 @@ export const leadStatusEnum = pgEnum("lead_status", [
   "interested",
   "not_interested",
   "converted",
+  "demo_scheduled",
+  "proposal_sent",
+  "negotiation",
+  "lost",
 ]);
+
+export const PIPELINE_STAGES = [
+  { value: "new", label: "New Lead", color: "chart-1" },
+  { value: "contacted", label: "Contacted", color: "chart-4" },
+  { value: "interested", label: "Interested", color: "chart-2" },
+  { value: "demo_scheduled", label: "Demo", color: "chart-3" },
+  { value: "proposal_sent", label: "Proposal", color: "chart-5" },
+  { value: "negotiation", label: "Negotiation", color: "chart-4" },
+  { value: "converted", label: "Won", color: "primary" },
+  { value: "lost", label: "Lost", color: "destructive" },
+] as const;
+
+export type PipelineStage = typeof PIPELINE_STAGES[number]["value"];
 
 export const leads = pgTable("leads", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

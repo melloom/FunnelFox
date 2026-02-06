@@ -4,12 +4,17 @@ interface ScrapedBusiness {
   name: string;
   url: string;
   description?: string;
+  hasWebsite: boolean;
+  source?: string;
 }
 
 interface WebsiteAnalysis {
   score: number;
   issues: string[];
+  hasWebsite: boolean;
 }
+
+const SAFARI_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
 
 export async function searchBusinesses(
   category: string,
@@ -17,41 +22,69 @@ export async function searchBusinesses(
   maxResults: number = 20
 ): Promise<ScrapedBusiness[]> {
   const businesses: ScrapedBusiness[] = [];
-  const query = `${category} ${location} website`;
 
-  try {
-    const searches = [
-      searchDuckDuckGo(query, maxResults),
-      searchBing(query, maxResults),
-    ];
+  const queries = [
+    `${category} ${location}`,
+    `${category} shop ${location}`,
+    `${category} ${location} local business`,
+  ];
 
-    const results = await Promise.allSettled(searches);
+  const searches: Promise<ScrapedBusiness[]>[] = [];
+  for (const query of queries) {
+    searches.push(searchBing(query, maxResults, category));
+  }
+  searches.push(searchDuckDuckGo(`${category} ${location}`, maxResults, category));
 
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        businesses.push(...result.value);
-      }
+  const results = await Promise.allSettled(searches);
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      businesses.push(...result.value);
     }
-  } catch (err) {
-    console.error("Search error:", err);
   }
 
   const seen = new Set<string>();
   const unique: ScrapedBusiness[] = [];
   for (const biz of businesses) {
-    const domain = extractDomain(biz.url);
-    if (!domain || seen.has(domain)) continue;
-    if (isExcludedDomain(domain)) continue;
-    seen.add(domain);
+    const key = biz.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+    if (!key || key.length < 3) continue;
+    const domain = biz.url ? extractDomain(biz.url) : null;
+    const dedupeKey = domain || key;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
     unique.push(biz);
   }
 
   return unique.slice(0, maxResults);
 }
 
+function processSearchResult(
+  title: string,
+  href: string,
+  snippet: string,
+  category: string
+): ScrapedBusiness | null {
+  const domain = extractDomain(href);
+  if (!domain) return null;
+  if (isExcludedDomain(domain)) return null;
+  if (isAggregatorSite(domain)) return null;
+  if (isListTitle(title, category)) return null;
+
+  const bizName = cleanBusinessName(title);
+  if (!bizName || bizName.length < 3 || bizName.length > 80) return null;
+
+  return {
+    name: bizName,
+    url: normalizeUrl(href),
+    description: snippet || undefined,
+    hasWebsite: true,
+    source: "web",
+  };
+}
+
 async function searchDuckDuckGo(
   query: string,
-  maxResults: number
+  maxResults: number,
+  category: string
 ): Promise<ScrapedBusiness[]> {
   const results: ScrapedBusiness[] = [];
 
@@ -65,15 +98,15 @@ async function searchDuckDuckGo(
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": SAFARI_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
       },
     });
     clearTimeout(timeout);
 
-    if (!response.ok) return results;
+    const status = response.status;
+    if (status !== 200 && status !== 202) return results;
 
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -94,14 +127,12 @@ async function searchDuckDuckGo(
         } catch {}
       }
 
-      if (actualUrl && title && isValidBusinessUrl(actualUrl)) {
-        results.push({
-          name: cleanBusinessName(title),
-          url: normalizeUrl(actualUrl),
-          description: snippet || undefined,
-        });
+      if (actualUrl && title) {
+        const biz = processSearchResult(title, actualUrl, snippet, category);
+        if (biz) results.push(biz);
       }
     });
+
   } catch (err) {
     console.error("DuckDuckGo search error:", err);
   }
@@ -111,7 +142,8 @@ async function searchDuckDuckGo(
 
 async function searchBing(
   query: string,
-  maxResults: number
+  maxResults: number,
+  category: string
 ): Promise<ScrapedBusiness[]> {
   const results: ScrapedBusiness[] = [];
 
@@ -125,10 +157,11 @@ async function searchBing(
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": SAFARI_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "identity",
+        Connection: "keep-alive",
       },
     });
     clearTimeout(timeout);
@@ -141,19 +174,18 @@ async function searchBing(
     $("li.b_algo").each((_i, el) => {
       if (results.length >= maxResults) return false;
 
-      const linkEl = $(el).find("h2 a");
-      const href = linkEl.attr("href") || "";
-      const title = linkEl.text().trim();
-      const snippet = $(el).find(".b_caption p").text().trim();
+      const title = $(el).find("h2 a").text().trim();
+      const snippet = $(el).find(".b_caption p, .b_lineclamp2").text().trim();
 
-      if (href && title && isValidBusinessUrl(href)) {
-        results.push({
-          name: cleanBusinessName(title),
-          url: normalizeUrl(href),
-          description: snippet || undefined,
-        });
+      const cite = $(el).find("cite").text().trim();
+      const actualUrl = extractUrlFromCite(cite);
+
+      if (actualUrl && title) {
+        const biz = processSearchResult(title, actualUrl, snippet, category);
+        if (biz) results.push(biz);
       }
     });
+
   } catch (err) {
     console.error("Bing search error:", err);
   }
@@ -161,9 +193,104 @@ async function searchBing(
   return results;
 }
 
+function extractUrlFromCite(cite: string): string {
+  if (!cite) return "";
+  let url = cite
+    .replace(/\s*›\s*/g, "/")
+    .replace(/\s+/g, "")
+    .trim();
+
+  if (!url.startsWith("http")) {
+    url = "https://" + url;
+  }
+
+  try {
+    new URL(url);
+    return url;
+  } catch {
+    return "";
+  }
+}
+
+function isListTitle(title: string, category: string): boolean {
+  const lower = title.toLowerCase();
+
+  const listPatterns = [
+    /^(the\s+)?(top|best)\s+\d+/i,
+    /\d+\s+(best|top)\s+/i,
+    /best\s+.{3,30}\s+(in|near)\s+/i,
+    /top\s+.{3,30}\s+(in|near)\s+/i,
+    /updated\s+20\d{2}/i,
+    /^(find|view|search|browse|list|compare|discover)\s+/i,
+    /near\s+(me|you)\b/i,
+    /\b(ranking|ratings)\b/i,
+    /\breview(s|ed)?\b.*\b(in|near|for)\b/i,
+  ];
+
+  for (const pattern of listPatterns) {
+    if (pattern.test(lower)) return true;
+  }
+
+  const catLower = category.toLowerCase();
+  const plurals = [`${catLower}s in `, `${catLower}s near `, `${catLower} shops in `, `${catLower} shops near `];
+  for (const phrase of plurals) {
+    if (lower.includes(phrase) && !lower.includes(" - ")) return true;
+  }
+
+  return false;
+}
+
+function isAggregatorSite(domain: string): boolean {
+  const aggregators = [
+    "yelp.com", "yellowpages.com", "bbb.org", "angieslist.com", "angi.com",
+    "thumbtack.com", "homeadvisor.com", "nextdoor.com",
+    "mapquest.com", "manta.com", "chamberofcommerce.com",
+    "superpages.com", "citysearch.com", "local.com",
+    "merchantcircle.com", "hotfrog.com", "brownbook.net",
+    "cylex.us.com", "dexknows.com", "judysbook.com",
+    "foursquare.com", "tripadvisor.com",
+    "barberhead.com", "barbershops.net", "onebarber.com",
+    "bestprosintown.com", "marylandrecommendations.com",
+    "booksy.com", "thecut.co", "vagaro.com", "styleseat.com",
+    "fresha.com", "schedulicity.com", "genbook.com",
+    "expertise.com", "therealyellowpages.com",
+    "bark.com", "houzz.com", "care.com", "taskrabbit.com",
+    "handy.com", "porch.com", "buildzoom.com", "fixr.com",
+    "healthgrades.com", "zocdoc.com", "vitals.com",
+    "avvo.com", "findlaw.com", "justia.com", "lawyers.com",
+    "realtor.com", "zillow.com", "trulia.com", "redfin.com",
+    "opentable.com", "doordash.com", "grubhub.com", "ubereats.com",
+    "niche.com", "greatschools.org",
+    "whitepages.com", "spokeo.com",
+    "patch.com", "newsbreak.com",
+  ];
+  return aggregators.some((ex) => domain.includes(ex));
+}
+
+function isExcludedDomain(domain: string): boolean {
+  const excluded = [
+    "facebook.com", "twitter.com", "x.com", "instagram.com",
+    "linkedin.com", "youtube.com", "tiktok.com", "pinterest.com",
+    "reddit.com", "wikipedia.org",
+    "google.com", "bing.com", "duckduckgo.com",
+    "amazon.com", "ebay.com", "craigslist.org", "indeed.com",
+    "glassdoor.com", "apple.com", "microsoft.com",
+  ];
+  if (domain.endsWith(".gov")) return true;
+  return excluded.some((ex) => domain.includes(ex));
+}
+
 export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis> {
   const issues: string[] = [];
   let score = 100;
+
+  if (!targetUrl || targetUrl.trim() === "" || targetUrl === "none") {
+    return {
+      score: 0,
+      issues: ["No website found", "Business needs a website built from scratch"],
+      hasWebsite: false,
+    };
+  }
 
   let fullUrl = targetUrl;
   if (!fullUrl.startsWith("http")) {
@@ -178,8 +305,7 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
     const response = await fetch(fullUrl, {
       signal: controller.signal,
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": SAFARI_UA,
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",
@@ -190,12 +316,19 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
     if (!response.ok) {
       issues.push("Website returns error status");
       score -= 30;
-      return { score: Math.max(0, score), issues };
+      return { score: Math.max(0, score), issues, hasWebsite: true };
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html")) {
+      issues.push("Website does not serve HTML");
+      score -= 20;
+      return { score: Math.max(0, score), issues, hasWebsite: true };
     }
 
     const finalUrl = response.url;
     if (!finalUrl.startsWith("https://")) {
-      issues.push("No HTTPS");
+      issues.push("No HTTPS - security risk");
       score -= 15;
     }
 
@@ -222,8 +355,8 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       score -= 10;
     }
 
-    const title = $("title").text().trim();
-    if (!title || title.length < 3) {
+    const pageTitle = $("title").text().trim();
+    if (!pageTitle || pageTitle.length < 3) {
       issues.push("Missing or empty title tag");
       score -= 10;
     }
@@ -296,11 +429,8 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       score -= 10;
     }
 
-    const hasSsl = $('link[rel="stylesheet"][href^="https"]').length > 0 ||
-      $('script[src^="https"]').length > 0;
-
-    const hasContactForm = html.includes("contact") || html.includes("form");
     const hasCTA = $('a[href*="contact"], a[href*="quote"], a[href*="book"], button').length > 0;
+    const hasContactForm = html.includes("contact") || html.includes("form");
 
     if (!hasCTA && !hasContactForm) {
       issues.push("No clear call-to-action");
@@ -318,17 +448,31 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       }
     }
 
+    const isTemplateSite =
+      html.includes("wix.com") ||
+      html.includes("squarespace.com") ||
+      html.includes("weebly.com") ||
+      html.includes("godaddy.com/website-builder") ||
+      html.includes("wordpress.com") ||
+      html.includes("site123.com") ||
+      html.includes("jimdo.com");
+
+    if (isTemplateSite) {
+      issues.push("Uses basic website builder (not custom)");
+      score -= 5;
+    }
+
   } catch (err: any) {
     if (err.name === "AbortError") {
       issues.push("Website timed out (>10s)");
       score -= 30;
     } else {
-      issues.push("Website unreachable");
+      issues.push("Website unreachable or broken");
       score -= 40;
     }
   }
 
-  return { score: Math.max(0, Math.min(100, score)), issues };
+  return { score: Math.max(0, Math.min(100, score)), issues, hasWebsite: true };
 }
 
 function extractDomain(url: string): string | null {
@@ -338,32 +482,6 @@ function extractDomain(url: string): string | null {
     return new URL(fullUrl).hostname.replace(/^www\./, "");
   } catch {
     return null;
-  }
-}
-
-function isExcludedDomain(domain: string): boolean {
-  const excluded = [
-    "facebook.com", "twitter.com", "x.com", "instagram.com",
-    "linkedin.com", "youtube.com", "tiktok.com", "pinterest.com",
-    "reddit.com", "wikipedia.org", "yelp.com", "yellowpages.com",
-    "bbb.org", "google.com", "bing.com", "duckduckgo.com",
-    "amazon.com", "ebay.com", "craigslist.org", "indeed.com",
-    "glassdoor.com", "tripadvisor.com", "angieslist.com",
-    "thumbtack.com", "homeadvisor.com", "nextdoor.com",
-    "mapquest.com", "apple.com", "microsoft.com",
-  ];
-  return excluded.some((ex) => domain.includes(ex));
-}
-
-function isValidBusinessUrl(url: string): boolean {
-  try {
-    let fullUrl = url;
-    if (!fullUrl.startsWith("http")) fullUrl = `https://${fullUrl}`;
-    const parsed = new URL(fullUrl);
-    const domain = parsed.hostname.replace(/^www\./, "");
-    return !isExcludedDomain(domain) && domain.includes(".");
-  } catch {
-    return false;
   }
 }
 
@@ -379,10 +497,27 @@ function normalizeUrl(url: string): string {
 }
 
 function cleanBusinessName(title: string): string {
-  return title
-    .replace(/\s*[-|–—]\s*.+$/, "")
+  let name = title
+    .replace(/\s*[-|–—]\s*(Home|About|Contact|Services|Official|Website|Site|Page|Welcome|Reviews?|Get\s|Your\s|We\s|The\s+Best|A\s+).*$/i, "")
     .replace(/\s*\|.*$/, "")
+    .replace(/\s*[-–—]\s*[A-Z][a-z]+,?\s+[A-Z]{2}\s*$/, "")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 100);
+    .trim();
+
+  if (name.length > 50) {
+    const dash = name.indexOf(" - ");
+    if (dash > 0 && dash < 50) {
+      name = name.slice(0, dash);
+    }
+    const pipe = name.indexOf(" | ");
+    if (pipe > 0 && pipe < 50) {
+      name = name.slice(0, pipe);
+    }
+  }
+
+  name = name
+    .replace(/,\s+(Inc|LLC|Ltd|Corp|Co)\b\.?$/i, "")
+    .trim();
+
+  return name.slice(0, 80);
 }

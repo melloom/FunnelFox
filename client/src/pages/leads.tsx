@@ -30,31 +30,37 @@ import {
   Globe,
   SlidersHorizontal,
   X,
-  ChevronDown,
   NotebookPen,
+  Trash2,
 } from "lucide-react";
 import type { Lead } from "@shared/schema";
+import { PIPELINE_STAGES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+const STAGE_TEXT_COLORS: Record<string, string> = {
+  "chart-1": "text-chart-1",
+  "chart-2": "text-chart-2",
+  "chart-3": "text-chart-3",
+  "chart-4": "text-chart-4",
+  "chart-5": "text-chart-5",
+  "primary": "text-primary",
+  "destructive": "text-destructive",
+};
+
 function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, string> = {
-    new: "bg-chart-1/15 text-chart-1",
-    contacted: "bg-chart-4/15 text-chart-4",
-    interested: "bg-chart-2/15 text-chart-2",
-    not_interested: "bg-chart-5/15 text-chart-5",
-    converted: "bg-primary/15 text-primary",
-  };
-  const labels: Record<string, string> = {
-    new: "New",
-    contacted: "Contacted",
-    interested: "Interested",
-    not_interested: "Not Interested",
-    converted: "Converted",
-  };
+  const stage = PIPELINE_STAGES.find((s) => s.value === status);
+  if (!stage) {
+    return (
+      <Badge variant="outline" className="border-0 bg-muted text-muted-foreground">
+        {status}
+      </Badge>
+    );
+  }
+  const textColor = STAGE_TEXT_COLORS[stage.color] || "";
   return (
-    <Badge variant="outline" className={`${variants[status] || ""} border-0`}>
-      {labels[status] || status}
+    <Badge variant="outline" className={`${textColor} border-0 bg-muted`}>
+      {stage.label}
     </Badge>
   );
 }
@@ -103,10 +109,23 @@ function LeadDetailDialog({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/leads/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({ title: "Lead deleted" });
+      onClose();
+    },
+  });
+
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
 
   if (!lead) return null;
+
+  const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -126,21 +145,26 @@ function LeadDetailDialog({
             {lead.industry && (
               <Badge variant="secondary" className="text-xs">{lead.industry}</Badge>
             )}
+            {noWebsite && (
+              <Badge variant="secondary" className="text-xs">No website</Badge>
+            )}
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-              <a
-                href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline underline-offset-2 truncate"
-                data-testid="link-lead-website"
-              >
-                {lead.websiteUrl}
-              </a>
-            </div>
+            {!noWebsite && (
+              <div className="flex items-center gap-2 text-sm">
+                <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+                <a
+                  href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2 truncate"
+                  data-testid="link-lead-website"
+                >
+                  {lead.websiteUrl}
+                </a>
+              </div>
+            )}
 
             {lead.contactName && (
               <div className="flex items-center gap-2 text-sm">
@@ -233,24 +257,36 @@ function LeadDetailDialog({
           </div>
 
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">Update Status</p>
-            <div className="flex flex-wrap gap-2">
-              {["new", "contacted", "interested", "not_interested", "converted"].map(
-                (s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={lead.status === s ? "default" : "outline"}
-                    className="text-xs toggle-elevate"
-                    onClick={() => updateMutation.mutate({ id: lead.id, status: s })}
-                    disabled={updateMutation.isPending}
-                    data-testid={`button-status-${s}`}
-                  >
-                    {s.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                  </Button>
-                )
-              )}
+            <p className="text-xs font-medium text-muted-foreground mb-2">Move to Stage</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PIPELINE_STAGES.map((stage) => (
+                <Button
+                  key={stage.value}
+                  size="sm"
+                  variant={lead.status === stage.value ? "default" : "outline"}
+                  className="text-xs toggle-elevate"
+                  onClick={() => updateMutation.mutate({ id: lead.id, status: stage.value })}
+                  disabled={updateMutation.isPending || lead.status === stage.value}
+                  data-testid={`button-status-${stage.value}`}
+                >
+                  {stage.label}
+                </Button>
+              ))}
             </div>
+          </div>
+
+          <div className="flex justify-end pt-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive"
+              onClick={() => deleteMutation.mutate(lead.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-delete-lead"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Delete Lead
+            </Button>
           </div>
         </div>
       </DialogContent>
@@ -327,17 +363,17 @@ export default function LeadsPage() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+          <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
             <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder="Stage" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
-            <SelectItem value="interested">Interested</SelectItem>
-            <SelectItem value="not_interested">Not Interested</SelectItem>
-            <SelectItem value="converted">Converted</SelectItem>
+            <SelectItem value="all">All Stages</SelectItem>
+            {PIPELINE_STAGES.map((stage) => (
+              <SelectItem key={stage.value} value={stage.value}>
+                {stage.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         {industries.length > 0 && (
@@ -389,65 +425,77 @@ export default function LeadsPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {sorted.map((lead) => (
-            <Card
-              key={lead.id}
-              className="hover-elevate cursor-pointer"
-              onClick={() => setSelectedLead(lead)}
-              data-testid={`card-lead-${lead.id}`}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="text-sm font-semibold truncate" data-testid={`text-company-name-${lead.id}`}>
-                        {lead.companyName}
-                      </h3>
-                      <StatusBadge status={lead.status} />
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                      <span className="flex items-center gap-1 truncate">
-                        <Globe className="w-3 h-3 shrink-0" />
-                        {lead.websiteUrl}
-                      </span>
-                      {lead.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 shrink-0" />
-                          {lead.location}
-                        </span>
+          {sorted.map((lead) => {
+            const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
+            return (
+              <Card
+                key={lead.id}
+                className="hover-elevate cursor-pointer"
+                onClick={() => setSelectedLead(lead)}
+                data-testid={`card-lead-${lead.id}`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="text-sm font-semibold truncate" data-testid={`text-company-name-${lead.id}`}>
+                          {lead.companyName}
+                        </h3>
+                        <StatusBadge status={lead.status} />
+                        {noWebsite && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            No site
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                        {!noWebsite && (
+                          <span className="flex items-center gap-1 truncate">
+                            <Globe className="w-3 h-3 shrink-0" />
+                            {lead.websiteUrl}
+                          </span>
+                        )}
+                        {lead.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            {lead.location}
+                          </span>
+                        )}
+                        {lead.industry && (
+                          <span className="flex items-center gap-1">
+                            <Building2 className="w-3 h-3 shrink-0" />
+                            {lead.industry}
+                          </span>
+                        )}
+                      </div>
+                      {lead.contactName && (
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          Contact: {lead.contactName}
+                          {lead.contactEmail && ` - ${lead.contactEmail}`}
+                        </p>
                       )}
-                      {lead.industry && (
-                        <span className="flex items-center gap-1">
-                          <Building2 className="w-3 h-3 shrink-0" />
-                          {lead.industry}
-                        </span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <ScoreBadge score={lead.websiteScore} />
+                      {!noWebsite && (
+                        <a
+                          href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          data-testid={`link-visit-site-${lead.id}`}
+                        >
+                          <Button size="icon" variant="ghost">
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        </a>
                       )}
                     </div>
-                    {lead.contactName && (
-                      <p className="text-xs text-muted-foreground mt-1.5">
-                        Contact: {lead.contactName}
-                        {lead.contactEmail && ` - ${lead.contactEmail}`}
-                      </p>
-                    )}
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <ScoreBadge score={lead.websiteScore} />
-                    <a
-                      href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      data-testid={`link-visit-site-${lead.id}`}
-                    >
-                      <Button size="icon" variant="ghost">
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </a>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

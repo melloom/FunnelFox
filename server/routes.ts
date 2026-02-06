@@ -97,37 +97,78 @@ export async function registerRoutes(
       );
 
       const existingLeads = await storage.getLeads();
-      const existingUrls = new Set(
-        existingLeads.map((l) => {
+      const existingDomains = new Set<string>();
+      const existingNames = new Set<string>();
+      for (const l of existingLeads) {
+        if (l.websiteUrl && l.websiteUrl !== "none") {
           try {
             let u = l.websiteUrl;
             if (!u.startsWith("http")) u = `https://${u}`;
-            return new URL(u).hostname.replace(/^www\./, "");
-          } catch {
-            return l.websiteUrl;
-          }
-        })
-      );
+            existingDomains.add(new URL(u).hostname.replace(/^www\./, ""));
+          } catch {}
+        }
+        existingNames.add(l.companyName.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30));
+      }
 
       const newBusinesses = businesses.filter((biz) => {
-        try {
-          let u = biz.url;
-          if (!u.startsWith("http")) u = `https://${u}`;
-          const domain = new URL(u).hostname.replace(/^www\./, "");
-          return !existingUrls.has(domain);
-        } catch {
-          return true;
+        const nameKey = biz.name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+        if (existingNames.has(nameKey)) return false;
+
+        if (biz.hasWebsite && biz.url) {
+          try {
+            let u = biz.url;
+            if (!u.startsWith("http")) u = `https://${u}`;
+            const domain = new URL(u).hostname.replace(/^www\./, "");
+            return !existingDomains.has(domain);
+          } catch {
+            return true;
+          }
         }
+        return true;
       });
 
       const results = [];
       const BATCH_SIZE = 3;
 
-      for (let i = 0; i < newBusinesses.length; i += BATCH_SIZE) {
-        const batch = newBusinesses.slice(i, i + BATCH_SIZE);
+      const withWebsite = newBusinesses.filter((b) => b.hasWebsite && b.url);
+      const withoutWebsite = newBusinesses.filter((b) => !b.hasWebsite || !b.url);
+
+      for (const biz of withoutWebsite) {
+        try {
+          const notesParts: string[] = [];
+          if (biz.description) notesParts.push(biz.description);
+          notesParts.push("Found on directory listing - no website detected");
+          if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
+
+          const lead = await storage.createLead({
+            companyName: biz.name,
+            websiteUrl: "none",
+            industry: category,
+            location: location,
+            status: "new",
+            websiteScore: 0,
+            websiteIssues: ["No website found", "Business needs a website built from scratch"],
+            notes: notesParts.join(" | ") || null,
+            source: "auto-discover",
+            contactName: null,
+            contactEmail: null,
+            contactPhone: null,
+          });
+          results.push(lead);
+        } catch (err) {
+          console.error(`Failed to create no-website lead ${biz.name}:`, err);
+        }
+      }
+
+      for (let i = 0; i < withWebsite.length; i += BATCH_SIZE) {
+        const batch = withWebsite.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
           batch.map(async (biz) => {
             const analysis = await analyzeWebsite(biz.url);
+            const notesParts: string[] = [];
+            if (biz.description) notesParts.push(biz.description);
+            if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
+
             return storage.createLead({
               companyName: biz.name,
               websiteUrl: biz.url,
@@ -136,7 +177,7 @@ export async function registerRoutes(
               status: "new",
               websiteScore: analysis.score,
               websiteIssues: analysis.issues,
-              notes: biz.description || null,
+              notes: notesParts.join(" | ") || null,
               source: "auto-discover",
               contactName: null,
               contactEmail: null,
