@@ -30,26 +30,46 @@ import { useLocation, Link } from "wouter";
 import type { Lead } from "@shared/schema";
 
 const CATEGORIES = [
-  "Restaurant",
-  "Retail Store",
-  "Dental Office",
-  "Law Firm",
-  "Real Estate Agency",
-  "Auto Repair Shop",
-  "Hair Salon",
-  "Gym",
-  "Plumber",
-  "Electrician",
-  "HVAC Company",
-  "Landscaping Company",
-  "Accounting Firm",
-  "Veterinary Clinic",
-  "Chiropractic Office",
-  "Bakery",
-  "Coffee Shop",
-  "Florist",
-  "Photography Studio",
-  "Cleaning Service",
+  { label: "Restaurant", value: "restaurant" },
+  { label: "Pizza Shop", value: "pizza shop" },
+  { label: "Coffee Shop / Cafe", value: "coffee shop" },
+  { label: "Bakery", value: "bakery" },
+  { label: "Bar / Pub", value: "bar" },
+  { label: "Food Truck", value: "food truck" },
+  { label: "Barber Shop", value: "barber shop" },
+  { label: "Hair Salon", value: "hair salon" },
+  { label: "Nail Salon", value: "nail salon" },
+  { label: "Spa / Massage", value: "spa" },
+  { label: "Tattoo Shop", value: "tattoo shop" },
+  { label: "Dentist", value: "dentist" },
+  { label: "Chiropractor", value: "chiropractor" },
+  { label: "Veterinarian", value: "veterinarian" },
+  { label: "Auto Repair / Mechanic", value: "auto repair shop" },
+  { label: "Auto Detailing", value: "auto detailing" },
+  { label: "Towing Service", value: "towing service" },
+  { label: "Plumber", value: "plumber" },
+  { label: "Electrician", value: "electrician" },
+  { label: "HVAC / AC Repair", value: "hvac company" },
+  { label: "Roofing Company", value: "roofing company" },
+  { label: "Landscaping / Lawn Care", value: "landscaping" },
+  { label: "Cleaning Service", value: "cleaning service" },
+  { label: "Pest Control", value: "pest control" },
+  { label: "Moving Company", value: "moving company" },
+  { label: "Gym / Fitness Studio", value: "gym" },
+  { label: "Yoga Studio", value: "yoga studio" },
+  { label: "Martial Arts Studio", value: "martial arts" },
+  { label: "Dance Studio", value: "dance studio" },
+  { label: "Daycare / Childcare", value: "daycare" },
+  { label: "Dog Groomer", value: "dog groomer" },
+  { label: "Pet Boarding / Kennel", value: "pet boarding" },
+  { label: "Florist", value: "florist" },
+  { label: "Photographer", value: "photographer" },
+  { label: "Jeweler", value: "jewelry store" },
+  { label: "Dry Cleaner / Laundromat", value: "dry cleaner" },
+  { label: "Printing Shop", value: "print shop" },
+  { label: "Accountant / CPA", value: "accountant" },
+  { label: "Insurance Agent", value: "insurance agency" },
+  { label: "Real Estate Agent", value: "real estate agent" },
 ];
 
 interface DiscoverResult {
@@ -148,8 +168,8 @@ export default function DiscoverPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
                       </SelectItem>
                     ))}
                     <SelectItem value="custom">Custom category...</SelectItem>
