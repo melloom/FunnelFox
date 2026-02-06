@@ -40,7 +40,7 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
         !lead.websiteUrl || lead.websiteUrl === "none"
           ? "\n\nI noticed your business doesn't currently have a website. Having a professional web presence can significantly increase your customer reach and credibility. I'd love to help you get started."
           : "";
-      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nMy name is Melvin Peralta, and I'm a web developer who specializes in helping local businesses like ${lead.companyName} grow their online presence.${noSite}${issues}\n\nI'd love to schedule a quick 15-minute call to discuss how I can help. Would you be available this week?\n\nBest regards,\nMelvin Peralta\n667-200-9784`;
+      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nMy name is Melvin Peralta, and I'm a web developer who specializes in helping local businesses like ${lead.companyName} grow their online presence.${noSite}${issues}\n\nI'd love to schedule a quick 15-minute call to discuss how I can help. Would you be available this week?\n\nBest regards,\nMelvin Peralta\n667-200-9784\nhttps://mellowsites.com`;
     },
   },
   {
@@ -52,7 +52,7 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
       const issues = lead.websiteIssues?.length
         ? `Here are some quick wins I identified:\n${lead.websiteIssues.slice(0, 3).map((i) => `  - ${i}`).join("\n")}\n\n`
         : "";
-      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI recently came across ${lead.companyName} and was impressed by what you offer${lead.industry ? ` in the ${lead.industry} space` : ""}.\n\nAs a web developer, I ran a quick audit on your online presence. ${score}${issues}I'd be happy to put together a detailed free report showing exactly how to improve your website's performance, SEO, and mobile experience.\n\nNo strings attached - just want to help local businesses thrive online. Would you be interested?\n\nCheers,\nMelvin Peralta\n667-200-9784`;
+      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI recently came across ${lead.companyName} and was impressed by what you offer${lead.industry ? ` in the ${lead.industry} space` : ""}.\n\nAs a web developer, I ran a quick audit on your online presence. ${score}${issues}I'd be happy to put together a detailed free report showing exactly how to improve your website's performance, SEO, and mobile experience.\n\nNo strings attached - just want to help local businesses thrive online. Would you be interested?\n\nCheers,\nMelvin Peralta\n667-200-9784\nhttps://mellowsites.com`;
     },
   },
   {
@@ -60,14 +60,14 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
     name: "Follow Up",
     subject: (lead) => `Following Up - ${lead.companyName} Website`,
     body: (lead) =>
-      `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI reached out recently about helping ${lead.companyName} with your web presence and wanted to follow up.\n\nI understand things get busy, so I wanted to keep this brief. I'm still available to help with:\n  - Modern, mobile-friendly website design\n  - Search engine optimization (SEO)\n  - Speed and performance improvements\n  - Online booking/contact systems\n\nWould a quick 10-minute chat work for you this week? I'm flexible on timing.\n\nBest,\nMelvin Peralta\n667-200-9784`,
+      `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI reached out recently about helping ${lead.companyName} with your web presence and wanted to follow up.\n\nI understand things get busy, so I wanted to keep this brief. I'm still available to help with:\n  - Modern, mobile-friendly website design\n  - Search engine optimization (SEO)\n  - Speed and performance improvements\n  - Online booking/contact systems\n\nWould a quick 10-minute chat work for you this week? I'm flexible on timing.\n\nBest,\nMelvin Peralta\n667-200-9784\nhttps://mellowsites.com`,
   },
   {
     id: "no_website",
     name: "No Website Pitch",
     subject: (lead) => `Get ${lead.companyName} Online - Affordable Web Design`,
     body: (lead) =>
-      `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI came across ${lead.companyName}${lead.location ? ` in ${lead.location}` : ""} and noticed you don't currently have a website. In today's market, over 80% of customers search online before visiting a business.\n\nI help local businesses get online quickly and affordably. Here's what I can do for you:\n  - Professional website that looks great on phones and computers\n  - Show up in Google when people search for ${lead.industry || "businesses"} in your area\n  - Easy contact forms so customers can reach you 24/7\n  - Fast turnaround - you could be live in as little as 2 weeks\n\nI'd love to show you some examples of similar businesses I've helped. Can we chat for 10 minutes this week?\n\nLooking forward to hearing from you,\nMelvin Peralta\n667-200-9784`,
+      `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI came across ${lead.companyName}${lead.location ? ` in ${lead.location}` : ""} and noticed you don't currently have a website. In today's market, over 80% of customers search online before visiting a business.\n\nI help local businesses get online quickly and affordably. Here's what I can do for you:\n  - Professional website that looks great on phones and computers\n  - Show up in Google when people search for ${lead.industry || "businesses"} in your area\n  - Easy contact forms so customers can reach you 24/7\n  - Fast turnaround - you could be live in as little as 2 weeks\n\nI'd love to show you some examples of similar businesses I've helped. Can we chat for 10 minutes this week?\n\nLooking forward to hearing from you,\nMelvin Peralta\n667-200-9784\nhttps://mellowsites.com`,
   },
   {
     id: "proposal",
@@ -78,7 +78,7 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
       const scope = noSite
         ? "  - Custom website design and development\n  - Mobile-responsive layout\n  - SEO-optimized structure\n  - Contact forms and call-to-action elements\n  - Google Maps integration\n  - Social media integration"
         : "  - Website redesign with modern, clean aesthetics\n  - Mobile responsiveness improvements\n  - Performance and speed optimization\n  - SEO enhancements\n  - Updated content and imagery\n  - Analytics and tracking setup";
-      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nThank you for your interest in improving ${lead.companyName}'s online presence. As discussed, I've put together a proposal for your review.\n\nProject Scope:\n${scope}\n\nTimeline: [X weeks]\nInvestment: $[Amount]\n\nWhat's Included:\n  - Initial discovery and strategy session\n  - Design mockups for your approval\n  - Development and testing\n  - Content migration and setup\n  - 30 days of post-launch support\n  - Training on how to update your site\n\nI'm confident this project will help ${lead.companyName} attract more customers and grow your business online. I'd be happy to walk through the details on a quick call.\n\nLooking forward to working together,\nMelvin Peralta\n667-200-9784`;
+      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nThank you for your interest in improving ${lead.companyName}'s online presence. As discussed, I've put together a proposal for your review.\n\nProject Scope:\n${scope}\n\nTimeline: [X weeks]\nInvestment: $[Amount]\n\nWhat's Included:\n  - Initial discovery and strategy session\n  - Design mockups for your approval\n  - Development and testing\n  - Content migration and setup\n  - 30 days of post-launch support\n  - Training on how to update your site\n\nI'm confident this project will help ${lead.companyName} attract more customers and grow your business online. I'd be happy to walk through the details on a quick call.\n\nLooking forward to working together,\nMelvin Peralta\n667-200-9784\nhttps://mellowsites.com`;
     },
   },
   {
@@ -89,7 +89,7 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
       const socials = lead.socialMedia?.length
         ? `I can see you're already active on social media, which is great! `
         : "";
-      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI found ${lead.companyName} through your social media presence. ${socials}A dedicated website would complement your social channels by:\n  - Giving you a professional home base that you fully control\n  - Helping you rank in Google search results\n  - Converting social followers into paying customers\n  - Providing a place for reviews, portfolios, and detailed service info\n\nI specialize in building websites that work seamlessly with social media. I can even set up automatic feeds from your social profiles.\n\nWould you be interested in a free mockup of what your website could look like?\n\nBest,\nMelvin Peralta\n667-200-9784`;
+      return `Hi${lead.contactName ? ` ${lead.contactName.split(" ")[0]}` : ""},\n\nI found ${lead.companyName} through your social media presence. ${socials}A dedicated website would complement your social channels by:\n  - Giving you a professional home base that you fully control\n  - Helping you rank in Google search results\n  - Converting social followers into paying customers\n  - Providing a place for reviews, portfolios, and detailed service info\n\nI specialize in building websites that work seamlessly with social media. I can even set up automatic feeds from your social profiles.\n\nWould you be interested in a free mockup of what your website could look like?\n\nBest,\nMelvin Peralta\n667-200-9784\nhttps://mellowsites.com`;
     },
   },
 ];
