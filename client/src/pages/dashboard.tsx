@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, UserX, Star, TrendingUp, Globe } from "lucide-react";
+import { Users, UserCheck, UserX, Star, TrendingUp, Globe, Search } from "lucide-react";
 import type { Lead } from "@shared/schema";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -111,12 +111,20 @@ export default function Dashboard() {
             Your web development lead pipeline at a glance
           </p>
         </div>
-        <Link href="/add">
-          <Button data-testid="button-add-lead-hero">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Add New Lead
-          </Button>
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/discover">
+            <Button data-testid="button-discover-leads-hero">
+              <Search className="w-4 h-4 mr-2" />
+              Discover Leads
+            </Button>
+          </Link>
+          <Link href="/add">
+            <Button variant="outline" data-testid="button-add-lead-hero">
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Add Manually
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema } from "@shared/schema";
 import { z } from "zod";
+import { searchBusinesses, analyzeWebsite } from "./scraper";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -75,108 +76,91 @@ export async function registerRoutes(
     try {
       const { url } = req.body;
       if (!url) return res.status(400).json({ error: "URL is required" });
-
-      let targetUrl = url;
-      if (!targetUrl.startsWith("http")) {
-        targetUrl = `https://${targetUrl}`;
-      }
-
-      const issues: string[] = [];
-      let score = 100;
-
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-
-        const response = await fetch(targetUrl, {
-          signal: controller.signal,
-          headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; LeadHunter/1.0)",
-          },
-        });
-        clearTimeout(timeout);
-
-        const html = await response.text();
-        const lowerHtml = html.toLowerCase();
-
-        if (!lowerHtml.includes("<meta name=\"viewport\"")) {
-          issues.push("Not mobile-responsive");
-          score -= 20;
-        }
-
-        if (!lowerHtml.includes("https://") && !lowerHtml.includes("ssl")) {
-          if (!targetUrl.startsWith("https://")) {
-            issues.push("No HTTPS");
-            score -= 15;
-          }
-        }
-
-        if (!lowerHtml.includes("<meta name=\"description\"")) {
-          issues.push("Missing meta description");
-          score -= 10;
-        }
-
-        if (!lowerHtml.includes("<title>") || lowerHtml.includes("<title></title>")) {
-          issues.push("Missing or empty title tag");
-          score -= 10;
-        }
-
-        const hasModernFramework =
-          lowerHtml.includes("react") ||
-          lowerHtml.includes("vue") ||
-          lowerHtml.includes("angular") ||
-          lowerHtml.includes("next") ||
-          lowerHtml.includes("nuxt");
-
-        if (!hasModernFramework) {
-          issues.push("No modern framework detected");
-          score -= 10;
-        }
-
-        if (!lowerHtml.includes("schema.org") && !lowerHtml.includes("json-ld")) {
-          issues.push("No structured data");
-          score -= 5;
-        }
-
-        if (!lowerHtml.includes("font-awesome") &&
-            !lowerHtml.includes("google fonts") &&
-            !lowerHtml.includes("fonts.googleapis")) {
-          issues.push("No custom typography");
-          score -= 5;
-        }
-
-        if (!lowerHtml.includes("analytics") && !lowerHtml.includes("gtag")) {
-          issues.push("No analytics found");
-          score -= 5;
-        }
-
-        const imgCount = (html.match(/<img/g) || []).length;
-        const altCount = (html.match(/alt="/g) || []).length;
-        if (imgCount > 0 && altCount < imgCount / 2) {
-          issues.push("Images missing alt text");
-          score -= 5;
-        }
-
-        if (html.length > 500000) {
-          issues.push("Large page size");
-          score -= 10;
-        }
-
-      } catch (fetchErr: any) {
-        if (fetchErr.name === "AbortError") {
-          issues.push("Very slow load time");
-          score -= 25;
-        } else {
-          issues.push("Website unreachable");
-          score -= 40;
-        }
-      }
-
-      score = Math.max(0, Math.min(100, score));
-
-      res.json({ score, issues });
+      const analysis = await analyzeWebsite(url);
+      res.json(analysis);
     } catch (err) {
       res.status(500).json({ error: "Failed to analyze website" });
+    }
+  });
+
+  app.post("/api/discover", async (req, res) => {
+    try {
+      const { category, location, maxResults } = req.body;
+      if (!category || !location) {
+        return res.status(400).json({ error: "Category and location are required" });
+      }
+
+      const businesses = await searchBusinesses(
+        category,
+        location,
+        Math.min(maxResults || 15, 30)
+      );
+
+      const existingLeads = await storage.getLeads();
+      const existingUrls = new Set(
+        existingLeads.map((l) => {
+          try {
+            let u = l.websiteUrl;
+            if (!u.startsWith("http")) u = `https://${u}`;
+            return new URL(u).hostname.replace(/^www\./, "");
+          } catch {
+            return l.websiteUrl;
+          }
+        })
+      );
+
+      const newBusinesses = businesses.filter((biz) => {
+        try {
+          let u = biz.url;
+          if (!u.startsWith("http")) u = `https://${u}`;
+          const domain = new URL(u).hostname.replace(/^www\./, "");
+          return !existingUrls.has(domain);
+        } catch {
+          return true;
+        }
+      });
+
+      const results = [];
+      const BATCH_SIZE = 3;
+
+      for (let i = 0; i < newBusinesses.length; i += BATCH_SIZE) {
+        const batch = newBusinesses.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (biz) => {
+            const analysis = await analyzeWebsite(biz.url);
+            return storage.createLead({
+              companyName: biz.name,
+              websiteUrl: biz.url,
+              industry: category,
+              location: location,
+              status: "new",
+              websiteScore: analysis.score,
+              websiteIssues: analysis.issues,
+              notes: biz.description || null,
+              source: "auto-discover",
+              contactName: null,
+              contactEmail: null,
+              contactPhone: null,
+            });
+          })
+        );
+
+        for (const result of batchResults) {
+          if (result.status === "fulfilled") {
+            results.push(result.value);
+          }
+        }
+      }
+
+      res.json({
+        found: businesses.length,
+        new: results.length,
+        skipped: businesses.length - newBusinesses.length,
+        leads: results,
+      });
+    } catch (err) {
+      console.error("Discover error:", err);
+      res.status(500).json({ error: "Failed to discover leads" });
     }
   });
 

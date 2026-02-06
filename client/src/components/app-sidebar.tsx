@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Target } from "lucide-react";
+import { LayoutDashboard, Users, Plus, Target, Search } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -15,6 +15,7 @@ import {
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Discover Leads", url: "/discover", icon: Search },
   { title: "All Leads", url: "/leads", icon: Users },
   { title: "Add Lead", url: "/add", icon: Plus },
 ];
