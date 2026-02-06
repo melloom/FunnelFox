@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLeadSchema } from "@shared/schema";
+import { insertLeadSchema, PIPELINE_STAGES } from "@shared/schema";
 import { z } from "zod";
 import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -38,6 +38,7 @@ export async function registerRoutes(
     try {
       const parsed = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(parsed);
+      await storage.createActivity({ leadId: lead.id, action: "created", details: "Lead created" });
       res.status(201).json(lead);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -51,10 +52,30 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+      const existing = await storage.getLead(id);
+      if (!existing) return res.status(404).json({ error: "Lead not found" });
       const updateSchema = insertLeadSchema.partial();
       const parsed = updateSchema.parse(req.body);
       const updated = await storage.updateLead(id, parsed);
       if (!updated) return res.status(404).json({ error: "Lead not found" });
+
+      if (parsed.status && parsed.status !== existing.status) {
+        const fromLabel = PIPELINE_STAGES.find((s) => s.value === existing.status)?.label || existing.status;
+        const toLabel = PIPELINE_STAGES.find((s) => s.value === parsed.status)?.label || parsed.status;
+        await storage.createActivity({
+          leadId: id,
+          action: "stage_changed",
+          details: `${fromLabel} → ${toLabel}`,
+        });
+      }
+      if (parsed.notes !== undefined && parsed.notes !== existing.notes) {
+        await storage.createActivity({
+          leadId: id,
+          action: "notes_updated",
+          details: parsed.notes ? "Notes updated" : "Notes cleared",
+        });
+      }
+
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -73,6 +94,73 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Failed to delete lead" });
+    }
+  });
+
+  app.post("/api/leads/bulk-delete", isAuthenticated, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const intIds = ids.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id));
+      const deleted = await storage.deleteLeads(intIds);
+      res.json({ deleted });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to delete leads" });
+    }
+  });
+
+  app.post("/api/leads/bulk-update", isAuthenticated, async (req, res) => {
+    try {
+      const { ids, data } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const intIds = ids.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id));
+      const updateSchema = insertLeadSchema.partial();
+      const parsed = updateSchema.parse(data);
+      const updated = await storage.updateLeads(intIds, parsed);
+      if (parsed.status) {
+        const stageLabel = PIPELINE_STAGES.find((s) => s.value === parsed.status)?.label || parsed.status;
+        for (const id of intIds) {
+          await storage.createActivity({
+            leadId: id,
+            action: "stage_changed",
+            details: `Moved to ${stageLabel}`,
+          });
+        }
+      }
+      res.json({ updated });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: err.errors[0].message });
+      }
+      res.status(500).json({ error: "Failed to update leads" });
+    }
+  });
+
+  app.get("/api/leads/:id/activities", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+      const activities = await storage.getActivities(id);
+      res.json(activities);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch activities" });
+    }
+  });
+
+  app.post("/api/leads/:id/activities", isAuthenticated, async (req, res) => {
+    try {
+      const leadId = parseInt(req.params.id);
+      if (isNaN(leadId)) return res.status(400).json({ error: "Invalid ID" });
+      const { action, details } = req.body;
+      if (!action) return res.status(400).json({ error: "action is required" });
+      const activity = await storage.createActivity({ leadId, action, details: details || null });
+      res.json(activity);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to create activity" });
     }
   });
 

@@ -1,13 +1,16 @@
 import {
   leads,
   users,
+  activityLog,
   type Lead,
   type InsertLead,
   type User,
   type InsertUser,
+  type Activity,
+  type InsertActivity,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -18,6 +21,11 @@ export interface IStorage {
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: number, data: Partial<InsertLead>): Promise<Lead | undefined>;
   deleteLead(id: number): Promise<boolean>;
+  deleteLeads(ids: number[]): Promise<number>;
+  updateLeads(ids: number[], data: Partial<InsertLead>): Promise<number>;
+  getActivities(leadId: number): Promise<Activity[]>;
+  createActivity(activity: InsertActivity): Promise<Activity>;
+  getActivitiesForLeads(leadIds: number[]): Promise<Activity[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -62,6 +70,32 @@ export class DatabaseStorage implements IStorage {
   async deleteLead(id: number): Promise<boolean> {
     const result = await db.delete(leads).where(eq(leads.id, id)).returning();
     return result.length > 0;
+  }
+
+  async deleteLeads(ids: number[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await db.delete(leads).where(inArray(leads.id, ids)).returning();
+    return result.length;
+  }
+
+  async updateLeads(ids: number[], data: Partial<InsertLead>): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await db.update(leads).set(data).where(inArray(leads.id, ids)).returning();
+    return result.length;
+  }
+
+  async getActivities(leadId: number): Promise<Activity[]> {
+    return db.select().from(activityLog).where(eq(activityLog.leadId, leadId)).orderBy(desc(activityLog.createdAt));
+  }
+
+  async createActivity(activity: InsertActivity): Promise<Activity> {
+    const [created] = await db.insert(activityLog).values(activity).returning();
+    return created;
+  }
+
+  async getActivitiesForLeads(leadIds: number[]): Promise<Activity[]> {
+    if (leadIds.length === 0) return [];
+    return db.select().from(activityLog).where(inArray(activityLog.leadId, leadIds)).orderBy(desc(activityLog.createdAt));
   }
 }
 

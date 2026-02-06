@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -35,13 +36,20 @@ import {
   Star,
   Send,
   Download,
+  CheckSquare,
+  ArrowRight,
+  Flame,
+  Clock,
+  History,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
 import { PIPELINE_STAGES } from "@shared/schema";
+import type { Activity } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplateDialog } from "@/components/email-template-dialog";
+import { calculateLeadScore, getScoreColor } from "@/lib/lead-scoring";
 
 const STAGE_TEXT_COLORS: Record<string, string> = {
   "chart-1": "text-chart-1",
@@ -131,6 +139,67 @@ function ScoreBadge({ score }: { score: number | null }) {
   );
 }
 
+function PriorityBadge({ lead }: { lead: Lead }) {
+  const { label } = calculateLeadScore(lead);
+  if (label === "Cold") return null;
+  const color = getScoreColor(label);
+  return (
+    <Badge variant="secondary" className={`text-[10px] ${color}`} data-testid={`badge-priority-${lead.id}`}>
+      <Flame className="w-2.5 h-2.5 mr-0.5" />
+      {label}
+    </Badge>
+  );
+}
+
+function ActivityTimeline({ leadId }: { leadId: number }) {
+  const { data: activities = [], isLoading } = useQuery<Activity[]>({
+    queryKey: ["/api/leads", leadId, "activities"],
+    queryFn: async () => {
+      const res = await fetch(`/api/leads/${leadId}/activities`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch activities");
+      return res.json();
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-16 w-full" />;
+  if (activities.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground py-2">No activity recorded yet</p>
+    );
+  }
+
+  const ACTION_LABELS: Record<string, string> = {
+    stage_changed: "Stage changed",
+    notes_updated: "Notes updated",
+    created: "Lead created",
+    deleted: "Lead deleted",
+  };
+
+  return (
+    <div className="space-y-2 max-h-48 overflow-y-auto">
+      {activities.slice(0, 20).map((activity) => (
+        <div key={activity.id} className="flex items-start gap-2 text-xs" data-testid={`activity-${activity.id}`}>
+          <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground mt-1.5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <span className="font-medium">{ACTION_LABELS[activity.action] || activity.action}</span>
+            {activity.details && (
+              <span className="text-muted-foreground ml-1">{activity.details}</span>
+            )}
+            <div className="text-muted-foreground mt-0.5">
+              {new Date(activity.createdAt).toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LeadDetailDialog({
   lead,
   open,
@@ -148,6 +217,7 @@ function LeadDetailDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "activities"] });
       toast({ title: "Lead updated" });
     },
   });
@@ -158,6 +228,7 @@ function LeadDetailDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "activities"] });
       toast({ title: "Notes saved" });
     },
   });
@@ -176,10 +247,12 @@ function LeadDetailDialog({
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   if (!lead) return null;
 
   const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
+  const leadScore = calculateLeadScore(lead);
 
   return (
     <>
@@ -203,7 +276,24 @@ function LeadDetailDialog({
             {noWebsite && (
               <Badge variant="secondary" className="text-xs">No website</Badge>
             )}
+            {leadScore.label !== "Cold" && (
+              <Badge variant="secondary" className={`text-xs ${getScoreColor(leadScore.label)}`}>
+                <Flame className="w-3 h-3 mr-0.5" />
+                {leadScore.label} ({leadScore.score})
+              </Badge>
+            )}
           </div>
+
+          {leadScore.reasons.length > 0 && (
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              {leadScore.reasons.map((r, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <ArrowRight className="w-3 h-3 shrink-0" />
+                  {r}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-3">
             {!noWebsite && (
@@ -367,6 +457,22 @@ function LeadDetailDialog({
             </div>
           </div>
 
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs font-medium text-muted-foreground">Activity Timeline</p>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowTimeline(!showTimeline)}
+                data-testid="button-toggle-timeline"
+              >
+                <History className="w-3.5 h-3.5 mr-1" />
+                {showTimeline ? "Hide" : "Show"}
+              </Button>
+            </div>
+            {showTimeline && <ActivityTimeline leadId={lead.id} />}
+          </div>
+
           <div className="flex items-center justify-between gap-2 pt-2 border-t flex-wrap">
             {lead.contactEmail && (
               <Button
@@ -406,13 +512,46 @@ function LeadDetailDialog({
 }
 
 export default function LeadsPage() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"date" | "priority">("date");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkStage, setBulkStage] = useState("");
 
   const { data: leads = [], isLoading } = useQuery<Lead[]>({
     queryKey: ["/api/leads"],
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      await apiRequest("POST", "/api/leads/bulk-delete", { ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      setSelectedIds(new Set());
+      toast({ title: "Leads deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete leads", variant: "destructive" });
+    },
+  });
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async ({ ids, data }: { ids: number[]; data: Record<string, string> }) => {
+      await apiRequest("POST", "/api/leads/bulk-update", { ids, data });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      setSelectedIds(new Set());
+      setBulkStage("");
+      toast({ title: "Leads updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update leads", variant: "destructive" });
+    },
   });
 
   const industries = Array.from(new Set(leads.map((l) => l.industry).filter(Boolean)));
@@ -429,13 +568,39 @@ export default function LeadsPage() {
     return matchesSearch && matchesStatus && matchesIndustry;
   });
 
-  const sorted = [...filtered].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    if (sortBy === "priority") {
+      arr.sort((a, b) => calculateLeadScore(b).score - calculateLeadScore(a).score);
+    } else {
+      arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return arr;
+  }, [filtered, sortBy]);
 
   const hasFilters = search || statusFilter !== "all" || industryFilter !== "all";
+  const isSelectMode = selectedIds.size > 0;
 
-  function exportToCSV() {
+  function toggleSelect(id: number, e?: { stopPropagation: () => void }) {
+    e?.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === sorted.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sorted.map((l) => l.id)));
+    }
+  }
+
+  function exportToCSV(leadsToExport?: Lead[]) {
+    const data = leadsToExport || sorted;
     const stageLabel = (val: string) => PIPELINE_STAGES.find((s) => s.value === val)?.label || val;
     const escapeCSV = (val: string) => {
       if (!val) return "";
@@ -444,8 +609,8 @@ export default function LeadsPage() {
       }
       return val;
     };
-    const headers = ["Company Name", "Website", "Contact Name", "Email", "Phone", "Industry", "Location", "Stage", "Website Score", "Website Issues", "Social Media", "Notes", "Source", "Date Added"];
-    const rows = sorted.map((lead) => [
+    const headers = ["Company Name", "Website", "Contact Name", "Email", "Phone", "Industry", "Location", "Stage", "Website Score", "Website Issues", "Social Media", "Priority", "Notes", "Source", "Date Added"];
+    const rows = data.map((lead) => [
       escapeCSV(lead.companyName),
       escapeCSV(lead.websiteUrl === "none" ? "" : lead.websiteUrl),
       escapeCSV(lead.contactName || ""),
@@ -457,6 +622,7 @@ export default function LeadsPage() {
       lead.websiteScore != null ? String(lead.websiteScore) : "",
       escapeCSV((lead.websiteIssues || []).join("; ")),
       escapeCSV((lead.socialMedia || []).map((s) => { const i = s.indexOf(":"); return i > -1 ? s.slice(i + 1) : s; }).join("; ")),
+      calculateLeadScore(lead).label,
       escapeCSV(lead.notes || ""),
       escapeCSV(lead.source || ""),
       new Date(lead.createdAt).toLocaleDateString(),
@@ -540,6 +706,20 @@ export default function LeadsPage() {
               </SelectContent>
             </Select>
           )}
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as "date" | "priority")}>
+            <SelectTrigger className="w-[130px]" data-testid="select-sort">
+              {sortBy === "priority" ? (
+                <Flame className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              ) : (
+                <Clock className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              )}
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date">Newest</SelectItem>
+              <SelectItem value="priority">Priority</SelectItem>
+            </SelectContent>
+          </Select>
           {hasFilters && (
             <Button
               variant="ghost"
@@ -558,7 +738,7 @@ export default function LeadsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={exportToCSV}
+            onClick={() => exportToCSV()}
             disabled={sorted.length === 0}
             data-testid="button-export-csv"
           >
@@ -567,6 +747,65 @@ export default function LeadsPage() {
           </Button>
         </div>
       </div>
+
+      {isSelectMode && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-muted flex-wrap" data-testid="bulk-actions-bar">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="w-px h-5 bg-border" />
+          <Select value={bulkStage} onValueChange={(v) => {
+            setBulkStage(v);
+            bulkUpdateMutation.mutate({ ids: Array.from(selectedIds), data: { status: v } });
+          }} disabled={bulkUpdateMutation.isPending}>
+            <SelectTrigger className="w-[150px]" data-testid="select-bulk-stage">
+              <ArrowRight className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="Move to stage" />
+            </SelectTrigger>
+            <SelectContent>
+              {PIPELINE_STAGES.map((stage) => (
+                <SelectItem key={stage.value} value={stage.value}>
+                  {stage.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const selectedLeads = sorted.filter((l) => selectedIds.has(l.id));
+              exportToCSV(selectedLeads);
+            }}
+            data-testid="button-bulk-export"
+          >
+            <Download className="w-3.5 h-3.5 mr-1.5" />
+            Export
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            onClick={() => {
+              if (confirm(`Delete ${selectedIds.size} lead${selectedIds.size > 1 ? "s" : ""}?`)) {
+                bulkDeleteMutation.mutate(Array.from(selectedIds));
+              }
+            }}
+            disabled={bulkDeleteMutation.isPending}
+            data-testid="button-bulk-delete"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+            Delete
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            data-testid="button-deselect-all"
+          >
+            <X className="w-3.5 h-3.5 mr-1" />
+            Deselect
+          </Button>
+        </div>
+      )}
 
       {sorted.length === 0 ? (
         <Card>
@@ -584,23 +823,44 @@ export default function LeadsPage() {
         </Card>
       ) : (
         <div className="space-y-2">
+          {sorted.length > 1 && (
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox
+                checked={selectedIds.size === sorted.length}
+                onCheckedChange={toggleSelectAll}
+                data-testid="checkbox-select-all"
+              />
+              <span className="text-xs text-muted-foreground">
+                Select all ({sorted.length})
+              </span>
+            </div>
+          )}
           {sorted.map((lead) => {
             const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
+            const isSelected = selectedIds.has(lead.id);
             return (
               <Card
                 key={lead.id}
-                className="hover-elevate cursor-pointer"
+                className={`hover-elevate cursor-pointer ${isSelected ? "ring-1 ring-primary" : ""}`}
                 onClick={() => setSelectedLead(lead)}
                 data-testid={`card-lead-${lead.id}`}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="pt-0.5" onClick={(e) => { e.stopPropagation(); toggleSelect(lead.id); }}>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(lead.id)}
+                        data-testid={`checkbox-lead-${lead.id}`}
+                      />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="text-sm font-semibold truncate" data-testid={`text-company-name-${lead.id}`}>
                           {lead.companyName}
                         </h3>
                         <StatusBadge status={lead.status} />
+                        <PriorityBadge lead={lead} />
                         {noWebsite && (
                           <Badge variant="secondary" className="text-[10px]">
                             No site
