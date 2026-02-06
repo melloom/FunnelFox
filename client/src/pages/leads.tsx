@@ -129,11 +129,11 @@ function LeadDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-primary" />
-            {lead.companyName}
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <Building2 className="w-5 h-5 text-primary shrink-0" />
+            <span className="break-words">{lead.companyName}</span>
           </DialogTitle>
           <DialogDescription>Lead details and contact information</DialogDescription>
         </DialogHeader>
@@ -258,7 +258,7 @@ function LeadDetailDialog({
 
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2">Move to Stage</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5">
               {PIPELINE_STAGES.map((stage) => (
                 <Button
                   key={stage.value}
@@ -343,16 +343,16 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-leads-title">All Leads</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-leads-title">All Leads</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           {leads.length} lead{leads.length !== 1 ? "s" : ""} in your pipeline
         </p>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-3 sm:flex-wrap">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search leads..."
@@ -362,51 +362,53 @@ export default function LeadsPage() {
             data-testid="input-search-leads"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
-            <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-            <SelectValue placeholder="Stage" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Stages</SelectItem>
-            {PIPELINE_STAGES.map((stage) => (
-              <SelectItem key={stage.value} value={stage.value}>
-                {stage.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {industries.length > 0 && (
-          <Select value={industryFilter} onValueChange={setIndustryFilter}>
-            <SelectTrigger className="w-[150px]" data-testid="select-industry-filter">
-              <Building2 className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Industry" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px] sm:w-[160px]" data-testid="select-status-filter">
+              <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="Stage" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Industries</SelectItem>
-              {industries.map((ind) => (
-                <SelectItem key={ind!} value={ind!}>
-                  {ind}
+              <SelectItem value="all">All Stages</SelectItem>
+              {PIPELINE_STAGES.map((stage) => (
+                <SelectItem key={stage.value} value={stage.value}>
+                  {stage.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearch("");
-              setStatusFilter("all");
-              setIndustryFilter("all");
-            }}
-            data-testid="button-clear-filters"
-          >
-            <X className="w-3.5 h-3.5 mr-1" />
-            Clear
-          </Button>
-        )}
+          {industries.length > 0 && (
+            <Select value={industryFilter} onValueChange={setIndustryFilter}>
+              <SelectTrigger className="w-[130px] sm:w-[150px]" data-testid="select-industry-filter">
+                <Building2 className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Industry" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Industries</SelectItem>
+                {industries.map((ind) => (
+                  <SelectItem key={ind!} value={ind!}>
+                    {ind}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+                setIndustryFilter("all");
+              }}
+              data-testid="button-clear-filters"
+            >
+              <X className="w-3.5 h-3.5 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       {sorted.length === 0 ? (
@@ -475,7 +477,7 @@ export default function LeadsPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                       <ScoreBadge score={lead.websiteScore} />
                       {!noWebsite && (
                         <a
@@ -483,6 +485,7 @@ export default function LeadsPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
+                          className="hidden sm:block"
                           data-testid={`link-visit-site-${lead.id}`}
                         >
                           <Button size="icon" variant="ghost">

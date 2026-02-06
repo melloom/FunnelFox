@@ -138,14 +138,13 @@ export default function DiscoverPage() {
   });
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-discover-title">
+        <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-discover-title">
           Discover Leads
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Search for businesses by category and location using multiple sources (Bing, DuckDuckGo,
-          OpenStreetMap, and more). We'll analyze their websites and add prospects to your pipeline automatically.
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          Search for businesses by category and location. We'll analyze their websites and add prospects to your pipeline.
         </p>
       </div>
 
@@ -200,7 +199,7 @@ export default function DiscoverPage() {
               </div>
             </div>
 
-            <div className="flex items-end gap-3 flex-wrap">
+            <div className="flex items-end gap-3 flex-wrap sm:flex-nowrap">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Max Results</label>
                 <Select value={maxResults} onValueChange={setMaxResults}>
@@ -263,8 +262,8 @@ export default function DiscoverPage() {
 
       {results && !discoverMutation.isPending && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <Globe className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm">

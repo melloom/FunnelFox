@@ -115,10 +115,10 @@ export default function AddLeadPage() {
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" data-testid="text-add-lead-title">Add New Lead</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+      <div className="mb-5 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-add-lead-title">Add New Lead</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Enter a potential client's details to add them to your pipeline
         </p>
       </div>

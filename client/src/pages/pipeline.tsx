@@ -12,6 +12,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -26,6 +33,7 @@ import {
   ExternalLink,
   ArrowRight,
   ChevronRight,
+  ChevronDown,
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
@@ -112,7 +120,7 @@ function LeadCard({
               )}
             </div>
           )}
-          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
             {lead.location && (
               <span className="flex items-center gap-0.5 truncate">
                 <MapPin className="w-2.5 h-2.5 shrink-0" />
@@ -172,11 +180,11 @@ function LeadDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-primary" />
-            {lead.companyName}
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <Building2 className="w-5 h-5 text-primary shrink-0" />
+            <span className="break-words">{lead.companyName}</span>
           </DialogTitle>
           <DialogDescription>Manage this lead in your pipeline</DialogDescription>
         </DialogHeader>
@@ -198,7 +206,7 @@ function LeadDetailDialog({
 
           <div className="space-y-2.5">
             {!noWebsite && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm min-w-0">
                 <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
                 <a
                   href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
@@ -218,9 +226,9 @@ function LeadDetailDialog({
               </div>
             )}
             {lead.contactEmail && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm min-w-0">
                 <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                <a href={`mailto:${lead.contactEmail}`} className="text-primary underline underline-offset-2">
+                <a href={`mailto:${lead.contactEmail}`} className="text-primary underline underline-offset-2 truncate">
                   {lead.contactEmail}
                 </a>
               </div>
@@ -263,7 +271,7 @@ function LeadDetailDialog({
 
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2">Move to Stage</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5">
               {PIPELINE_STAGES.map((stage) => (
                 <Button
                   key={stage.value}
@@ -299,8 +307,53 @@ function LeadDetailDialog({
   );
 }
 
+function MobileStageSection({
+  stage,
+  leads,
+  onSelectLead,
+}: {
+  stage: (typeof PIPELINE_STAGES)[number];
+  leads: Lead[];
+  onSelectLead: (lead: Lead) => void;
+}) {
+  const [expanded, setExpanded] = useState(leads.length > 0);
+  const stageColor = STAGE_COLORS[stage.color] || "bg-muted";
+
+  return (
+    <div data-testid={`mobile-column-${stage.value}`}>
+      <button
+        className="flex items-center justify-between gap-2 w-full p-3 rounded-md hover-elevate"
+        onClick={() => setExpanded(!expanded)}
+        data-testid={`button-toggle-${stage.value}`}
+      >
+        <div className="flex items-center gap-2">
+          <div className={`w-2.5 h-2.5 rounded-full ${stageColor}`} />
+          <h3 className="text-sm font-semibold">{stage.label}</h3>
+          <Badge variant="secondary" className="text-[10px] h-5 min-w-[20px] justify-center">
+            {leads.length}
+          </Badge>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-0" : "-rotate-90"}`} />
+      </button>
+      {expanded && leads.length > 0 && (
+        <div className="space-y-2 px-1 pb-3">
+          {leads.map((lead) => (
+            <LeadCard key={lead.id} lead={lead} onSelect={onSelectLead} />
+          ))}
+        </div>
+      )}
+      {expanded && leads.length === 0 && (
+        <div className="flex items-center justify-center h-12 mx-1 mb-3 border border-dashed rounded-md">
+          <p className="text-[10px] text-muted-foreground">No leads</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PipelinePage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [mobileStage, setMobileStage] = useState("all");
   const { toast } = useToast();
 
   const { data: leads = [], isLoading } = useQuery<Lead[]>({
@@ -328,13 +381,9 @@ export default function PipelinePage() {
     return (
       <div className="p-4 space-y-4">
         <Skeleton className="h-8 w-48" />
-        <div className="flex gap-4 overflow-x-auto">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="min-w-[250px] space-y-3">
-              <Skeleton className="h-6 w-24" />
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
+        <div className="space-y-3">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
           ))}
         </div>
       </div>
@@ -345,14 +394,25 @@ export default function PipelinePage() {
     <div className="p-4 space-y-4 h-full flex flex-col">
       <div className="flex items-center justify-between gap-4 flex-wrap shrink-0">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-pipeline-title">Pipeline</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-pipeline-title">Pipeline</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
             {leads.length} lead{leads.length !== 1 ? "s" : ""} across {activeStages.length} stages
           </p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
+      <div className="md:hidden flex-1 overflow-y-auto space-y-1">
+        {activeStages.map((stage) => (
+          <MobileStageSection
+            key={stage.value}
+            stage={stage}
+            leads={getLeadsForStage(stage.value)}
+            onSelectLead={setSelectedLead}
+          />
+        ))}
+      </div>
+
+      <div className="hidden md:flex flex-1 overflow-x-auto overflow-y-hidden min-h-0">
         <div className="flex gap-3 h-full pb-2" style={{ minWidth: `${activeStages.length * 240}px` }}>
           {activeStages.map((stage) => {
             const stageLeads = getLeadsForStage(stage.value);
@@ -384,7 +444,7 @@ export default function PipelinePage() {
                       <div className="absolute top-1 right-1 invisible group-hover:visible">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" data-testid={`button-move-menu-${lead.id}`}>
+                            <Button size="icon" variant="ghost" data-testid={`button-move-menu-${lead.id}`}>
                               <MoreHorizontal className="w-3 h-3" />
                             </Button>
                           </DropdownMenuTrigger>
