@@ -19,6 +19,7 @@ import AddLeadPage from "@/pages/add-lead";
 import DiscoverPage from "@/pages/discover";
 import PipelinePage from "@/pages/pipeline";
 import LandingPage from "@/pages/landing";
+import AuthPage from "@/pages/auth-page";
 
 function Router() {
   return (
@@ -52,10 +53,13 @@ function AuthenticatedApp() {
               <ThemeToggle />
               {user && (
                 <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground hidden sm:block" data-testid="text-user-name">
+                    {user.firstName || user.email}
+                  </span>
                   <Avatar className="w-7 h-7">
                     <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
                     <AvatarFallback className="text-[10px]">
-                      {(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}
+                      {(user.firstName?.[0] || user.email[0] || "").toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <Button size="icon" variant="ghost" data-testid="button-logout" onClick={() => logout()}>
@@ -89,7 +93,12 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <LandingPage />;
+    return (
+      <Switch>
+        <Route path="/auth" component={AuthPage} />
+        <Route component={LandingPage} />
+      </Switch>
+    );
   }
 
   return <AuthenticatedApp />;

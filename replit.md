@@ -4,6 +4,7 @@
 A lead generation web application designed for web developers to discover, track, and manage potential clients. The app searches the web for businesses, analyzes their websites for quality issues, and provides a CRM-style pipeline to manage outreach from discovery through conversion.
 
 ## Recent Changes
+- 2026-02-06: Switched from Replit Auth (OIDC) to custom email/password authentication with bcrypt password hashing, express-session with PostgreSQL session store. Added login/register pages, landing page redesign with hero, how-it-works, features, and CTA sections. Seeded account: Melvin.a.p.cruz@gmail.com.
 - 2026-02-06: Made app a PWA with manifest, service worker, and app icons. Added safe-area-inset handling for phone notches (viewport-fit=cover, safe-area CSS classes). Uses 100dvh for proper mobile height. Added apple-mobile-web-app meta tags.
 - 2026-02-06: Added OpenStreetMap Overpass API and Google Places API (optional) as additional data sources. OSM provides structured business data with addresses, phone numbers, and cuisine info. Google Places requires GOOGLE_PLACES_API_KEY env var. Added 30+ OSM category mappings, geocoding via Nominatim, and improved address/phone propagation to leads.
 - 2026-02-06: Rewrote scraper to fix search engine blocking (switched to Safari UA), extract real URLs from Bing cite elements instead of redirect URLs, added 50+ aggregator site filters, list-title pattern detection, and improved business name cleaning. Cleaned junk data from database.
@@ -50,7 +51,18 @@ A lead generation web application designed for web developers to discover, track
 - `client/src/components/app-sidebar.tsx` - Navigation sidebar
 - `client/src/components/theme-provider.tsx` - Dark/light theme support
 
+## Authentication
+- Custom email/password auth with bcrypt password hashing
+- express-session with PostgreSQL session store (connect-pg-simple)
+- POST /api/register, POST /api/login, POST /api/logout, GET /api/auth/user
+- All API endpoints protected with isAuthenticated middleware
+- Auth files in server/replit_integrations/auth/ (replitAuth.ts, routes.ts, storage.ts)
+
 ## API Endpoints
+- `POST /api/register` - Create account (email, password, firstName, lastName)
+- `POST /api/login` - Sign in (email, password)
+- `POST /api/logout` - Sign out
+- `GET /api/auth/user` - Get current user
 - `GET /api/leads` - Get all leads
 - `POST /api/leads` - Create a lead
 - `PATCH /api/leads/:id` - Update a lead (including status/stage changes)
