@@ -307,6 +307,8 @@ function LeadDetailDialog({
   );
 }
 
+const MOBILE_STAGE_LIMIT = 3;
+
 function MobileStageSection({
   stage,
   leads,
@@ -317,7 +319,10 @@ function MobileStageSection({
   onSelectLead: (lead: Lead) => void;
 }) {
   const [expanded, setExpanded] = useState(leads.length > 0);
+  const [showAll, setShowAll] = useState(false);
   const stageColor = STAGE_COLORS[stage.color] || "bg-muted";
+  const visibleLeads = showAll ? leads : leads.slice(0, MOBILE_STAGE_LIMIT);
+  const hasMore = leads.length > MOBILE_STAGE_LIMIT;
 
   return (
     <div data-testid={`mobile-column-${stage.value}`}>
@@ -337,9 +342,31 @@ function MobileStageSection({
       </button>
       {expanded && leads.length > 0 && (
         <div className="space-y-2 px-1 pb-3">
-          {leads.map((lead) => (
+          {visibleLeads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} onSelect={onSelectLead} />
           ))}
+          {hasMore && !showAll && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+              onClick={() => setShowAll(true)}
+              data-testid={`button-show-more-${stage.value}`}
+            >
+              Show {leads.length - MOBILE_STAGE_LIMIT} more
+            </Button>
+          )}
+          {hasMore && showAll && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+              onClick={() => setShowAll(false)}
+              data-testid={`button-show-less-${stage.value}`}
+            >
+              Show less
+            </Button>
+          )}
         </div>
       )}
       {expanded && leads.length === 0 && (
