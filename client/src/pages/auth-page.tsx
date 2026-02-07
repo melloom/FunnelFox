@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -13,12 +14,17 @@ import foxLogo from "@assets/fox_1770439380079.png";
 export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { login } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!acceptedTerms) {
+      toast({ title: "Required", description: "Please accept the Terms of Service and Privacy Policy to continue.", variant: "destructive" });
+      return;
+    }
     try {
       await login.mutateAsync({ email, password });
       setLocation("/");
@@ -80,7 +86,26 @@ export default function AuthPage() {
                   data-testid="input-password"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={login.isPending} data-testid="button-submit-auth">
+              <div className="flex items-start gap-2.5">
+                <Checkbox
+                  id="accept-terms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                  data-testid="checkbox-accept-terms"
+                  className="mt-0.5"
+                />
+                <label htmlFor="accept-terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer select-none">
+                  I agree to the{" "}
+                  <Link href="/terms">
+                    <span className="underline text-foreground" data-testid="link-auth-terms">Terms of Service</span>
+                  </Link>
+                  {" "}and{" "}
+                  <Link href="/privacy">
+                    <span className="underline text-foreground" data-testid="link-auth-privacy">Privacy Policy</span>
+                  </Link>
+                </label>
+              </div>
+              <Button type="submit" className="w-full" disabled={login.isPending || !acceptedTerms} data-testid="button-submit-auth">
                 {login.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -90,17 +115,6 @@ export default function AuthPage() {
             </form>
           </CardContent>
         </Card>
-
-        <p className="text-center text-[11px] text-muted-foreground pb-6">
-          By signing in, you agree to our{" "}
-          <Link href="/terms">
-            <span className="underline cursor-pointer" data-testid="link-auth-terms">Terms of Service</span>
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy">
-            <span className="underline cursor-pointer" data-testid="link-auth-privacy">Privacy Policy</span>
-          </Link>
-        </p>
       </div>
     </div>
   );

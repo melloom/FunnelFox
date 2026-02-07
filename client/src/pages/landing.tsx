@@ -41,7 +41,7 @@ export default function LandingPage() {
           <span className="text-sm font-bold tracking-tight">FunnelFox</span>
         </div>
         <Link href="/auth">
-          <Button variant="outline" size="sm" data-testid="button-login-header">
+          <Button variant="outline" data-testid="button-login-header">
             Log in
           </Button>
         </Link>
