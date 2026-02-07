@@ -107,6 +107,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  const ADMIN_EMAIL = "Melvin.a.p.cruz@gmail.com";
+
   app.post("/api/login", loginLimiter, async (req, res) => {
     try {
       const data = loginSchema.parse(req.body);
@@ -119,6 +121,12 @@ export async function setupAuth(app: Express) {
       const valid = await bcrypt.compare(data.password, user.password);
       if (!valid) {
         return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && (!user.isAdmin || user.planStatus !== "pro")) {
+        await db.update(users).set({ isAdmin: true, planStatus: "pro" }).where(eq(users.id, user.id));
+        user.isAdmin = true;
+        user.planStatus = "pro";
       }
 
       req.session.userId = user.id;

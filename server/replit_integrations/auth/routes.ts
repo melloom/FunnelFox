@@ -8,12 +8,19 @@ import { getUncachableStripeClient } from "../../stripeClient";
 import bcrypt from "bcryptjs";
 
 export function registerAuthRoutes(app: Express): void {
+  const ADMIN_EMAIL = "Melvin.a.p.cruz@gmail.com";
+
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.session.userId;
       const user = await authStorage.getUser(userId);
       if (!user) {
         return res.status(401).json({ message: "User not found" });
+      }
+      if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && (!user.isAdmin || user.planStatus !== "pro")) {
+        await db.update(users).set({ isAdmin: true, planStatus: "pro" }).where(eq(users.id, userId));
+        user.isAdmin = true;
+        user.planStatus = "pro";
       }
       const { password: _, ...safeUser } = user;
       res.json(safeUser);
