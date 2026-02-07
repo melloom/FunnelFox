@@ -145,8 +145,8 @@ export function registerStripeRoutes(app: Express) {
         payment_method_types: ["card"],
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
-        success_url: `${baseUrl}/pricing?success=true`,
-        cancel_url: `${baseUrl}/pricing?canceled=true`,
+        success_url: `${baseUrl}/subscription?success=true`,
+        cancel_url: `${baseUrl}/subscription?canceled=true`,
       });
 
       res.json({ url: session.url });
@@ -170,13 +170,57 @@ export function registerStripeRoutes(app: Express) {
       const baseUrl = `${req.protocol}://${req.get("host")}`;
       const session = await stripe.billingPortal.sessions.create({
         customer: user.stripeCustomerId,
-        return_url: `${baseUrl}/pricing`,
+        return_url: `${baseUrl}/subscription`,
       });
 
       res.json({ url: session.url });
     } catch (err: any) {
       console.error("Billing portal error:", err);
       res.status(500).json({ error: err.message || "Failed to create portal session" });
+    }
+  });
+
+  app.post("/api/subscription/cancel", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user?.stripeSubscriptionId) {
+        return res.status(400).json({ error: "No active subscription found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+
+      res.json({ success: true, message: "Subscription will cancel at end of billing period" });
+    } catch (err: any) {
+      console.error("Cancel subscription error:", err);
+      res.status(500).json({ error: err.message || "Failed to cancel subscription" });
+    }
+  });
+
+  app.post("/api/subscription/resume", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user?.stripeSubscriptionId) {
+        return res.status(400).json({ error: "No subscription found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        cancel_at_period_end: false,
+      });
+
+      res.json({ success: true, message: "Subscription resumed" });
+    } catch (err: any) {
+      console.error("Resume subscription error:", err);
+      res.status(500).json({ error: err.message || "Failed to resume subscription" });
     }
   });
 

@@ -25,6 +25,7 @@ import AuthPage from "@/pages/auth-page";
 import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
 import AccountPage from "@/pages/account";
+import SubscriptionPage from "@/pages/subscription";
 
 function Router() {
   return (
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/leads" component={LeadsPage} />
       <Route path="/add" component={AddLeadPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/subscription" component={SubscriptionPage} />
       <Route path="/help" component={HelpPage} />
       <Route path="/account" component={AccountPage} />
       <Route path="/terms" component={TermsPage} />

@@ -53,7 +53,7 @@ export default function TermsPage() {
             <section className="space-y-2">
               <h2 className="text-base font-semibold">4. Subscription Plans and Billing</h2>
               <p>
-                LeadHunter offers a free tier and a paid Pro subscription plan. The Pro plan is billed monthly at the rate displayed on our pricing page (currently $20/month). All prices are in US dollars.
+                LeadHunter offers a free tier and a paid Pro subscription plan. The Pro plan is billed monthly at the rate displayed on our pricing page (currently $30/month). All prices are in US dollars.
               </p>
               <p>
                 Subscriptions automatically renew each billing cycle unless canceled. You may cancel your subscription at any time through the billing portal. Upon cancellation, you retain access to Pro features until the end of your current billing period. No partial refunds are provided for unused time within a billing cycle.

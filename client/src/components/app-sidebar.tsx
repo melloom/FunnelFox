@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Target, Search, Kanban, HelpCircle, CreditCard, Crown, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, Crown, Settings } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -16,15 +16,18 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
+const mainNavItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Pipeline", url: "/pipeline", icon: Kanban },
   { title: "Discover Leads", url: "/discover", icon: Search },
   { title: "All Leads", url: "/leads", icon: Users },
   { title: "Add Lead", url: "/add", icon: Plus },
-  { title: "Pricing", url: "/pricing", icon: CreditCard },
-  { title: "Help", url: "/help", icon: HelpCircle },
+];
+
+const bottomNavItems = [
+  { title: "Subscription", url: "/subscription", icon: CreditCard },
   { title: "Account", url: "/account", icon: Settings },
+  { title: "Help", url: "/help", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
@@ -49,9 +52,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary">
-            <Target className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img
+            src="/favicon-32x32.png"
+            alt="LeadHunter"
+            className="w-8 h-8 rounded-md"
+            data-testid="img-sidebar-logo"
+          />
           <div>
             <h2 className="text-sm font-semibold" data-testid="text-app-title">LeadHunter</h2>
             <p className="text-xs text-muted-foreground">Find your next client</p>
@@ -63,7 +69,26 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {mainNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === item.url}
+                  >
+                    <Link href={item.url} onClick={handleNavClick} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {bottomNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -82,7 +107,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4">
         {subscription && (
-          <Link href="/pricing" onClick={handleNavClick} data-testid="link-sidebar-plan">
+          <Link href="/subscription" onClick={handleNavClick} data-testid="link-sidebar-plan">
             <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer">
               {subscription.planStatus === "pro" ? (
                 <Crown className="w-4 h-4 text-primary shrink-0" />
@@ -99,7 +124,7 @@ export function AppSidebar() {
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  {subscription.monthlyDiscoveriesUsed}/{subscription.discoveryLimit} discoveries
+                  {subscription.monthlyDiscoveriesUsed}/{subscription.discoveryLimit === 999 ? "Unlimited" : subscription.discoveryLimit} discoveries
                 </p>
               </div>
             </div>

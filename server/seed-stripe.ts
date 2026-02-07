@@ -26,12 +26,12 @@ async function seedStripeProducts() {
 
   const monthlyPrice = await stripe.prices.create({
     product: product.id,
-    unit_amount: 2000,
+    unit_amount: 3000,
     currency: "usd",
     recurring: { interval: "month" },
     lookup_key: "pro_monthly",
   });
-  console.log("Created monthly price:", monthlyPrice.id, "- $20/month");
+  console.log("Created monthly price:", monthlyPrice.id, "- $30/month");
 
   console.log("Stripe products seeded successfully!");
 }

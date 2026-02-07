@@ -111,12 +111,12 @@ app.use((req, res, next) => {
         });
         await stripe.prices.create({
           product: product.id,
-          unit_amount: 2000,
+          unit_amount: 3000,
           currency: "usd",
           recurring: { interval: "month" },
           lookup_key: "pro_monthly",
         });
-        console.log("Stripe product 'LeadHunter Pro' seeded with $20/month price");
+        console.log("Stripe product 'LeadHunter Pro' seeded with $30/month price");
       } else {
         console.log("Stripe product exists:", existing.id);
       }
