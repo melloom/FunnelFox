@@ -24,6 +24,7 @@ import LandingPage from "@/pages/landing";
 import AuthPage from "@/pages/auth-page";
 import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
+import AccountPage from "@/pages/account";
 
 function Router() {
   return (
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/add" component={AddLeadPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/help" component={HelpPage} />
+      <Route path="/account" component={AccountPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route component={NotFound} />

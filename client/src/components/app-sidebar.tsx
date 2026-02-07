@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Target, Search, Kanban, HelpCircle, CreditCard, Crown } from "lucide-react";
+import { LayoutDashboard, Users, Plus, Target, Search, Kanban, HelpCircle, CreditCard, Crown, Settings } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ const navItems = [
   { title: "Add Lead", url: "/add", icon: Plus },
   { title: "Pricing", url: "/pricing", icon: CreditCard },
   { title: "Help", url: "/help", icon: HelpCircle },
+  { title: "Account", url: "/account", icon: Settings },
 ];
 
 export function AppSidebar() {
