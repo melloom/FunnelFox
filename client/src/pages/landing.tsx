@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Target,
   Search,
   Globe,
   Kanban,
@@ -9,6 +8,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Link } from "wouter";
+import foxLogo from "@assets/fox_1770439380079.png";
 
 function FeatureCard({
   icon: Icon,
@@ -37,9 +37,7 @@ export default function LandingPage() {
     <div className="min-h-[100dvh] flex flex-col bg-background">
       <header className="flex items-center justify-between px-5 py-4 safe-area-x safe-area-top">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-            <Target className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img src={foxLogo} alt="FunnelFox" className="w-8 h-8 rounded-md object-cover" data-testid="img-app-logo" />
           <span className="text-sm font-bold tracking-tight">FunnelFox</span>
         </div>
         <Link href="/auth">

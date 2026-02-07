@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Target, Loader2, CheckCircle, ArrowLeft } from "lucide-react";
+import { Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import foxLogo from "@assets/fox_1770439380079.png";
 
 export default function ResetPasswordPage() {
   const search = useSearch();
@@ -51,9 +52,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex items-center justify-center mb-4">
-            <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary">
-              <Target className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={foxLogo} alt="FunnelFox" className="w-12 h-12 rounded-md object-cover" data-testid="img-app-logo" />
           </div>
           <h1 className="text-2xl font-bold">Invalid Reset Link</h1>
           <p className="text-sm text-muted-foreground">
@@ -94,9 +93,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center mb-4">
-            <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary">
-              <Target className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={foxLogo} alt="FunnelFox" className="w-12 h-12 rounded-md object-cover" data-testid="img-app-logo" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-reset-title">
             Reset Password
