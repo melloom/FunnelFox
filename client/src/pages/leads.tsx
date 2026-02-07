@@ -305,16 +305,16 @@ function LeadDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-sm:text-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Building2 className="w-5 h-5 text-primary shrink-0" />
             <span className="break-words min-w-0">{lead.companyName}</span>
           </DialogTitle>
-          <DialogDescription>Lead details and contact information</DialogDescription>
+          <DialogDescription className="max-sm:text-xs">Lead details and contact information</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-2">
+        <div className="space-y-3 sm:space-y-4 mt-1 sm:mt-2">
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={lead.status} />
             <ScoreBadge score={lead.websiteScore} />
@@ -615,7 +615,7 @@ function LeadDetailDialog({
                 <img
                   src={lead.screenshotUrl}
                   alt={`Screenshot of ${lead.companyName}'s website`}
-                  className="w-full h-auto"
+                  className="w-full h-auto max-h-40 sm:max-h-60 object-cover object-top"
                   loading="lazy"
                   data-testid="img-website-screenshot"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
