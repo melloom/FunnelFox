@@ -38,6 +38,9 @@ import {
   Copy,
   Check,
   Send,
+  Award,
+  FileText,
+  Bot,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -169,6 +172,18 @@ function LeadCard({
               </Badge>
             )}
             <SocialMediaIcons socialMedia={lead.socialMedia} size="sm" />
+            {lead.googleRating != null && (
+              <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                <Star className="w-2.5 h-2.5 text-yellow-500" />
+                {lead.googleRating.toFixed(1)}
+              </span>
+            )}
+            {lead.bbbRating && (
+              <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                <Award className="w-2.5 h-2.5" />
+                {lead.bbbRating}
+              </span>
+            )}
           </div>
           {lead.detectedTechnologies && lead.detectedTechnologies.length > 0 && (
             <div className="flex flex-wrap gap-1">
@@ -426,6 +441,64 @@ function PipelineLeadDetailDialog({
                     </Badge>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {(lead.bbbRating || lead.googleRating != null || lead.hasSitemap != null || lead.hasRobotsTxt != null) && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Business Intelligence</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {lead.bbbRating && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50" data-testid="info-pipeline-bbb-rating">
+                    <Award className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">BBB Rating</p>
+                      <p className="text-sm font-semibold">
+                        {lead.bbbRating}
+                        {lead.bbbAccredited && (
+                          <Badge variant="secondary" className="ml-1.5 text-[9px]">Accredited</Badge>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {lead.googleRating != null && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50" data-testid="info-pipeline-google-rating">
+                    <Star className="w-4 h-4 text-yellow-500 shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Google Rating</p>
+                      <p className="text-sm font-semibold">
+                        {lead.googleRating.toFixed(1)}
+                        {lead.googleReviewCount != null && (
+                          <span className="text-xs text-muted-foreground font-normal ml-1">({lead.googleReviewCount.toLocaleString()} reviews)</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {lead.hasSitemap != null && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50" data-testid="info-pipeline-sitemap">
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Sitemap</p>
+                      <p className={`text-sm font-medium ${lead.hasSitemap ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                        {lead.hasSitemap ? "Found" : "Missing"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {lead.hasRobotsTxt != null && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50" data-testid="info-pipeline-robots">
+                    <Bot className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Robots.txt</p>
+                      <p className={`text-sm font-medium ${lead.hasRobotsTxt ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                        {lead.hasRobotsTxt ? "Found" : "Missing"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

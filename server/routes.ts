@@ -316,7 +316,7 @@ export async function registerRoutes(
         const batch = withWebsite.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
           batch.map(async (biz) => {
-            const analysis = await analyzeWebsite(biz.url);
+            const analysis = await analyzeWebsite(biz.url, biz.name, biz.address || location);
             const notesParts: string[] = [];
             if (biz.description) notesParts.push(biz.description);
             if (biz.address) notesParts.push(`Address: ${biz.address}`);
@@ -354,6 +354,13 @@ export async function registerRoutes(
               socialMedia: uniqueSocials,
               detectedTechnologies: analysis.technologies || null,
               screenshotUrl: analysis.screenshotUrl || null,
+              bbbRating: biz.bbbRating || null,
+              bbbAccredited: biz.bbbAccredited || null,
+              googleRating: analysis.googleRating || null,
+              googleReviewCount: analysis.googleReviewCount || null,
+              hasSitemap: analysis.hasSitemap || null,
+              hasRobotsTxt: analysis.hasRobotsTxt || null,
+              sitemapIssues: analysis.sitemapIssues || null,
             });
           })
         );

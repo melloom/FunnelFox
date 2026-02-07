@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, pgEnum, boolean, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -45,6 +45,13 @@ export const leads = pgTable("leads", {
   socialMedia: text("social_media").array(),
   detectedTechnologies: text("detected_technologies").array(),
   screenshotUrl: text("screenshot_url"),
+  bbbRating: text("bbb_rating"),
+  bbbAccredited: boolean("bbb_accredited"),
+  googleRating: real("google_rating"),
+  googleReviewCount: integer("google_review_count"),
+  hasSitemap: boolean("has_sitemap"),
+  hasRobotsTxt: boolean("has_robots_txt"),
+  sitemapIssues: text("sitemap_issues").array(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

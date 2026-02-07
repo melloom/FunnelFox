@@ -9,6 +9,8 @@ interface ScrapedBusiness {
   phone?: string;
   address?: string;
   socialMedia?: string[];
+  bbbRating?: string;
+  bbbAccredited?: boolean;
 }
 
 interface WebsiteAnalysis {
@@ -155,6 +157,7 @@ export async function searchBusinesses(
   searchFns.push(() => searchYellowPages(category, location, maxResults));
   searchFns.push(() => searchYelp(category, location, maxResults));
   searchFns.push(() => searchFacebookPages(category, location, maxResults));
+  searchFns.push(() => searchBBB(category, location, maxResults));
 
   const apiFns: (() => Promise<ScrapedBusiness[]>)[] = [];
   apiFns.push(() => searchOpenStreetMap(category, location, maxResults));
@@ -1388,6 +1391,188 @@ async function searchFacebookPages(
   return results;
 }
 
+async function searchBBB(
+  category: string,
+  location: string,
+  maxResults: number
+): Promise<ScrapedBusiness[]> {
+  const results: ScrapedBusiness[] = [];
+
+  try {
+    const encodedCategory = encodeURIComponent(category);
+    const encodedLocation = encodeURIComponent(location);
+    const url = `https://www.bbb.org/search?find_country=US&find_text=${encodedCategory}&find_loc=${encodedLocation}&find_type=Category&page=1`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getRandomUA(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return results;
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    $('[data-testid="search-result"], .search-result-card, .result-item, .bds-card, [class*="result"]').each((_i, el) => {
+      if (results.length >= maxResults) return false;
+
+      const nameEl = $(el).find('a.text-blue-medium, a[class*="business-name"], h3 a, h4 a, .result-name a, a[href*="/profile/"]').first();
+      const name = nameEl.text().trim() || $(el).find('h3, h4, .name, [class*="name"]').first().text().trim();
+      if (!name || name.length < 3 || name.length > 80) return;
+      if (isListTitle(name, category)) return;
+
+      const ratingEl = $(el).find('[class*="rating"], .bds-rating, [data-rating], .letter-grade, [class*="grade"]').first();
+      let bbbRating = ratingEl.text().trim() || ratingEl.attr("data-rating") || "";
+      const ratingMatch = bbbRating.match(/([A-F][+-]?)/i);
+      if (ratingMatch) {
+        bbbRating = ratingMatch[1].toUpperCase();
+      } else {
+        bbbRating = "";
+      }
+
+      const accreditedEl = $(el).find('[class*="accredit"], .accredited, [data-accredited]');
+      const accreditedText = accreditedEl.text().toLowerCase();
+      const bbbAccredited = accreditedText.includes("accredited") ||
+        accreditedEl.length > 0 && !accreditedText.includes("not accredited");
+
+      const phone = $(el).find('a[href^="tel:"], .phone, [class*="phone"]').first().text().trim();
+      const address = $(el).find('.address, [class*="address"], .location').first().text().trim();
+
+      let websiteUrl = "";
+      $(el).find('a[href]').each((_j, linkEl) => {
+        const href = $(linkEl).attr("href") || "";
+        if (href.startsWith("http") && !href.includes("bbb.org")) {
+          const domain = extractDomain(href);
+          if (domain && !isExcludedDomain(domain) && !isAggregatorSite(domain)) {
+            websiteUrl = normalizeUrl(href);
+          }
+        }
+      });
+
+      results.push({
+        name: cleanBusinessName(name),
+        url: websiteUrl,
+        hasWebsite: !!websiteUrl,
+        source: "bbb",
+        phone: phone || undefined,
+        address: address || undefined,
+        bbbRating: bbbRating || undefined,
+        bbbAccredited: bbbAccredited || undefined,
+      });
+    });
+
+    if (results.length === 0) {
+      $('a[href*="/profile/"]').each((_i, el) => {
+        if (results.length >= maxResults) return false;
+
+        const name = $(el).text().trim();
+        if (!name || name.length < 3 || name.length > 80) return;
+        if (isListTitle(name, category)) return;
+
+        const parentEl = $(el).closest('div, li, article');
+        const phone = parentEl.find('a[href^="tel:"]').first().text().trim();
+        const address = parentEl.find('.address, [class*="address"]').first().text().trim();
+
+        const existing = results.find(r => normalizeName(r.name) === normalizeName(name));
+        if (existing) return;
+
+        results.push({
+          name: cleanBusinessName(name),
+          url: "",
+          hasWebsite: false,
+          source: "bbb",
+          phone: phone || undefined,
+          address: address || undefined,
+        });
+      });
+    }
+  } catch (err) {
+    console.error("BBB search error:", err);
+  }
+
+  return results;
+}
+
+async function scrapeGoogleBusinessRating(
+  businessName: string,
+  location: string
+): Promise<{ rating: number | null; reviewCount: number | null }> {
+  try {
+    const query = encodeURIComponent(`"${businessName}" "${location}" site:google.com/maps`);
+    const url = `https://html.duckduckgo.com/html/?q=${query}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getRandomUA(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return { rating: null, reviewCount: null };
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    let rating: number | null = null;
+    let reviewCount: number | null = null;
+
+    $(".result").each((_i, el) => {
+      if (rating !== null) return false;
+
+      const snippet = $(el).find(".result__snippet").text().trim();
+      const title = $(el).find(".result__a").text().trim();
+      const combined = `${title} ${snippet}`;
+
+      const ratingPatterns = [
+        /Rating:\s*(\d+(?:\.\d+)?)\s*[·\-]\s*(\d[\d,]*)\s*reviews?/i,
+        /(\d+(?:\.\d+)?)\s*\((\d[\d,]*)\)/,
+        /(\d+(?:\.\d+)?)\s*stars?\s*[·\-]\s*(\d[\d,]*)\s*reviews?/i,
+        /(\d+(?:\.\d+)?)\s*out of\s*5\s*[·\-]\s*(\d[\d,]*)\s*reviews?/i,
+        /(\d+(?:\.\d+)?)\s*[·\-]\s*(\d[\d,]*)\s*(?:reviews?|Google\s*reviews?)/i,
+      ];
+
+      for (const pattern of ratingPatterns) {
+        const match = combined.match(pattern);
+        if (match) {
+          const r = parseFloat(match[1]);
+          if (r >= 1 && r <= 5) {
+            rating = r;
+            reviewCount = parseInt(match[2].replace(/,/g, ""), 10);
+            return false;
+          }
+        }
+      }
+
+      const simpleRating = combined.match(/(\d+(?:\.\d+)?)\s*(?:stars?|rating)/i);
+      if (simpleRating) {
+        const r = parseFloat(simpleRating[1]);
+        if (r >= 1 && r <= 5) {
+          rating = r;
+        }
+      }
+    });
+
+    return { rating, reviewCount };
+  } catch (err) {
+    console.error("Google Business rating scrape error:", err);
+    return { rating: null, reviewCount: null };
+  }
+}
+
 function isListTitle(title: string, category: string): boolean {
   const lower = title.toLowerCase();
 
@@ -1775,7 +1960,7 @@ function generateScreenshotUrl(targetUrl: string): string {
   return `https://image.thum.io/get/width/1280/crop/800/noanimate/${encodeURIComponent(url)}`;
 }
 
-export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis & { socialMedia?: string[]; contactInfo?: ExtractedContact; technologies?: string[]; screenshotUrl?: string }> {
+export async function analyzeWebsite(targetUrl: string, businessName?: string, location?: string): Promise<WebsiteAnalysis & { socialMedia?: string[]; contactInfo?: ExtractedContact; technologies?: string[]; screenshotUrl?: string; googleRating?: number; googleReviewCount?: number; hasSitemap?: boolean; hasRobotsTxt?: boolean; sitemapIssues?: string[] }> {
   const issues: string[] = [];
   let score = 100;
 
@@ -2183,6 +2368,104 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       score -= 5;
     }
 
+    let hasRobotsTxtFile = false;
+    let hasSitemapFile = false;
+    const sitemapIssuesList: string[] = [];
+
+    const parsedUrl = new URL(finalUrl);
+    const baseUrl = `${parsedUrl.protocol}//${parsedUrl.hostname}`;
+
+    try {
+      const robotsController = new AbortController();
+      const robotsTimeout = setTimeout(() => robotsController.abort(), 5000);
+      const robotsResponse = await fetch(`${baseUrl}/robots.txt`, {
+        signal: robotsController.signal,
+        headers: { "User-Agent": getRandomUA() },
+      });
+      clearTimeout(robotsTimeout);
+
+      if (robotsResponse.ok) {
+        const robotsText = await robotsResponse.text();
+        if (robotsText && robotsText.length > 0 && !robotsText.includes("<html")) {
+          hasRobotsTxtFile = true;
+          const lines = robotsText.split("\n").map(l => l.trim().toLowerCase());
+          const hasDisallowAll = lines.some(l => l === "disallow: /");
+          const userAgentAll = lines.some(l => l === "user-agent: *");
+          if (hasDisallowAll && userAgentAll) {
+            issues.push("robots.txt blocks search engines (SEO)");
+            score -= 10;
+            sitemapIssuesList.push("robots.txt blocks all crawlers");
+          }
+          const sitemapDirective = robotsText.match(/^Sitemap:\s*(.+)$/im);
+          if (sitemapDirective) {
+            sitemapIssuesList.push(`Sitemap declared in robots.txt: ${sitemapDirective[1].trim()}`);
+          }
+        } else {
+          issues.push("No robots.txt file (SEO)");
+          score -= 2;
+          sitemapIssuesList.push("Missing robots.txt");
+        }
+      } else {
+        issues.push("No robots.txt file (SEO)");
+        score -= 2;
+        sitemapIssuesList.push("Missing robots.txt");
+      }
+    } catch {
+      sitemapIssuesList.push("Could not fetch robots.txt");
+    }
+
+    try {
+      const sitemapController = new AbortController();
+      const sitemapTimeout = setTimeout(() => sitemapController.abort(), 5000);
+      const sitemapResponse = await fetch(`${baseUrl}/sitemap.xml`, {
+        signal: sitemapController.signal,
+        headers: { "User-Agent": getRandomUA() },
+      });
+      clearTimeout(sitemapTimeout);
+
+      if (sitemapResponse.ok) {
+        const sitemapText = await sitemapResponse.text();
+        const contentType = sitemapResponse.headers.get("content-type") || "";
+        if (sitemapText.includes("<urlset") || sitemapText.includes("<sitemapindex") || contentType.includes("xml")) {
+          hasSitemapFile = true;
+          const urlCount = (sitemapText.match(/<loc>/gi) || []).length;
+          if (urlCount > 0 && urlCount < 5) {
+            issues.push("Sitemap has very few URLs (SEO)");
+            score -= 2;
+            sitemapIssuesList.push(`Sitemap contains only ${urlCount} URLs`);
+          }
+          if (!sitemapText.includes("<urlset") && !sitemapText.includes("<sitemapindex")) {
+            issues.push("Sitemap.xml is malformed (SEO)");
+            score -= 3;
+            sitemapIssuesList.push("Sitemap missing urlset or sitemapindex tags");
+          }
+        } else {
+          issues.push("Sitemap.xml is malformed (SEO)");
+          score -= 3;
+          sitemapIssuesList.push("Sitemap does not contain valid XML");
+        }
+      } else {
+        issues.push("No sitemap.xml found (SEO)");
+        score -= 5;
+        sitemapIssuesList.push("Missing sitemap.xml");
+      }
+    } catch {
+      sitemapIssuesList.push("Could not fetch sitemap.xml");
+    }
+
+    let googleRating: number | undefined;
+    let googleReviewCount: number | undefined;
+
+    const resolvedBizName = businessName || pageTitle?.replace(/\s*[-|–—].*$/, "").trim() || "";
+    const resolvedLocation = location || "";
+    if (resolvedBizName && resolvedBizName.length >= 3) {
+      try {
+        const gRating = await scrapeGoogleBusinessRating(resolvedBizName, resolvedLocation);
+        if (gRating.rating !== null) googleRating = gRating.rating;
+        if (gRating.reviewCount !== null) googleReviewCount = gRating.reviewCount;
+      } catch {}
+    }
+
     const socialMedia = extractSocialLinksFromHtml(html, $);
 
     const contactInfo = extractContactInfo(html, $, fullUrl);
@@ -2230,6 +2513,11 @@ export async function analyzeWebsite(targetUrl: string): Promise<WebsiteAnalysis
       contactInfo: hasContact ? cleanedContactInfo : undefined,
       technologies: techList.length ? techList : undefined,
       screenshotUrl,
+      googleRating,
+      googleReviewCount,
+      hasSitemap: hasSitemapFile,
+      hasRobotsTxt: hasRobotsTxtFile,
+      sitemapIssues: sitemapIssuesList.length ? sitemapIssuesList : undefined,
     };
 
   } catch (err: any) {
