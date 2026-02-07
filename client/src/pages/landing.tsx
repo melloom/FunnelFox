@@ -33,32 +33,32 @@ const features = [
   {
     icon: Search,
     title: "Smart Discovery",
-    description: "Search Bing, DuckDuckGo, Yellow Pages, and OpenStreetMap to find businesses in any category and location.",
+    description: "Search across 6+ data sources to instantly find businesses in any niche and city that need a website or a better one.",
   },
   {
     icon: Globe,
-    title: "Website Analysis",
-    description: "Auto-score websites on mobile-friendliness, SEO, HTTPS, performance, and detect their tech stack.",
+    title: "Website Scoring",
+    description: "Every prospect's site gets graded on speed, SEO, mobile, and security — so you can show them exactly what's wrong.",
   },
   {
     icon: Kanban,
-    title: "8-Stage Pipeline",
-    description: "Track leads from New Lead through Contacted, Demo, Proposal, Negotiation to Won — all in a Kanban board.",
+    title: "Sales Pipeline",
+    description: "Drag-and-drop Kanban board moves prospects from first contact to signed contract across 8 customizable stages.",
   },
   {
     icon: Mail,
-    title: "Email Outreach",
-    description: "Send professional outreach emails directly from the app with Gmail integration and activity logging.",
+    title: "Built-In Outreach",
+    description: "Send personalized pitch emails straight from FunnelFox with Gmail — no copy-pasting into another tool.",
   },
   {
     icon: BarChart3,
-    title: "Lead Scoring",
-    description: "Auto-rank leads as Hot, Warm, Cool, or Cold based on website status, social presence, and contact info.",
+    title: "Priority Scoring",
+    description: "Leads are auto-ranked Hot, Warm, Cool, or Cold so you spend time on the prospects most likely to convert.",
   },
   {
     icon: Shield,
-    title: "Business Intel",
-    description: "Enrich leads with BBB ratings, Google reviews, social media links, and technology detection.",
+    title: "Deep Business Intel",
+    description: "Phone numbers, emails, Google ratings, BBB scores, social links, and tech stack — all pulled automatically.",
   },
 ];
 
@@ -136,8 +136,8 @@ export default function LandingPage() {
               className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight"
               data-testid="text-landing-headline"
             >
-              Find businesses that need
-              <span className="text-primary"> your services</span>
+              Stop chasing leads.
+              <span className="text-primary"> Start closing them.</span>
             </motion.h1>
 
             <motion.p
@@ -146,8 +146,8 @@ export default function LandingPage() {
               className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto leading-relaxed"
               data-testid="text-landing-subtitle"
             >
-              Discover local businesses without websites or with outdated ones.
-              Analyze their web presence, reach out directly, and close deals — all in one place.
+              FunnelFox automatically finds businesses with no website or a broken one,
+              scores their web presence, and gives you everything you need to pitch them — emails, phone numbers, and a full CRM to close the deal.
             </motion.p>
 
             <motion.div variants={fadeUp} custom={3} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -192,10 +192,10 @@ export default function LandingPage() {
         >
           <motion.div variants={fadeUp} custom={0} className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" data-testid="text-features-heading">
-              Everything you need to land clients
+              Your entire sales workflow, automated
             </h2>
             <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-              From discovery to signed contract, FunnelFox handles every step of your sales pipeline.
+              Find the prospect, prove they need you, send the pitch, and track every deal — without leaving FunnelFox.
             </p>
           </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -216,10 +216,10 @@ export default function LandingPage() {
             <Card className="bg-primary/5 border-primary/20">
               <CardContent className="pt-8 pb-8 space-y-4">
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-                  Ready to find your next client?
+                  Your next client is one search away
                 </h2>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  Start discovering leads for free. No credit card required.
+                  5 free discoveries a month. No credit card needed. Start landing clients today.
                 </p>
                 <Link href="/auth">
                   <Button size="lg" data-testid="button-cta-bottom">
