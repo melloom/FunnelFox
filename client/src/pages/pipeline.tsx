@@ -294,8 +294,6 @@ function PipelineLeadDetailDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({ title: "Lead moved" });
-    },
-    onSettled: () => {
       onClose();
     },
   });

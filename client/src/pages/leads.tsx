@@ -286,8 +286,6 @@ function LeadDetailDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "activities"] });
       toast({ title: "Lead updated" });
-    },
-    onSettled: () => {
       onClose();
     },
   });
