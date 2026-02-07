@@ -157,11 +157,6 @@ export default function LandingPage() {
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
-              <Link href="/pricing">
-                <Button size="lg" variant="outline" data-testid="button-learn-more">
-                  See Pricing
-                </Button>
-              </Link>
             </motion.div>
           </motion.div>
         </section>
