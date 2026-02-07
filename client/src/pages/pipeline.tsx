@@ -287,11 +287,11 @@ function PipelineLeadDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Building2 className="w-5 h-5 text-primary shrink-0" />
-            <span className="break-words">{lead.companyName}</span>
+            <span className="break-words min-w-0">{lead.companyName}</span>
           </DialogTitle>
           <DialogDescription>Manage this lead in your pipeline</DialogDescription>
         </DialogHeader>
@@ -472,11 +472,12 @@ function PipelineLeadDetailDialog({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 pt-2 border-t flex-wrap">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t">
             {lead.contactEmail && (
               <Button
                 size="sm"
                 onClick={() => setEmailDialogOpen(true)}
+                className="w-full sm:w-auto"
                 data-testid="button-pipeline-email-lead"
               >
                 <Mail className="w-3.5 h-3.5 mr-1" />
@@ -486,7 +487,7 @@ function PipelineLeadDetailDialog({
             <Button
               variant="ghost"
               size="sm"
-              className="text-destructive"
+              className="text-destructive w-full sm:w-auto"
               onClick={() => deleteMutation.mutate(lead.id)}
               disabled={deleteMutation.isPending}
               data-testid="button-delete-lead"

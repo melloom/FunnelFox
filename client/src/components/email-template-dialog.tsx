@@ -198,11 +198,11 @@ export function EmailTemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mail className="w-5 h-5 text-primary" />
-            Email {lead.companyName}
+            <Mail className="w-5 h-5 text-primary shrink-0" />
+            <span className="truncate min-w-0">Email {lead.companyName}</span>
           </DialogTitle>
           <DialogDescription>
             {gmailConnected
@@ -211,44 +211,48 @@ export function EmailTemplateDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-2">
+        <div className="space-y-3 sm:space-y-4 mt-1 sm:mt-2">
           {gmailConnected && (
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700">
                 <Check className="w-3 h-3 mr-1" />
                 Gmail Connected
               </Badge>
-              <span className="text-xs text-muted-foreground">{gmailStatus?.email}</span>
+              {gmailStatus?.email && (
+                <span className="text-xs text-muted-foreground truncate">{gmailStatus.email}</span>
+              )}
             </div>
           )}
 
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Template</label>
-            <Select value={selectedTemplate} onValueChange={loadTemplate}>
-              <SelectTrigger data-testid="select-email-template">
-                <FileText className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EMAIL_TEMPLATES.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Template</label>
+              <Select value={selectedTemplate} onValueChange={loadTemplate}>
+                <SelectTrigger data-testid="select-email-template">
+                  <FileText className="w-3.5 h-3.5 mr-1.5 text-muted-foreground shrink-0" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMAIL_TEMPLATES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">To</label>
+              <Input
+                value={editedTo}
+                onChange={(e) => setEditedTo(e.target.value)}
+                placeholder="recipient@example.com"
+                data-testid="input-email-to"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">To</label>
-            <Input
-              value={editedTo}
-              onChange={(e) => setEditedTo(e.target.value)}
-              placeholder="recipient@example.com"
-              data-testid="input-email-to"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Subject</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Subject</label>
             <Input
               value={editedSubject}
               onChange={(e) => setEditedSubject(e.target.value)}
@@ -257,20 +261,21 @@ export function EmailTemplateDialog({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Message</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Message</label>
             <Textarea
               value={editedBody}
               onChange={(e) => setEditedBody(e.target.value)}
-              className="min-h-[280px] text-sm font-mono leading-relaxed"
+              className="min-h-[180px] sm:min-h-[280px] text-sm font-mono leading-relaxed"
               data-testid="input-email-body"
             />
           </div>
 
-          <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
             {gmailConnected ? (
               <Button
                 onClick={() => sendMutation.mutate()}
                 disabled={sendMutation.isPending || !canSend}
+                className="w-full sm:w-auto"
                 data-testid="button-send-email-gmail"
               >
                 {sendMutation.isPending ? (
@@ -281,12 +286,12 @@ export function EmailTemplateDialog({
                 {sendMutation.isPending ? "Sending..." : "Send via Gmail"}
               </Button>
             ) : (
-              <Button onClick={handleMailto} disabled={!canSend} data-testid="button-send-email">
+              <Button onClick={handleMailto} disabled={!canSend} className="w-full sm:w-auto" data-testid="button-send-email">
                 <Send className="w-4 h-4 mr-1.5" />
                 Open in Email App
               </Button>
             )}
-            <Button variant="outline" onClick={handleCopy} data-testid="button-copy-email">
+            <Button variant="outline" onClick={handleCopy} className="w-full sm:w-auto" data-testid="button-copy-email">
               {copied ? <Check className="w-4 h-4 mr-1.5" /> : <Copy className="w-4 h-4 mr-1.5" />}
               {copied ? "Copied" : "Copy"}
             </Button>
