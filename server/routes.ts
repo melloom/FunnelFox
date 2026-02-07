@@ -103,6 +103,20 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/leads/all", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+      if (!user?.isAdmin) return res.status(403).json({ error: "Admin only" });
+      await db.delete(activityLog);
+      await db.delete(leadsTable);
+      res.json({ success: true, message: "All leads and activity logs cleared" });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to clear leads" });
+    }
+  });
+
   app.delete("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -112,20 +126,6 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Failed to delete lead" });
-    }
-  });
-
-  app.delete("/api/leads/all", isAuthenticated, async (req, res) => {
-    try {
-      const userId = req.session.userId;
-      if (!userId) return res.status(401).json({ error: "Not authenticated" });
-      const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-      if (!user?.isAdmin) return res.status(403).json({ error: "Admin only" });
-      await db.delete(activityLog);
-      const result = await db.delete(leadsTable);
-      res.json({ success: true, message: "All leads and activity logs cleared" });
-    } catch (err) {
-      res.status(500).json({ error: "Failed to clear leads" });
     }
   });
 
