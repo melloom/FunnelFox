@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema, PIPELINE_STAGES } from "@shared/schema";
 import { z } from "zod";
-import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache } from "./scraper";
+import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache, enrichContactInfo } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sendEmail, isGmailConnected, getGmailAddress } from "./gmail";
 import { registerStripeRoutes, checkDiscoveryLimit, incrementDiscoveryUsage, checkLeadLimit } from "./stripe-routes";
@@ -299,43 +299,61 @@ export async function registerRoutes(
       const withWebsite = newBusinesses.filter((b) => b.hasWebsite && b.url);
       const withoutWebsite = newBusinesses.filter((b) => !b.hasWebsite || !b.url);
 
-      for (const biz of withoutWebsite) {
-        try {
-          const notesParts: string[] = [];
-          if (biz.description) notesParts.push(biz.description);
-          if (biz.address) notesParts.push(`Address: ${biz.address}`);
-          if (biz.socialMedia?.length) {
-            notesParts.push(`Has social media but no website - great lead`);
-          } else {
-            notesParts.push("No website detected - needs a website built");
-          }
-          if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
+      const ENRICH_BATCH = 4;
+      for (let ei = 0; ei < withoutWebsite.length; ei += ENRICH_BATCH) {
+        const enrichBatch = withoutWebsite.slice(ei, ei + ENRICH_BATCH);
+        const enrichResults = await Promise.allSettled(
+          enrichBatch.map(async (biz) => {
+            let bizPhone = biz.phone || null;
+            let bizEmail = biz.email || null;
 
-          const issues = ["No website found", "Business needs a website built from scratch"];
-          if (biz.socialMedia?.length) {
-            issues.push(`Active on social media (${biz.socialMedia.map(s => s.split(":")[0]).join(", ")}) but no website`);
-          }
+            if (!bizPhone || !bizEmail) {
+              try {
+                const enriched = await enrichContactInfo(biz.name, biz.address || location);
+                if (!bizPhone && enriched.phone) bizPhone = enriched.phone;
+                if (!bizEmail && enriched.email) bizEmail = enriched.email;
+              } catch {}
+            }
 
-          const lead = await storage.createLead({
-            companyName: biz.name,
-            websiteUrl: "none",
-            industry: category,
-            location: biz.address || location,
-            status: "new",
-            websiteScore: 0,
-            websiteIssues: issues,
-            notes: notesParts.join(" | ") || null,
-            source: "auto-discover",
-            contactName: null,
-            contactEmail: null,
-            contactPhone: biz.phone || null,
-            socialMedia: biz.socialMedia || null,
-            detectedTechnologies: null,
-            screenshotUrl: null,
-          });
-          results.push(lead);
-        } catch (err) {
-          console.error(`Failed to create no-website lead ${biz.name}:`, err);
+            const notesParts: string[] = [];
+            if (biz.description) notesParts.push(biz.description);
+            if (biz.address) notesParts.push(`Address: ${biz.address}`);
+            if (biz.socialMedia?.length) {
+              notesParts.push(`Has social media but no website - great lead`);
+            } else {
+              notesParts.push("No website detected - needs a website built");
+            }
+            if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
+
+            const issues = ["No website found", "Business needs a website built from scratch"];
+            if (biz.socialMedia?.length) {
+              issues.push(`Active on social media (${biz.socialMedia.map(s => s.split(":")[0]).join(", ")}) but no website`);
+            }
+
+            return storage.createLead({
+              companyName: biz.name,
+              websiteUrl: "none",
+              industry: category,
+              location: biz.address || location,
+              status: "new",
+              websiteScore: 0,
+              websiteIssues: issues,
+              notes: notesParts.join(" | ") || null,
+              source: "auto-discover",
+              contactName: null,
+              contactEmail: bizEmail,
+              contactPhone: bizPhone,
+              socialMedia: biz.socialMedia || null,
+              detectedTechnologies: null,
+              screenshotUrl: null,
+            });
+          })
+        );
+
+        for (const result of enrichResults) {
+          if (result.status === "fulfilled") {
+            results.push(result.value);
+          }
         }
       }
 

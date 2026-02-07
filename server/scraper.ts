@@ -7,6 +7,7 @@ interface ScrapedBusiness {
   hasWebsite: boolean;
   source?: string;
   phone?: string;
+  email?: string;
   address?: string;
   socialMedia?: string[];
   bbbRating?: string;
@@ -116,6 +117,79 @@ export function clearSearchCache(): void {
 export function getSearchCacheStats(): { size: number; maxSize: number; ttlHours: number } {
   pruneCache();
   return { size: searchCache.size, maxSize: MAX_CACHE_ENTRIES, ttlHours: CACHE_TTL_MS / (60 * 60 * 1000) };
+}
+
+export async function enrichContactInfo(
+  businessName: string,
+  location: string
+): Promise<{ phone?: string; email?: string }> {
+  const result: { phone?: string; email?: string } = {};
+
+  try {
+    const query = `"${businessName}" ${location} phone number contact`;
+    const encodedQuery = encodeURIComponent(query);
+    const url = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getRandomUA(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (response.status !== 200 && response.status !== 202) return result;
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    const snippets = $(".result__snippet").map((_i, el) => $(el).text()).get().join(" ");
+    const titles = $(".result__a").map((_i, el) => $(el).text()).get().join(" ");
+    const combined = `${snippets} ${titles}`;
+
+    const phonePatterns = [
+      /\+1[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g,
+      /\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/g,
+    ];
+
+    for (const pattern of phonePatterns) {
+      const matches = combined.match(pattern);
+      if (matches && matches.length > 0) {
+        const cleanPhone = matches[0].replace(/[^0-9+]/g, "");
+        if (cleanPhone.length >= 10) {
+          result.phone = matches[0].trim();
+          break;
+        }
+      }
+    }
+
+    const emailPattern = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+    const emailMatches = combined.match(emailPattern);
+    if (emailMatches) {
+      const validEmail = emailMatches.find(e => {
+        const lower = e.toLowerCase();
+        return !lower.includes("example.com") &&
+               !lower.includes("sentry.io") &&
+               !lower.includes("wixpress") &&
+               !lower.includes("@2x") &&
+               !lower.endsWith(".png") &&
+               !lower.endsWith(".jpg") &&
+               !lower.endsWith(".svg");
+      });
+      if (validEmail) {
+        result.email = validEmail;
+      }
+    }
+  } catch (err) {
+    // Enrichment is best-effort, don't fail
+  }
+
+  return result;
 }
 
 export async function searchBusinesses(
@@ -288,6 +362,7 @@ function calculateSimilarity(a: string, b: string): number {
 
 function mergeBusinessData(existing: ScrapedBusiness, incoming: ScrapedBusiness): void {
   if (!existing.phone && incoming.phone) existing.phone = incoming.phone;
+  if (!existing.email && incoming.email) existing.email = incoming.email;
   if (!existing.address && incoming.address) existing.address = incoming.address;
   if ((!existing.description || existing.description.length < 20) && incoming.description && incoming.description.length > (existing.description?.length || 0)) {
     existing.description = incoming.description;
@@ -731,6 +806,7 @@ async function searchOpenStreetMap(
 
       const website = tags.website || tags["contact:website"] || "";
       const phone = tags.phone || tags["contact:phone"] || "";
+      const emailTag = tags.email || tags["contact:email"] || "";
       const street = tags["addr:street"] || "";
       const houseNum = tags["addr:housenumber"] || "";
       const city = tags["addr:city"] || "";
@@ -754,6 +830,7 @@ async function searchOpenStreetMap(
         hasWebsite: !!website,
         source: "openstreetmap",
         phone: phone || undefined,
+        email: emailTag || undefined,
         address: address || undefined,
       });
     }
