@@ -11,6 +11,7 @@ import {
   Shield,
 } from "lucide-react";
 import { Link } from "wouter";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { motion } from "framer-motion";
 import foxLogo from "@assets/fox_1770439380079.png";
 
@@ -104,11 +105,14 @@ export default function LandingPage() {
           <img src={foxLogo} alt="FunnelFox" className="w-8 h-8 rounded-md object-cover" data-testid="img-app-logo" />
           <span className="text-sm font-bold tracking-tight">FunnelFox</span>
         </div>
-        <Link href="/auth">
-          <Button variant="outline" data-testid="button-login-header">
-            Log in
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link href="/auth">
+            <Button variant="outline" data-testid="button-login-header">
+              Log in
+            </Button>
+          </Link>
+        </div>
       </motion.header>
 
       <main className="flex-1 safe-area-x">
