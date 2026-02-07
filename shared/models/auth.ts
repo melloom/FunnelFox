@@ -26,6 +26,8 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").default(false),
   monthlyDiscoveriesUsed: integer("monthly_discoveries_used").default(0),
   usageResetDate: timestamp("usage_reset_date"),
+  resetToken: varchar("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -41,6 +43,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
   isAdmin: true,
   monthlyDiscoveriesUsed: true,
   usageResetDate: true,
+  resetToken: true,
+  resetTokenExpiry: true,
 });
 
 export const loginSchema = z.object({

@@ -2,11 +2,15 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { authStorage } from "./storage";
-import { loginSchema, registerSchema } from "@shared/models/auth";
+import { loginSchema, registerSchema, users } from "@shared/models/auth";
 import { z } from "zod";
+import { db } from "../../db";
+import { eq, and, gt } from "drizzle-orm";
+import { sendEmail, isGmailConnected } from "../../gmail";
 
 declare module "express-session" {
   interface SessionData {
@@ -137,6 +141,103 @@ export async function setupAuth(app: Express) {
       res.clearCookie("connect.sid");
       res.json({ message: "Logged out" });
     });
+  });
+
+  const forgotPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { message: "Too many password reset requests. Try again in 15 minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        return res.status(400).json({ message: "A valid email address is required" });
+      }
+
+      const user = await authStorage.getUserByEmail(email);
+
+      res.json({ message: "If an account with that email exists, a password reset link has been sent." });
+
+      if (!user) return;
+
+      const gmailConnected = await isGmailConnected();
+      if (!gmailConnected) {
+        console.error("Gmail not connected - cannot send password reset email");
+        return;
+      }
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiry = new Date(Date.now() + 60 * 60 * 1000);
+
+      await db.update(users).set({
+        resetToken: token,
+        resetTokenExpiry: expiry,
+      }).where(eq(users.id, user.id));
+
+      const host = process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
+      const resetUrl = `https://${host}/reset-password?token=${token}`;
+
+      const emailBody = `Hi ${user.firstName || "there"},
+
+You requested a password reset for your FunnelFox account.
+
+Click the link below to reset your password. This link expires in 1 hour.
+
+${resetUrl}
+
+If you did not request this, you can safely ignore this email. Your password will not be changed.`;
+
+      await sendEmail(
+        user.email,
+        "Reset Your FunnelFox Password",
+        emailBody,
+        "FunnelFox"
+      );
+    } catch (error) {
+      console.error("Forgot password error:", error);
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: "Token and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const [user] = await db.select().from(users).where(
+        and(
+          eq(users.resetToken, token),
+          gt(users.resetTokenExpiry, new Date())
+        )
+      );
+
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired reset link. Please request a new one." });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      await db.update(users).set({
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
+      }).where(eq(users.id, user.id));
+
+      res.json({ message: "Password has been reset successfully. You can now sign in." });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
   });
 }
 

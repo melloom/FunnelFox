@@ -1,96 +1,7 @@
 # FunnelFox - Web Development Lead Generator
 
 ## Overview
-A lead generation web application (FunnelFox, formerly LeadHunter) designed for web developers to discover, track, and manage potential clients. The app searches the web for businesses, analyzes their websites for quality issues, and provides a CRM-style pipeline to manage outreach from discovery through conversion. Domain: funnelfox.org.
-
-## Recent Changes
-- 2026-02-07: Renamed app from LeadHunter to FunnelFox across all files (HTML meta, manifest, service worker, sidebar, landing, auth, help, terms, privacy, email templates, server user-agents, Stripe product names). Stripe product lookup uses fallback to find existing "LeadHunter Pro" product.
-- 2026-02-07: Enhanced Account Settings page with 5 sections: Profile, Usage This Month (progress bars + plan link), Preferences (theme toggle, Gmail status), Security (change password with dialog), Quick Links, and Danger Zone (delete account). Added POST /api/auth/change-password endpoint with bcrypt verification. Files: client/src/pages/account.tsx, server/replit_integrations/auth/routes.ts.
-- 2026-02-07: Dedicated Subscription page (/subscription) with full plan management. Cancel subscription (sets cancel_at_period_end via Stripe API), resume subscription (removes cancel_at_period_end), upgrade via checkout, manage billing portal. Usage progress bars, plan comparison grid, status badges (Active/Canceling/Admin). API endpoints: POST /api/subscription/cancel, POST /api/subscription/resume. Price changed to $30/month. /pricing redirects to /subscription. Files: client/src/pages/subscription.tsx, server/stripe-routes.ts.
-- 2026-02-07: Sidebar restructure: replaced Target icon logo with favicon image, moved Help to bottom nav group. Nav split into main (Dashboard, Pipeline, Discover, All Leads, Add Lead) and bottom (Subscription, Account, Help). Sidebar footer links to /subscription. Files: client/src/components/app-sidebar.tsx.
-- 2026-02-07: Updated Help page with comprehensive documentation. 15 FAQ items covering discovery, scoring, export, bulk actions, Gmail, subscription management, business intelligence, manual leads. 12 key features listed. Pages overview includes Subscription and Account. Subscription plans section with Free vs Pro ($30/mo) comparison. Contact email at bottom. Files: client/src/pages/help.tsx.
-- 2026-02-07: Account page simplified to profile + delete account only. Subscription management moved to dedicated /subscription page. Files: client/src/pages/account.tsx.
-- 2026-02-07: Leads are global (shared across all users, not per-user). All users can discover and manage the same lead pool.
-- 2026-02-07: Added multiple export formats for leads. Export menu dropdown with: CSV (.csv), Excel (.xlsx via SheetJS), JSON (.json), and Copy to Clipboard (tab-separated for pasting into Google Sheets/Airtable). Available for both all leads and bulk-selected leads. Files: client/src/pages/leads.tsx.
-- 2026-02-07: Professional HTML email template for Gmail outreach. Clean card layout with proper typography, sender signature with divider, branded footer. HTML escaping for security (prevents injection). Multipart email with text/plain fallback. Files: server/gmail.ts.
-- 2026-02-07: Added Account Settings page (/account) with profile info and account deletion. Delete requires typing "DELETE" to confirm. Active Pro subscribers must cancel subscription first. Admin accounts bypass subscription check. Stripe API failures block deletion (503). DELETE /api/account endpoint. Files: client/src/pages/account.tsx, server/replit_integrations/auth/routes.ts.
-- 2026-02-07: Added Terms of Service (/terms) and Privacy Policy (/privacy) legal pages. Contact email: contact@mellowsites.com, company: MellowSites. Covers billing, cookies, data handling, GDPR rights, third-party services. Legal links added to landing page footer, auth page, and sidebar footer. Routes accessible both logged in and logged out. Files: client/src/pages/terms.tsx, client/src/pages/privacy.tsx.
-- 2026-02-07: Enhanced webhook handler with invoice.payment_failed logging, cancel_at_period_end awareness, and monthlyDiscoveriesUsed reset on subscription deletion. Fixed discovery limit check to use req.session.userId.
-- 2026-02-07: Added SaaS subscription system with Stripe integration. $20/month Pro plan with 50 discoveries/month and unlimited leads. Free tier: 5 discoveries/month, 25 leads max. Pricing page with plan comparison. Stripe checkout, billing portal, and webhook handling. Usage tracking with monthly reset. Plan status shown in sidebar footer and discover page. Feature gating on discover and lead creation endpoints. Files: server/stripeClient.ts, server/stripe-routes.ts, server/webhookHandlers.ts, server/seed-stripe.ts, client/src/pages/pricing.tsx. New user columns: stripeCustomerId, stripeSubscriptionId, planStatus, monthlyDiscoveriesUsed, usageResetDate.
-- 2026-02-07: Added Business Intelligence section to lead detail dialogs (leads + pipeline pages) showing BBB rating, Google rating/reviews, sitemap status, robots.txt status. Compact BBB/Google indicators on lead list cards and pipeline cards.
-- 2026-02-07: Added Help page (/help) with Getting Started guide, Pages Overview, Key Features, Pipeline Stages, and FAQ accordion. Added Help link with HelpCircle icon to sidebar navigation. Added email send confirmation dialog (AlertDialog) that shows recipient and subject before sending.
-- 2026-02-07: Added Gmail integration for sending outreach emails directly from the app. Uses Replit Gmail connector with OAuth. Send button in email template dialog sends via Gmail API. Sent emails logged in activity timeline. Falls back to "Open in Email App" if Gmail not connected. Endpoints: GET /api/gmail/status, POST /api/gmail/send. Server module: server/gmail.ts.
-- 2026-02-06: Added Lighthouse-style website scoring with categorized issues (Performance, SEO, Accessibility, Security). Technology detection identifies CMS (WordPress, Wix, Squarespace, Shopify, etc.), frameworks (React, Next.js, Vue, Angular), analytics, marketing tools, hosting, and e-commerce platforms. Website screenshots via thum.io. New DB columns: detected_technologies (text array), screenshot_url (text).
-- 2026-02-06: Enhanced contact extraction to follow About, Contact, Team, Staff, and People pages (up to 4 in parallel) for deeper email/phone discovery. Added Yelp scraping (direct HTML + JSON fallback + DDG fallback) and Facebook/Instagram business page discovery via DuckDuckGo as new data sources.
-- 2026-02-06: Added bulk actions (multi-select leads, bulk move stage, bulk delete, bulk export). Added lead scoring system that auto-ranks leads by priority (Hot/Warm/Cool/Cold) based on website status, social media, contact info, and website quality. Added activity log/timeline tracking stage changes and note edits with timestamps. Sort leads by priority or date.
-- 2026-02-06: Added in-memory search result caching (3-hour TTL, max 200 entries). Repeat searches return instantly from cache. Cache stats and clear endpoints added (GET /api/cache/stats, POST /api/cache/clear). "From cache" badge shown on discover page results. Automatic pruning of expired/overflow entries.
-- 2026-02-06: Improved deduplication with fuzzy name matching (Levenshtein similarity >0.85), phone-based dedup, substring matching, and cross-key lookup (domain + name + phone). Route-level dedup also improved with same logic against existing DB leads. Added contact info extraction from websites: scrapes emails (regex + mailto: links), phone numbers (regex + tel: links), follows contact pages for additional data. Auto-fills lead contactEmail and contactPhone fields.
-- 2026-02-06: Added social media detection feature. Scraper searches Facebook/Instagram via DuckDuckGo, extracts social links from analyzed websites, stores as "platform:url" arrays in leads.socialMedia column. Businesses with social media but no website flagged as "High value" leads with star badge. Social media icons (react-icons/si) shown in leads list, pipeline cards, and detail dialogs with clickable links.
-- 2026-02-06: Switched from Replit Auth (OIDC) to custom email/password authentication with bcrypt password hashing, express-session with PostgreSQL session store. Added login/register pages, landing page redesign with hero, how-it-works, features, and CTA sections. Seeded account: Melvin.a.p.cruz@gmail.com.
-- 2026-02-06: Made app a PWA with manifest, service worker, and app icons. Added safe-area-inset handling for phone notches (viewport-fit=cover, safe-area CSS classes). Uses 100dvh for proper mobile height. Added apple-mobile-web-app meta tags.
-- 2026-02-06: Added OpenStreetMap Overpass API and Google Places API (optional) as additional data sources. OSM provides structured business data with addresses, phone numbers, and cuisine info. Google Places requires GOOGLE_PLACES_API_KEY env var. Added 30+ OSM category mappings, geocoding via Nominatim, and improved address/phone propagation to leads.
-- 2026-02-06: Rewrote scraper to fix search engine blocking (switched to Safari UA), extract real URLs from Bing cite elements instead of redirect URLs, added 50+ aggregator site filters, list-title pattern detection, and improved business name cleaning. Cleaned junk data from database.
-- 2026-02-06: Added CRM pipeline with 8 stages (New Lead, Contacted, Interested, Demo, Proposal, Negotiation, Won, Lost). Built Kanban-style pipeline board page. Updated all pages to use new pipeline stages with move-to-stage functionality.
-- 2026-02-06: Built automated lead discovery with real web scraping (DuckDuckGo + Bing), website quality analysis using cheerio, discover page with category/location search, manual lead entry, and lead pipeline management.
-
-## Architecture
-- **Frontend**: React + Vite + Tailwind CSS + Shadcn UI with wouter routing
-- **Backend**: Express.js with PostgreSQL (Drizzle ORM)
-- **Database**: PostgreSQL with leads table and CRM status enum (9 stages)
-- **Data Sources**: Bing search, DuckDuckGo search, OpenStreetMap Overpass API (free, no key), Google Maps (no key), Yellow Pages, Google Places API (optional, needs GOOGLE_PLACES_API_KEY)
-- **Web Scraping**: cheerio for HTML parsing, server-side fetch for search engines and website analysis
-- **Key Features**:
-  - Dashboard with pipeline overview stats
-  - **Pipeline** page - Kanban board with columns for each CRM stage, move leads between stages
-  - **Discover Leads** page - search by business category + location, auto-scrapes the web and directories
-  - Lead list with search, status filter, and industry filter
-  - Lead detail dialog with stage management, notes, and delete
-  - Add lead form with website quality analysis
-  - Website analyzer checks for mobile responsiveness, HTTPS, meta tags, modern frameworks, load time, SEO, etc.
-  - Identifies businesses without websites as high-value leads
-
-## Pipeline Stages (CRM)
-1. New Lead - just discovered
-2. Contacted - reached out
-3. Interested - showed interest
-4. Demo - demo/meeting scheduled
-5. Proposal - proposal/quote sent
-6. Negotiation - discussing terms
-7. Won - successfully converted
-8. Lost - didn't work out
-
-## Project Structure
-- `shared/schema.ts` - Drizzle schema with leads table, CRM status enum, PIPELINE_STAGES config
-- `server/routes.ts` - API routes (CRUD + website analyzer + discover)
-- `server/storage.ts` - Database storage layer (DatabaseStorage)
-- `server/scraper.ts` - Web scraping service (search engines, directory scraping, website analysis)
-- `server/db.ts` - Database connection
-- `client/src/pages/dashboard.tsx` - Dashboard with stats and pipeline overview
-- `client/src/pages/pipeline.tsx` - Kanban board for CRM pipeline management
-- `client/src/pages/discover.tsx` - Automated lead discovery page
-- `client/src/pages/leads.tsx` - Lead list with filters and detail dialog
-- `client/src/pages/add-lead.tsx` - Add lead form with website analysis
-- `client/src/components/app-sidebar.tsx` - Navigation sidebar
-- `client/src/components/theme-provider.tsx` - Dark/light theme support
-
-## Authentication
-- Custom email/password auth with bcrypt password hashing
-- express-session with PostgreSQL session store (connect-pg-simple)
-- POST /api/register, POST /api/login, POST /api/logout, GET /api/auth/user
-- All API endpoints protected with isAuthenticated middleware
-- Auth files in server/replit_integrations/auth/ (replitAuth.ts, routes.ts, storage.ts)
-
-## API Endpoints
-- `POST /api/register` - Create account (email, password, firstName, lastName)
-- `POST /api/login` - Sign in (email, password)
-- `POST /api/logout` - Sign out
-- `GET /api/auth/user` - Get current user
-- `GET /api/leads` - Get all leads
-- `POST /api/leads` - Create a lead
-- `PATCH /api/leads/:id` - Update a lead (including status/stage changes)
-- `DELETE /api/leads/:id` - Delete a lead
-- `POST /api/discover` - Discover businesses by category/location (auto-scrape)
-- `POST /api/analyze-website` - Analyze a single website
+FunnelFox, formerly LeadHunter, is a lead generation web application designed for web developers. Its primary purpose is to discover, track, and manage potential clients by searching the web for businesses, analyzing their websites for quality issues, and providing a CRM-style pipeline to manage the outreach process from discovery through conversion. The project aims to empower web developers to efficiently find and engage with businesses in need of web development services, focusing on those with poor online presence or without a website.
 
 ## User Preferences
 - Web developer looking for client leads
@@ -98,3 +9,35 @@ A lead generation web application (FunnelFox, formerly LeadHunter) designed for 
 - Needs CRM-style pipeline to move leads through sales stages
 - Focus on finding businesses without websites or with poor websites
 - No mock data - real scraping only
+
+## System Architecture
+The application follows a client-server architecture.
+- **Frontend**: Developed with React, Vite, Tailwind CSS, and Shadcn UI, utilizing wouter for routing. It's built as a Progressive Web App (PWA) with manifest, service worker, and safe-area-inset handling for mobile.
+- **Backend**: Implemented using Express.js.
+- **Database**: PostgreSQL with Drizzle ORM manages lead data, user information, and session storage. The `leads` table includes a CRM status enum for pipeline management. Leads are global and shared across all users.
+- **UI/UX**: Features a redesigned landing page with clear CTA sections, a Kanban-style pipeline board, and a comprehensive account settings page. The application supports dark/light themes. Sidebar navigation is structured for intuitive access to main features and account management.
+- **Technical Implementations**:
+    - **Authentication**: Custom email/password authentication system with bcrypt hashing and `express-session` using a PostgreSQL session store. Includes a forgot/reset password flow with rate limiting and email integration.
+    - **Lead Discovery & Analysis**: Automated web scraping (DuckDuckGo, Bing) for business discovery. `cheerio` is used for HTML parsing and website quality analysis, identifying issues like performance, SEO, accessibility, and security. Technology detection identifies CMS, frameworks, and analytics tools. Website screenshots are generated via thum.io.
+    - **CRM Pipeline**: An 8-stage Kanban board (New Lead, Contacted, Interested, Demo, Proposal, Negotiation, Won, Lost) facilitates lead management.
+    - **Lead Scoring & Management**: Leads are auto-ranked (Hot/Warm/Cool/Cold) based on website status, social media presence, and contact info. Features include bulk actions (move, delete, export), activity logging, and multiple export formats (CSV, Excel, JSON, Copy to Clipboard).
+    - **Contact Extraction**: Enhanced contact extraction follows multiple pages (About, Contact, Team) to find emails and phone numbers.
+    - **Deduplication**: Fuzzy name matching, phone-based, and cross-key lookup for robust lead deduplication.
+    - **Social Media Detection**: Scrapes and stores social media links from websites and via DuckDuckGo, highlighting businesses without websites but with social presence.
+    - **Email Integration**: Gmail integration allows sending outreach emails directly from the app, utilizing a professional HTML email template. Emails are logged in the activity timeline.
+    - **Business Intelligence**: Lead detail dialogs include BBB rating, Google rating/reviews, sitemap, and robots.txt status.
+    - **SaaS Subscription**: Implemented with Stripe for subscription management, including a Free tier and a Pro plan ($30/month) with usage limits (discoveries, leads) and plan comparison. Includes subscription cancellation, resumption, and billing portal access.
+    - **Legal Pages**: Dedicated Terms of Service and Privacy Policy pages.
+
+## External Dependencies
+- **Stripe**: For SaaS subscription management, checkout, billing portal, and webhook handling.
+- **Gmail API (via Replit Gmail connector)**: For sending outreach emails directly from the application.
+- **PostgreSQL**: Primary database for all application data.
+- **Bing Search**: Data source for lead discovery.
+- **DuckDuckGo Search**: Data source for lead discovery, including social media searches.
+- **OpenStreetMap Overpass API**: Provides structured business data (addresses, phone numbers, cuisine info) and geocoding via Nominatim.
+- **Google Places API (Optional)**: Additional data source for business information (requires `GOOGLE_PLACES_API_KEY`).
+- **Yellow Pages**: Data source for business information.
+- **thum.io**: For generating website screenshots.
+- **SheetJS**: For Excel (.xlsx) export functionality.
+- **react-icons/si**: For social media icons.

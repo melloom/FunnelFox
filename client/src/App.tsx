@@ -26,6 +26,8 @@ import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
 import AccountPage from "@/pages/account";
 import SubscriptionPage from "@/pages/subscription";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 
 function Router() {
   return (
@@ -108,6 +110,8 @@ function AppContent() {
     return (
       <Switch>
         <Route path="/auth" component={AuthPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <Route path="/terms" component={TermsPage} />
         <Route path="/privacy" component={PrivacyPage} />
         <Route component={LandingPage} />
