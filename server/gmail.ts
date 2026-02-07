@@ -44,8 +44,70 @@ async function getUncachableGmailClient() {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function buildHtmlEmail(body: string, fromName?: string): string {
+  const paragraphs = body.split('\n').map(line => {
+    if (!line.trim()) return '';
+    return `<p style="margin:0 0 12px 0;line-height:1.6;color:#374151;font-size:15px;">${escapeHtml(line)}</p>`;
+  }).join('\n');
+
+  const senderSignature = fromName
+    ? `<p style="margin:24px 0 0 0;padding-top:16px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:13px;line-height:1.5;">
+        Best regards,<br/>
+        <strong style="color:#374151;">${escapeHtml(fromName)}</strong>
+       </p>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background-color:#f3f4f6;">
+    <tr>
+      <td style="padding:32px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;width:100%;">
+          <tr>
+            <td style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
+                <tr>
+                  <td style="padding:32px 32px 24px 32px;">
+                    ${paragraphs}
+                    ${senderSignature}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 0;text-align:center;">
+              <p style="margin:0;color:#9ca3af;font-size:11px;line-height:1.5;">
+                Sent via LeadHunter by MellowSites
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 function buildRawEmail(to: string, subject: string, body: string, fromName?: string): string {
   const boundary = 'boundary_' + Date.now();
+  const htmlContent = buildHtmlEmail(body, fromName);
   const lines = [
     fromName ? `From: ${fromName}` : '',
     `To: ${to}`,
@@ -57,13 +119,13 @@ function buildRawEmail(to: string, subject: string, body: string, fromName?: str
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: 7bit',
     '',
-    body,
+    body + (fromName ? `\n\nBest regards,\n${fromName}` : ''),
     '',
     `--${boundary}`,
     'Content-Type: text/html; charset="UTF-8"',
     'Content-Transfer-Encoding: 7bit',
     '',
-    body.split('\n').map(line => line ? `<p>${line}</p>` : '<br/>').join('\n'),
+    htmlContent,
     '',
     `--${boundary}--`,
   ].filter(l => l !== undefined);

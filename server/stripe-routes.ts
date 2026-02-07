@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { db } from "./db";
 import { users } from "@shared/models/auth";
+import { leads } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { isAuthenticated } from "./replit_integrations/auth";
 
@@ -39,24 +40,54 @@ export function registerStripeRoutes(app: Express) {
           monthlyDiscoveriesUsed: 0,
           usageResetDate: nextReset,
         }).where(eq(users.id, userId));
+      }
 
-        return res.json({
-          planStatus: isPro ? "pro" : "free",
-          monthlyDiscoveriesUsed: 0,
-          discoveryLimit: isPro ? 999 : 5,
-          leadLimit: isPro ? null : 25,
-          stripeSubscriptionId: user.stripeSubscriptionId,
-          isAdmin: user.isAdmin || false,
-        });
+      const monthlyDiscoveriesUsed = resetNeeded ? 0 : (user.monthlyDiscoveriesUsed || 0);
+      const usageResetDate = resetNeeded ? getNextResetDate().toISOString() : (user.usageResetDate ? new Date(user.usageResetDate).toISOString() : null);
+
+      const [leadCountResult] = await db.select({ count: sql<number>`count(*)` }).from(leads).limit(1);
+      const totalLeads = Number(leadCountResult?.count || 0);
+
+      let stripeDetails: any = null;
+      if (user.stripeSubscriptionId && !user.isAdmin) {
+        try {
+          const stripe = await getUncachableStripeClient();
+          const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId, {
+            expand: ["default_payment_method"],
+          });
+          const priceAmount = sub.items?.data?.[0]?.price?.unit_amount;
+          const priceInterval = sub.items?.data?.[0]?.price?.recurring?.interval;
+          const pm = sub.default_payment_method as any;
+          stripeDetails = {
+            status: sub.status,
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+            currentPeriodStart: sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : null,
+            currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+            cancelAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
+            priceAmount: priceAmount ? priceAmount / 100 : null,
+            priceInterval: priceInterval || null,
+            cardBrand: pm?.card?.brand || null,
+            cardLast4: pm?.card?.last4 || null,
+          };
+        } catch (stripeErr: any) {
+          if (stripeErr.code !== "resource_missing") {
+            console.error("Error fetching stripe subscription details:", stripeErr);
+          }
+        }
       }
 
       res.json({
         planStatus: isPro ? "pro" : "free",
-        monthlyDiscoveriesUsed: user.monthlyDiscoveriesUsed || 0,
-        discoveryLimit: isPro ? 999 : 5,
+        monthlyDiscoveriesUsed,
+        discoveryLimit: isPro ? (user.isAdmin ? 999 : 50) : 5,
         leadLimit: isPro ? null : 25,
+        totalLeads,
         stripeSubscriptionId: user.stripeSubscriptionId,
+        stripeCustomerId: user.stripeCustomerId,
         isAdmin: user.isAdmin || false,
+        usageResetDate,
+        memberSince: user.createdAt ? new Date(user.createdAt).toISOString() : null,
+        stripe: stripeDetails,
       });
     } catch (err) {
       console.error("Error getting subscription:", err);

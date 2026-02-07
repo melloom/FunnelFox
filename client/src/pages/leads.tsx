@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,11 @@ import {
   Award,
   FileText,
   Bot,
+  ChevronDown,
+  Clipboard,
+  Table2,
+  FileJson,
+  Sheet,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -66,6 +71,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplateDialog } from "@/components/email-template-dialog";
 import { calculateLeadScore, getScoreColor } from "@/lib/lead-scoring";
+import * as XLSX from "xlsx";
 
 const STAGE_TEXT_COLORS: Record<string, string> = {
   "chart-1": "text-chart-1",
@@ -820,42 +826,172 @@ export default function LeadsPage() {
     }
   }
 
-  function exportToCSV(leadsToExport?: Lead[]) {
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportMenuTarget, setExportMenuTarget] = useState<"all" | "selected">("all");
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    if (showExportMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showExportMenu]);
+
+  function getExportData(leadsToExport?: Lead[]) {
     const data = leadsToExport || sorted;
     const stageLabel = (val: string) => PIPELINE_STAGES.find((s) => s.value === val)?.label || val;
-    const escapeCSV = (val: string) => {
-      if (!val) return "";
-      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-        return `"${val.replace(/"/g, '""')}"`;
-      }
-      return val;
-    };
-    const headers = ["Company Name", "Website", "Contact Name", "Email", "Phone", "Industry", "Location", "Stage", "Website Score", "Website Issues", "Social Media", "Priority", "Notes", "Source", "Date Added"];
-    const rows = data.map((lead) => [
-      escapeCSV(lead.companyName),
-      escapeCSV(lead.websiteUrl === "none" ? "" : lead.websiteUrl),
-      escapeCSV(lead.contactName || ""),
-      escapeCSV(lead.contactEmail || ""),
-      escapeCSV(lead.contactPhone || ""),
-      escapeCSV(lead.industry || ""),
-      escapeCSV(lead.location || ""),
-      escapeCSV(stageLabel(lead.status)),
-      lead.websiteScore != null ? String(lead.websiteScore) : "",
-      escapeCSV((lead.websiteIssues || []).join("; ")),
-      escapeCSV((lead.socialMedia || []).map((s) => { const i = s.indexOf(":"); return i > -1 ? s.slice(i + 1) : s; }).join("; ")),
-      calculateLeadScore(lead).label,
-      escapeCSV(lead.notes || ""),
-      escapeCSV(lead.source || ""),
-      lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    return data.map((lead) => ({
+      "Company Name": lead.companyName,
+      "Website": lead.websiteUrl === "none" ? "" : lead.websiteUrl,
+      "Contact Name": lead.contactName || "",
+      "Email": lead.contactEmail || "",
+      "Phone": lead.contactPhone || "",
+      "Industry": lead.industry || "",
+      "Location": lead.location || "",
+      "Stage": stageLabel(lead.status),
+      "Website Score": lead.websiteScore != null ? lead.websiteScore : "",
+      "Website Issues": (lead.websiteIssues || []).join("; "),
+      "Social Media": (lead.socialMedia || []).map((s) => { const i = s.indexOf(":"); return i > -1 ? s.slice(i + 1) : s; }).join("; "),
+      "Priority": calculateLeadScore(lead).label,
+      "Notes": lead.notes || "",
+      "Source": lead.source || "",
+      "Date Added": lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
+    }));
+  }
+
+  function downloadFile(content: string | ArrayBuffer, filename: string, type: string) {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportToCSV(leadsToExport?: Lead[]) {
+    const rows = getExportData(leadsToExport);
+    if (rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const escapeCSV = (val: any) => {
+      const s = String(val ?? "");
+      if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+    const csvRows = rows.map((r) => headers.map((h) => escapeCSV(r[h as keyof typeof r])).join(","));
+    const csv = [headers.join(","), ...csvRows].join("\n");
+    downloadFile(csv, `leads_${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8;");
+    toast({ title: "CSV exported", description: `${rows.length} leads exported to CSV.` });
+    setShowExportMenu(false);
+  }
+
+  function exportToExcel(leadsToExport?: Lead[]) {
+    const rows = getExportData(leadsToExport);
+    if (rows.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const colWidths = Object.keys(rows[0]).map((key) => ({
+      wch: Math.max(key.length, ...rows.map((r) => String(r[key as keyof typeof r] ?? "").length).slice(0, 50)) + 2,
+    }));
+    ws["!cols"] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Leads");
+    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    downloadFile(buffer, `leads_${new Date().toISOString().slice(0, 10)}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    toast({ title: "Excel exported", description: `${rows.length} leads exported to Excel.` });
+    setShowExportMenu(false);
+  }
+
+  function exportToJSON(leadsToExport?: Lead[]) {
+    const rows = getExportData(leadsToExport);
+    if (rows.length === 0) return;
+    const json = JSON.stringify(rows, null, 2);
+    downloadFile(json, `leads_${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+    toast({ title: "JSON exported", description: `${rows.length} leads exported to JSON.` });
+    setShowExportMenu(false);
+  }
+
+  function copyToClipboard(leadsToExport?: Lead[]) {
+    const rows = getExportData(leadsToExport);
+    if (rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const tsvRows = rows.map((r) => headers.map((h) => String(r[h as keyof typeof r] ?? "").replace(/\t/g, " ")).join("\t"));
+    const tsv = [headers.join("\t"), ...tsvRows].join("\n");
+    navigator.clipboard.writeText(tsv).then(() => {
+      toast({ title: "Copied to clipboard", description: `${rows.length} leads copied as tab-separated data. Paste into Google Sheets, Excel, or Airtable.` });
+    }).catch(() => {
+      toast({ title: "Copy failed", description: "Could not copy to clipboard.", variant: "destructive" });
+    });
+    setShowExportMenu(false);
+  }
+
+  function openExportMenu(target: "all" | "selected") {
+    setExportMenuTarget(target);
+    setShowExportMenu(true);
+  }
+
+  function getExportLeads() {
+    if (exportMenuTarget === "selected") {
+      return sorted.filter((l) => selectedIds.has(l.id));
+    }
+    return sorted;
+  }
+
+  function ExportMenuPopover({ anchorRef }: { anchorRef?: React.RefObject<HTMLDivElement | null> }) {
+    if (!showExportMenu) return null;
+    const leadsData = getExportLeads();
+    const count = leadsData.length;
+    return (
+      <div
+        ref={exportMenuRef}
+        className="absolute right-0 top-full mt-1 z-50 w-56 rounded-md border bg-popover p-1 shadow-md"
+        data-testid="export-menu"
+      >
+        <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+          Export {count} lead{count !== 1 ? "s" : ""}
+        </p>
+        <button
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover-elevate cursor-pointer"
+          onClick={() => exportToCSV(leadsData)}
+          data-testid="export-csv"
+        >
+          <FileText className="w-4 h-4 text-muted-foreground" />
+          CSV (.csv)
+        </button>
+        <button
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover-elevate cursor-pointer"
+          onClick={() => exportToExcel(leadsData)}
+          data-testid="export-excel"
+        >
+          <Table2 className="w-4 h-4 text-emerald-600" />
+          Excel (.xlsx)
+        </button>
+        <button
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover-elevate cursor-pointer"
+          onClick={() => exportToJSON(leadsData)}
+          data-testid="export-json"
+        >
+          <FileJson className="w-4 h-4 text-blue-500" />
+          JSON (.json)
+        </button>
+        <div className="my-1 h-px bg-border" />
+        <button
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover-elevate cursor-pointer"
+          onClick={() => copyToClipboard(leadsData)}
+          data-testid="export-clipboard"
+        >
+          <Clipboard className="w-4 h-4 text-muted-foreground" />
+          Copy to Clipboard
+        </button>
+        <p className="px-2 py-1 text-[10px] text-muted-foreground leading-tight mt-0.5">
+          Paste directly into Google Sheets or Airtable
+        </p>
+      </div>
+    );
   }
 
   if (isLoading) {
@@ -956,16 +1092,20 @@ export default function LeadsPage() {
               Clear
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportToCSV()}
-            disabled={sorted.length === 0}
-            data-testid="button-export-csv"
-          >
-            <Download className="w-3.5 h-3.5 mr-1.5" />
-            Export CSV
-          </Button>
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openExportMenu("all")}
+              disabled={sorted.length === 0}
+              data-testid="button-export"
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Export
+              <ChevronDown className="w-3.5 h-3.5 ml-1" />
+            </Button>
+            {showExportMenu && exportMenuTarget === "all" && <ExportMenuPopover />}
+          </div>
         </div>
       </div>
 
@@ -989,18 +1129,19 @@ export default function LeadsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const selectedLeads = sorted.filter((l) => selectedIds.has(l.id));
-              exportToCSV(selectedLeads);
-            }}
-            data-testid="button-bulk-export"
-          >
-            <Download className="w-3.5 h-3.5 mr-1.5" />
-            Export
-          </Button>
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openExportMenu("selected")}
+              data-testid="button-bulk-export"
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Export
+              <ChevronDown className="w-3.5 h-3.5 ml-1" />
+            </Button>
+            {showExportMenu && exportMenuTarget === "selected" && <ExportMenuPopover />}
+          </div>
           <Button
             variant="ghost"
             size="sm"
