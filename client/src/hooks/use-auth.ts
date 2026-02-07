@@ -51,9 +51,6 @@ export function useAuth() {
       const res = await apiRequest("POST", "/api/register", data);
       return res.json();
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(["/api/auth/user"], data);
-    },
   });
 
   const logoutMutation = useMutation({

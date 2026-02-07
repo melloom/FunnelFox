@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import foxLogo from "@assets/fox_1770439380079.png";
 
 export default function AuthPage() {
@@ -18,6 +19,9 @@ export default function AuthPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [resending, setResending] = useState(false);
   const { login, register } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -38,25 +42,97 @@ export default function AuthPage() {
     try {
       if (isRegister) {
         await register.mutateAsync({ email, password, firstName: firstName.trim(), lastName: lastName.trim() || undefined });
+        setVerificationEmail(email);
+        setShowVerification(true);
       } else {
         await login.mutateAsync({ email, password });
+        setLocation("/");
       }
-      setLocation("/");
     } catch (err: any) {
       const msg = err?.message || "Something went wrong";
       let parsed = msg;
       try {
         const j = JSON.parse(msg);
         parsed = j.message || msg;
+        if (j.needsVerification) {
+          setVerificationEmail(j.email || email);
+          setShowVerification(true);
+          return;
+        }
       } catch {}
       toast({ title: "Error", description: parsed, variant: "destructive" });
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    try {
+      await apiRequest("POST", "/api/auth/resend-verification", { email: verificationEmail });
+      toast({ title: "Verification email sent", description: "Check your inbox for a new verification link." });
+    } catch {
+      toast({ title: "Error", description: "Failed to resend verification email. Try again later.", variant: "destructive" });
+    } finally {
+      setResending(false);
     }
   };
 
   const switchMode = () => {
     setMode(isRegister ? "login" : "register");
     setAcceptedTerms(false);
+    setShowVerification(false);
   };
+
+  if (showVerification) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
+        <div className="pt-2">
+          <Button variant="ghost" size="icon" onClick={() => setShowVerification(false)} data-testid="button-back-verification">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="w-full max-w-sm space-y-6">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mail className="w-8 h-8 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-verify-title">Check your email</h1>
+              <p className="text-sm text-muted-foreground">
+                We sent a verification link to <span className="font-medium text-foreground">{verificationEmail}</span>. Click the link to activate your account.
+              </p>
+            </div>
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <p className="text-xs text-muted-foreground text-center">
+                  The link expires in 24 hours. If you don't see the email, check your spam folder.
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  data-testid="button-resend-verification"
+                >
+                  {resending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  Resend verification email
+                </Button>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => { setShowVerification(false); setMode("login"); }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors bg-transparent border-0 cursor-pointer"
+                    data-testid="button-back-to-login"
+                  >
+                    Already verified? <span className="text-primary underline underline-offset-2">Sign in</span>
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">

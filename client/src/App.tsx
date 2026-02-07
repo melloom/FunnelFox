@@ -28,6 +28,7 @@ import AccountPage from "@/pages/account";
 import SubscriptionPage from "@/pages/subscription";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
+import VerifyEmailPage from "@/pages/verify-email";
 
 function Router() {
   return (
@@ -110,6 +111,7 @@ function AppContent() {
     return (
       <Switch>
         <Route path="/auth" component={AuthPage} />
+        <Route path="/verify-email" component={VerifyEmailPage} />
         <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/reset-password" component={ResetPasswordPage} />
         <Route path="/terms" component={TermsPage} />

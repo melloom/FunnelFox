@@ -88,16 +88,38 @@ export async function setupAuth(app: Express) {
 
       const hashedPassword = await bcrypt.hash(data.password, 10);
 
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
       const user = await authStorage.createUser({
         email: data.email,
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName || null,
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiry: verificationExpiry,
       });
 
-      req.session.userId = user.id;
+      const host = process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
+      const verifyUrl = `https://${host}/verify-email?token=${verificationToken}`;
+
+      try {
+        const gmailConnected = await isGmailConnected();
+        if (gmailConnected) {
+          await sendEmail(
+            data.email,
+            "Verify Your FunnelFox Account",
+            `Hi ${data.firstName},\n\nWelcome to FunnelFox! Please verify your email address by clicking the link below:\n\n${verifyUrl}\n\nThis link expires in 24 hours.\n\nIf you did not create this account, you can safely ignore this email.`,
+            "FunnelFox"
+          );
+        }
+      } catch (emailErr) {
+        console.error("Failed to send verification email:", emailErr);
+      }
+
       const { password: _, ...safeUser } = user;
-      res.status(201).json(safeUser);
+      res.status(201).json({ ...safeUser, needsVerification: true });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
@@ -123,10 +145,23 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && (!user.isAdmin || user.planStatus !== "pro")) {
-        await db.update(users).set({ isAdmin: true, planStatus: "pro" }).where(eq(users.id, user.id));
-        user.isAdmin = true;
-        user.planStatus = "pro";
+      if (!user.emailVerified && user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        return res.status(403).json({
+          message: "Please verify your email address before signing in. Check your inbox for a verification link.",
+          needsVerification: true,
+          email: user.email,
+        });
+      }
+
+      if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        const updates: Record<string, any> = {};
+        if (!user.isAdmin) updates.isAdmin = true;
+        if (user.planStatus !== "pro") updates.planStatus = "pro";
+        if (!user.emailVerified) updates.emailVerified = true;
+        if (Object.keys(updates).length > 0) {
+          await db.update(users).set(updates).where(eq(users.id, user.id));
+          Object.assign(user, updates);
+        }
       }
 
       req.session.userId = user.id;
@@ -149,6 +184,87 @@ export async function setupAuth(app: Express) {
       res.clearCookie("connect.sid");
       res.json({ message: "Logged out" });
     });
+  });
+
+  app.get("/api/auth/verify-email", async (req, res) => {
+    try {
+      const { token } = req.query;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Verification token is required" });
+      }
+
+      const [user] = await db.select().from(users).where(
+        and(
+          eq(users.emailVerificationToken, token),
+          gt(users.emailVerificationExpiry, new Date())
+        )
+      );
+
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired verification link. Please request a new one." });
+      }
+
+      await db.update(users).set({
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
+      }).where(eq(users.id, user.id));
+
+      req.session.userId = user.id;
+      res.json({ message: "Email verified successfully! You are now signed in." });
+    } catch (error) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ message: "Verification failed" });
+    }
+  });
+
+  const resendVerificationLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    message: { message: "Too many verification emails requested. Try again in 15 minutes." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.post("/api/auth/resend-verification", resendVerificationLimiter, async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        return res.status(400).json({ message: "A valid email address is required" });
+      }
+
+      const user = await authStorage.getUserByEmail(email);
+
+      res.json({ message: "If an account with that email exists and is unverified, a new verification link has been sent." });
+
+      if (!user || user.emailVerified) return;
+
+      const gmailConnected = await isGmailConnected();
+      if (!gmailConnected) {
+        console.error("Gmail not connected - cannot send verification email");
+        return;
+      }
+
+      const newToken = crypto.randomBytes(32).toString("hex");
+      const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await db.update(users).set({
+        emailVerificationToken: newToken,
+        emailVerificationExpiry: newExpiry,
+      }).where(eq(users.id, user.id));
+
+      const host = process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
+      const verifyUrl = `https://${host}/verify-email?token=${newToken}`;
+
+      await sendEmail(
+        user.email,
+        "Verify Your FunnelFox Account",
+        `Hi ${user.firstName || "there"},\n\nPlease verify your email address by clicking the link below:\n\n${verifyUrl}\n\nThis link expires in 24 hours.\n\nIf you did not create this account, you can safely ignore this email.`,
+        "FunnelFox"
+      );
+    } catch (error) {
+      console.error("Resend verification error:", error);
+    }
   });
 
   const forgotPasswordLimiter = rateLimit({
