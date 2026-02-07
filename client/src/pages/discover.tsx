@@ -24,7 +24,17 @@ import {
   Phone,
   MapPinned,
   LocateFixed,
+  Mail,
+  Camera,
+  ExternalLink,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
@@ -112,6 +122,7 @@ export default function DiscoverPage() {
   const [geolocating, setGeolocating] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [lastSearch, setLastSearch] = useState<{ category: string; location: string } | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const { data: subscription } = useQuery<{
     planStatus: string;
@@ -432,7 +443,7 @@ export default function DiscoverPage() {
                 <Card
                   key={lead.id}
                   className="hover-elevate cursor-pointer"
-                  onClick={() => setLocation("/leads")}
+                  onClick={() => setSelectedLead(lead)}
                   data-testid={`card-discovered-lead-${lead.id}`}
                 >
                   <CardContent className="p-4">
@@ -541,6 +552,96 @@ export default function DiscoverPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
+        <DialogContent className="sm:max-w-lg max-sm:text-sm max-sm:max-h-[85vh] max-sm:overflow-y-auto max-sm:pb-[env(safe-area-inset-bottom,16px)]">
+          {selectedLead && (() => {
+            const lead = selectedLead;
+            const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 flex-wrap">
+                    <Building2 className="w-5 h-5 text-primary shrink-0" />
+                    <span className="break-words min-w-0">{lead.companyName}</span>
+                  </DialogTitle>
+                  <DialogDescription className="max-sm:text-xs">Newly discovered lead</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 sm:space-y-4 mt-1 sm:mt-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="bg-chart-1/15 text-chart-1 border-0 text-xs">New Lead</Badge>
+                    <ScoreBadge score={lead.websiteScore} />
+                    {noWebsite && <Badge variant="secondary" className="text-xs">No website</Badge>}
+                  </div>
+                  <div className="space-y-2.5">
+                    {!noWebsite && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <a href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 truncate" data-testid="link-discover-lead-website">{lead.websiteUrl}</a>
+                      </div>
+                    )}
+                    {lead.contactEmail && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <a href={`mailto:${lead.contactEmail}`} className="text-primary underline underline-offset-2 truncate">{lead.contactEmail}</a>
+                      </div>
+                    )}
+                    {lead.contactPhone && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2">{lead.contactPhone}</a>
+                      </div>
+                    )}
+                    {lead.location && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span>{lead.location}</span>
+                      </div>
+                    )}
+                  </div>
+                  {lead.websiteIssues && lead.websiteIssues.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Website Issues</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {lead.websiteIssues.map((issue, i) => (
+                          <Badge key={i} variant="secondary" className="text-[10px]">{issue}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!noWebsite && lead.screenshotUrl && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+                        <p className="text-xs font-medium text-muted-foreground">Website Screenshot</p>
+                      </div>
+                      <div className="rounded-md border overflow-hidden">
+                        <img src={lead.screenshotUrl} alt={`Screenshot of ${lead.companyName}`} className="w-full h-auto max-h-40 sm:max-h-60 object-cover object-top" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
+                    <Link href="/leads">
+                      <Button size="sm" className="w-full sm:w-auto" data-testid="button-discover-view-in-pipeline">
+                        <ArrowRight className="w-3.5 h-3.5 mr-1" />
+                        View in Pipeline
+                      </Button>
+                    </Link>
+                    {!noWebsite && (
+                      <a href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="w-full sm:w-auto" data-testid="button-discover-visit-site">
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                          Visit Website
+                        </Button>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

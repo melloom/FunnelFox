@@ -31,6 +31,7 @@ import {
   Phone,
   Mail,
   ArrowRight,
+  ArrowLeft,
   ChevronDown,
   MoreHorizontal,
   Trash2,
@@ -41,6 +42,9 @@ import {
   Award,
   FileText,
   Bot,
+  Camera,
+  Flame,
+  NotebookPen,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -48,6 +52,8 @@ import { PIPELINE_STAGES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplateDialog } from "@/components/email-template-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { calculateLeadScore, getScoreColor } from "@/lib/lead-scoring";
 
 const STAGE_COLORS: Record<string, string> = {
   "chart-1": "bg-chart-1",
@@ -274,9 +280,23 @@ function PipelineLeadDetailDialog({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
       await apiRequest("PATCH", `/api/leads/${id}`, { status });
     },
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/leads"] });
+      const prev = queryClient.getQueryData<Lead[]>(["/api/leads"]);
+      if (prev) {
+        queryClient.setQueryData<Lead[]>(["/api/leads"], prev.map(l => l.id === id ? { ...l, status: status as Lead["status"] } : l));
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) queryClient.setQueryData(["/api/leads"], context.prev);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({ title: "Lead moved" });
+    },
+    onSettled: () => {
+      onClose();
     },
   });
 
@@ -291,7 +311,19 @@ function PipelineLeadDetailDialog({
     },
   });
 
+  const updateNotesMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
+      await apiRequest("PATCH", `/api/leads/${id}`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({ title: "Notes saved" });
+    },
+  });
+
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState("");
 
   if (!lead) return null;
 
@@ -302,7 +334,18 @@ function PipelineLeadDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-sm:text-sm">
+      <DialogContent className="sm:max-w-lg max-sm:text-sm max-sm:max-h-[85vh] max-sm:overflow-y-auto max-sm:pb-[env(safe-area-inset-bottom,16px)]">
+        <div className="flex items-center gap-2 sm:hidden mb-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            data-testid="button-pipeline-detail-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-sm font-medium text-muted-foreground">Back to pipeline</span>
+        </div>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Building2 className="w-5 h-5 text-primary shrink-0" />
@@ -324,6 +367,16 @@ function PipelineLeadDetailDialog({
                 No website
               </Badge>
             )}
+            {(() => {
+              const leadScore = calculateLeadScore(lead);
+              if (leadScore.label === "Cold") return null;
+              return (
+                <Badge variant="secondary" className={`text-xs ${getScoreColor(leadScore.label)}`}>
+                  <Flame className="w-3 h-3 mr-0.5" />
+                  {leadScore.label} ({leadScore.score})
+                </Badge>
+              );
+            })()}
           </div>
 
           <div className="space-y-2.5">
@@ -523,12 +576,49 @@ function PipelineLeadDetailDialog({
             </div>
           )}
 
-          {lead.notes && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">Notes</p>
-              <p className="text-sm text-muted-foreground">{lead.notes}</p>
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs font-medium text-muted-foreground">Notes</p>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setEditingNotes(!editingNotes);
+                  setNotesValue(lead.notes || "");
+                }}
+                data-testid="button-pipeline-edit-notes"
+              >
+                <NotebookPen className="w-3.5 h-3.5 mr-1" />
+                {editingNotes ? "Cancel" : "Edit"}
+              </Button>
             </div>
-          )}
+            {editingNotes ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder="Add notes about this lead..."
+                  className="text-sm"
+                  data-testid="input-pipeline-notes"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    updateNotesMutation.mutate({ id: lead.id, notes: notesValue });
+                    setEditingNotes(false);
+                  }}
+                  disabled={updateNotesMutation.isPending}
+                  data-testid="button-pipeline-save-notes"
+                >
+                  Save Notes
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground" data-testid="text-pipeline-notes">
+                {lead.notes || "No notes yet"}
+              </p>
+            )}
+          </div>
 
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-2">Move to Stage</p>

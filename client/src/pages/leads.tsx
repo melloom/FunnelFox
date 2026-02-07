@@ -22,6 +22,12 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Search,
   ExternalLink,
   Phone,
@@ -63,6 +69,7 @@ import {
   Table2,
   FileJson,
   Sheet,
+  MoreVertical,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -264,10 +271,24 @@ function LeadDetailDialog({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
       await apiRequest("PATCH", `/api/leads/${id}`, { status });
     },
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/leads"] });
+      const prev = queryClient.getQueryData<Lead[]>(["/api/leads"]);
+      if (prev) {
+        queryClient.setQueryData<Lead[]>(["/api/leads"], prev.map(l => l.id === id ? { ...l, status: status as Lead["status"] } : l));
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) queryClient.setQueryData(["/api/leads"], context.prev);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "activities"] });
       toast({ title: "Lead updated" });
+    },
+    onSettled: () => {
+      onClose();
     },
   });
 
@@ -306,7 +327,7 @@ function LeadDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-sm:text-sm">
+      <DialogContent className="sm:max-w-lg max-sm:text-sm max-sm:max-h-[85vh] max-sm:overflow-y-auto max-sm:pb-[env(safe-area-inset-bottom,16px)]">
         <div className="flex items-center gap-2 sm:hidden mb-2">
           <Button
             variant="ghost"
@@ -495,27 +516,28 @@ function LeadDetailDialog({
                       const catScore = getCategoryScore(issues.length, maxDeductions);
                       const grade = getGrade(catScore);
                       return (
-                        <div key={key}>
-                          <div className="flex items-center gap-2 mb-1.5">
+                        <details key={key} className="group">
+                          <summary className="flex items-center gap-2 mb-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                            <ChevronDown className="w-3 h-3 text-muted-foreground transition-transform group-open:rotate-0 -rotate-90" />
                             <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                             <span className="text-xs font-medium flex-1">{key}</span>
                             <span className={`text-[10px] font-bold ${grade.color}`}>{grade.letter}</span>
                             <span className="text-[10px] text-muted-foreground">{issues.length} {issues.length === 1 ? "issue" : "issues"}</span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-muted mb-2 ml-5.5">
+                          </summary>
+                          <div className="w-full h-1.5 rounded-full bg-muted mb-2 ml-6">
                             <div
                               className={`h-full rounded-full transition-all ${catScore >= 80 ? "bg-emerald-500" : catScore >= 60 ? "bg-yellow-500" : catScore >= 40 ? "bg-orange-500" : "bg-red-500"}`}
                               style={{ width: `${catScore}%` }}
                             />
                           </div>
-                          <div className="flex flex-wrap gap-1 ml-5.5">
+                          <div className="flex flex-wrap gap-1 ml-6">
                             {issues.map((issue, i) => (
                               <Badge key={i} variant="secondary" className="text-[10px]">
                                 {issue}
                               </Badge>
                             ))}
                           </div>
-                        </div>
+                        </details>
                       );
                     })}
                   </div>
@@ -1291,8 +1313,34 @@ export default function LeadsPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-3 shrink-0">
                       <ScoreBadge score={lead.websiteScore} />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="sm:hidden" data-testid={`button-lead-actions-${lead.id}`}>
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => toggleSelect(lead.id)}>
+                              <Checkbox checked={isSelected} className="mr-2" />
+                              {isSelected ? "Deselect" : "Select"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => {
+                                if (confirm(`Delete ${lead.companyName}?`)) {
+                                  bulkDeleteMutation.mutate([lead.id]);
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                       {!noWebsite && (
                         <a
                           href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
