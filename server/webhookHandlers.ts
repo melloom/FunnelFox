@@ -45,7 +45,8 @@ export class WebhookHandlers {
             break;
           }
           const isActive = status === 'active' || status === 'trialing';
-          const planStatus = isActive ? 'pro' : 'free';
+          const isGracePeriod = status === 'past_due';
+          const planStatus = (isActive || isGracePeriod) ? 'pro' : 'free';
           const nextReset = user.usageResetDate || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
           await db.update(users).set({
             stripeSubscriptionId: subscriptionId,
@@ -56,7 +57,7 @@ export class WebhookHandlers {
           if (cancelAtPeriodEnd && isActive) {
             console.log(`User ${user.id} subscription set to cancel at period end (still active until then)`);
           } else {
-            console.log(`Updated user ${user.id} plan to ${planStatus} (subscription ${status})`);
+            console.log(`Updated user ${user.id} plan to ${planStatus} (subscription status: ${status})`);
           }
         }
         break;
@@ -79,11 +80,28 @@ export class WebhookHandlers {
         }
         break;
       }
-      case 'invoice.payment_failed': {
+      case 'customer.subscription.paused': {
         const customerId = data.customer;
         const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
         if (user) {
-          console.log(`Payment failed for user ${user.id} (customer ${customerId})`);
+          if (user.isAdmin) break;
+          await db.update(users).set({ planStatus: 'free' }).where(eq(users.id, user.id));
+          console.log(`Downgraded user ${user.id} to free (subscription paused)`);
+        }
+        break;
+      }
+      case 'invoice.payment_failed': {
+        const customerId = data.customer;
+        const attemptCount = data.attempt_count || 0;
+        const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
+        if (user) {
+          if (user.isAdmin) break;
+          if (attemptCount >= 2) {
+            await db.update(users).set({ planStatus: 'free' }).where(eq(users.id, user.id));
+            console.log(`Downgraded user ${user.id} to free after ${attemptCount} failed payment attempts`);
+          } else {
+            console.log(`Payment failed for user ${user.id} (attempt ${attemptCount}, keeping pro for now)`);
+          }
         }
         break;
       }

@@ -32,7 +32,7 @@ export function registerStripeRoutes(app: Express) {
         }
       }
 
-      const isPro = user.isAdmin || user.planStatus === "pro";
+      let isPro = user.isAdmin || user.planStatus === "pro";
 
       if (resetNeeded) {
         const nextReset = getNextResetDate();
@@ -49,12 +49,33 @@ export function registerStripeRoutes(app: Express) {
       const totalLeads = Number(leadCountResult?.count || 0);
 
       let stripeDetails: any = null;
+      let currentSubId = user.stripeSubscriptionId;
       if (user.stripeSubscriptionId && !user.isAdmin) {
         try {
           const stripe = await getUncachableStripeClient();
           const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId, {
             expand: ["default_payment_method"],
           });
+
+          const stripeIsActive = sub.status === 'active' || sub.status === 'trialing';
+          const stripeIsGracePeriod = sub.status === 'past_due';
+          const correctPlanStatus = (stripeIsActive || stripeIsGracePeriod) ? 'pro' : 'free';
+
+          if (user.planStatus !== correctPlanStatus) {
+            console.log(`Live sync: correcting user ${userId} plan from ${user.planStatus} to ${correctPlanStatus} (Stripe status: ${sub.status})`);
+            await db.update(users).set({ planStatus: correctPlanStatus }).where(eq(users.id, userId));
+            isPro = correctPlanStatus === 'pro';
+          }
+
+          if (sub.status === 'canceled' || sub.status === 'incomplete_expired') {
+            await db.update(users).set({
+              stripeSubscriptionId: null,
+              planStatus: 'free',
+            }).where(eq(users.id, userId));
+            isPro = false;
+            currentSubId = null;
+          }
+
           const priceAmount = sub.items?.data?.[0]?.price?.unit_amount;
           const priceInterval = sub.items?.data?.[0]?.price?.recurring?.interval;
           const pm = sub.default_payment_method as any;
@@ -70,7 +91,17 @@ export function registerStripeRoutes(app: Express) {
             cardLast4: pm?.card?.last4 || null,
           };
         } catch (stripeErr: any) {
-          if (stripeErr.code !== "resource_missing") {
+          if (stripeErr.code === "resource_missing") {
+            if (user.planStatus === 'pro') {
+              console.log(`Live sync: subscription ${user.stripeSubscriptionId} not found in Stripe, downgrading user ${userId} to free`);
+              await db.update(users).set({
+                stripeSubscriptionId: null,
+                planStatus: 'free',
+              }).where(eq(users.id, userId));
+              isPro = false;
+              currentSubId = null;
+            }
+          } else {
             console.error("Error fetching stripe subscription details:", stripeErr);
           }
         }
@@ -82,7 +113,7 @@ export function registerStripeRoutes(app: Express) {
         discoveryLimit: isPro ? (user.isAdmin ? 999 : 50) : 5,
         leadLimit: isPro ? null : 25,
         totalLeads,
-        stripeSubscriptionId: user.stripeSubscriptionId,
+        stripeSubscriptionId: currentSubId,
         stripeCustomerId: user.stripeCustomerId,
         isAdmin: user.isAdmin || false,
         usageResetDate,
