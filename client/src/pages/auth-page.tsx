@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import foxLogo from "@assets/fox_1770439380079.png";
@@ -40,7 +40,15 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 safe-area-x">
+    <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
+      <div className="pt-2">
+        <Link href="/">
+          <Button variant="ghost" size="icon" data-testid="button-back-auth">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+        </Link>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center mb-4">
@@ -115,6 +123,7 @@ export default function AuthPage() {
             </form>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );
