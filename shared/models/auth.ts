@@ -28,6 +28,9 @@ export const users = pgTable("users", {
   usageResetDate: timestamp("usage_reset_date"),
   resetToken: varchar("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
+  emailVerified: boolean("email_verified").default(false),
+  emailVerificationToken: varchar("email_verification_token"),
+  emailVerificationExpiry: timestamp("email_verification_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -45,6 +48,9 @@ export const insertUserSchema = createInsertSchema(users).omit({
   usageResetDate: true,
   resetToken: true,
   resetTokenExpiry: true,
+  emailVerified: true,
+  emailVerificationToken: true,
+  emailVerificationExpiry: true,
 });
 
 export const loginSchema = z.object({
