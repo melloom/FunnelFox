@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -16,8 +17,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, Send, Copy, Check, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Mail, Send, Copy, Check, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Lead } from "@shared/schema";
 
 interface EmailTemplate {
@@ -116,8 +119,40 @@ export function EmailTemplateDialog({
     const tmpl = EMAIL_TEMPLATES.find((t) => t.id === defaultTemplate);
     return tmpl ? tmpl.body(lead) : "";
   });
+  const [editedTo, setEditedTo] = useState(lead.contactEmail || "");
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+
+  const { data: gmailStatus } = useQuery<{ connected: boolean; email: string | null }>({
+    queryKey: ["/api/gmail/status"],
+    enabled: open,
+    staleTime: 60000,
+  });
+
+  useEffect(() => {
+    setEditedTo(lead.contactEmail || "");
+  }, [lead.contactEmail]);
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/gmail/send", {
+        to: editedTo,
+        subject: editedSubject,
+        body: editedBody,
+        leadId: lead.id,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Email sent successfully", description: `Sent to ${editedTo}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      handleClose();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
+    },
+  });
 
   const loadTemplate = (templateId: string) => {
     const tmpl = EMAIL_TEMPLATES.find((t) => t.id === templateId);
@@ -140,8 +175,8 @@ export function EmailTemplateDialog({
     }
   };
 
-  const handleSend = () => {
-    const mailto = `mailto:${encodeURIComponent(lead.contactEmail || "")}?subject=${encodeURIComponent(editedSubject)}&body=${encodeURIComponent(editedBody)}`;
+  const handleMailto = () => {
+    const mailto = `mailto:${encodeURIComponent(editedTo)}?subject=${encodeURIComponent(editedSubject)}&body=${encodeURIComponent(editedBody)}`;
     window.location.href = mailto;
   };
 
@@ -158,6 +193,9 @@ export function EmailTemplateDialog({
     }, 200);
   };
 
+  const gmailConnected = gmailStatus?.connected === true;
+  const canSend = editedTo.length > 0 && editedSubject.length > 0 && editedBody.length > 0;
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -166,10 +204,24 @@ export function EmailTemplateDialog({
             <Mail className="w-5 h-5 text-primary" />
             Email {lead.companyName}
           </DialogTitle>
-          <DialogDescription>Choose a template, customize it, then send or copy</DialogDescription>
+          <DialogDescription>
+            {gmailConnected
+              ? `Sending from ${gmailStatus?.email || "your Gmail"}`
+              : "Choose a template, customize it, then send or copy"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
+          {gmailConnected && (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700">
+                <Check className="w-3 h-3 mr-1" />
+                Gmail Connected
+              </Badge>
+              <span className="text-xs text-muted-foreground">{gmailStatus?.email}</span>
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Template</label>
             <Select value={selectedTemplate} onValueChange={loadTemplate}>
@@ -187,7 +239,12 @@ export function EmailTemplateDialog({
 
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">To</label>
-            <Input value={lead.contactEmail || ""} readOnly className="bg-muted/50" data-testid="input-email-to" />
+            <Input
+              value={editedTo}
+              onChange={(e) => setEditedTo(e.target.value)}
+              placeholder="recipient@example.com"
+              data-testid="input-email-to"
+            />
           </div>
 
           <div>
@@ -210,13 +267,28 @@ export function EmailTemplateDialog({
           </div>
 
           <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
-            <Button onClick={handleSend} data-testid="button-send-email">
-              <Send className="w-4 h-4 mr-1.5" />
-              Open in Email App
-            </Button>
+            {gmailConnected ? (
+              <Button
+                onClick={() => sendMutation.mutate()}
+                disabled={sendMutation.isPending || !canSend}
+                data-testid="button-send-email-gmail"
+              >
+                {sendMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 mr-1.5" />
+                )}
+                {sendMutation.isPending ? "Sending..." : "Send via Gmail"}
+              </Button>
+            ) : (
+              <Button onClick={handleMailto} disabled={!canSend} data-testid="button-send-email">
+                <Send className="w-4 h-4 mr-1.5" />
+                Open in Email App
+              </Button>
+            )}
             <Button variant="outline" onClick={handleCopy} data-testid="button-copy-email">
               {copied ? <Check className="w-4 h-4 mr-1.5" /> : <Copy className="w-4 h-4 mr-1.5" />}
-              {copied ? "Copied" : "Copy to Clipboard"}
+              {copied ? "Copied" : "Copy"}
             </Button>
           </div>
         </div>

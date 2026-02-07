@@ -5,6 +5,7 @@ import { insertLeadSchema, PIPELINE_STAGES } from "@shared/schema";
 import { z } from "zod";
 import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { sendEmail, isGmailConnected, getGmailAddress } from "./gmail";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -374,6 +375,48 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Discover error:", err);
       res.status(500).json({ error: "Failed to discover leads" });
+    }
+  });
+
+  app.get("/api/gmail/status", isAuthenticated, async (_req, res) => {
+    try {
+      const connected = await isGmailConnected();
+      const email = connected ? await getGmailAddress() : null;
+      res.json({ connected, email });
+    } catch (err) {
+      res.json({ connected: false, email: null });
+    }
+  });
+
+  const sendEmailSchema = z.object({
+    to: z.string().email("Invalid recipient email"),
+    subject: z.string().min(1, "Subject is required"),
+    body: z.string().min(1, "Email body is required"),
+    leadId: z.number().optional(),
+  });
+
+  app.post("/api/gmail/send", isAuthenticated, async (req, res) => {
+    try {
+      const data = sendEmailSchema.parse(req.body);
+      const senderName = "Melvin Peralta";
+      const result = await sendEmail(data.to, data.subject, data.body, senderName);
+
+      if (data.leadId) {
+        await storage.createActivity({
+          leadId: data.leadId,
+          action: "email_sent",
+          details: `Email sent to ${data.to}: "${data.subject}"`,
+        });
+      }
+
+      res.json({ success: true, messageId: result.messageId });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: err.errors[0].message });
+      }
+      console.error("Send email error:", err);
+      const message = err instanceof Error ? err.message : "Failed to send email";
+      res.status(500).json({ error: message });
     }
   });
 
