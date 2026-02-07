@@ -1,8 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLeadSchema, PIPELINE_STAGES } from "@shared/schema";
+import { insertLeadSchema, PIPELINE_STAGES, leads as leadsTable, activityLog } from "@shared/schema";
+import { users as usersTable } from "@shared/models/auth";
 import { z } from "zod";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache, enrichContactInfo } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sendEmail, isGmailConnected, getGmailAddress } from "./gmail";
@@ -109,6 +112,20 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: "Failed to delete lead" });
+    }
+  });
+
+  app.delete("/api/leads/all", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+      if (!user?.isAdmin) return res.status(403).json({ error: "Admin only" });
+      await db.delete(activityLog);
+      const result = await db.delete(leadsTable);
+      res.json({ success: true, message: "All leads and activity logs cleared" });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to clear leads" });
     }
   });
 
