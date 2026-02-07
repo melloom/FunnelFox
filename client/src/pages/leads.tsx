@@ -37,6 +37,7 @@ import {
   Send,
   Download,
   ArrowRight,
+  ArrowLeft,
   Flame,
   Clock,
   History,
@@ -306,6 +307,17 @@ function LeadDetailDialog({
     <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg max-sm:text-sm">
+        <div className="flex items-center gap-2 sm:hidden mb-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            data-testid="button-lead-detail-back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <span className="text-sm font-medium text-muted-foreground">Back to leads</span>
+        </div>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Building2 className="w-5 h-5 text-primary shrink-0" />

@@ -119,75 +119,133 @@ export function getSearchCacheStats(): { size: number; maxSize: number; ttlHours
   return { size: searchCache.size, maxSize: MAX_CACHE_ENTRIES, ttlHours: CACHE_TTL_MS / (60 * 60 * 1000) };
 }
 
-export async function enrichContactInfo(
-  businessName: string,
-  location: string
-): Promise<{ phone?: string; email?: string }> {
-  const result: { phone?: string; email?: string } = {};
+function extractPhoneFromText(text: string): string | undefined {
+  const phonePatterns = [
+    /\+1[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g,
+    /\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/g,
+  ];
+  for (const pattern of phonePatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      for (const m of matches) {
+        const clean = m.replace(/[^0-9+]/g, "");
+        if (clean.length >= 10 && clean.length <= 15) {
+          return m.trim();
+        }
+      }
+    }
+  }
+  return undefined;
+}
 
+function extractEmailFromText(text: string): string | undefined {
+  const emailPattern = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const matches = text.match(emailPattern);
+  if (!matches) return undefined;
+  const invalidDomains = [
+    "example.com", "sentry.io", "wixpress.com", "googleapis.com",
+    "w3.org", "schema.org", "apache.org", "cloudflare.com",
+    "wordpress.org", "gravatar.com", "jquery.com",
+  ];
+  const invalidExts = [".png", ".jpg", ".svg", ".gif", ".webp", ".css", ".js"];
+  return matches.find(e => {
+    const lower = e.toLowerCase();
+    if (invalidExts.some(ext => lower.endsWith(ext))) return false;
+    if (lower.includes("@2x") || lower.includes("@3x")) return false;
+    if (invalidDomains.some(d => lower.includes(d))) return false;
+    if (lower.split("@")[0].length < 2) return false;
+    return true;
+  });
+}
+
+async function ddgSearchText(query: string, timeoutMs = 8000): Promise<string> {
   try {
-    const query = `"${businessName}" ${location} phone number contact`;
-    const encodedQuery = encodeURIComponent(query);
-    const url = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": getRandomUA(),
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      }
+    );
+    clearTimeout(timeout);
+    if (response.status !== 200 && response.status !== 202) return "";
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const snippets = $(".result__snippet").map((_i, el) => $(el).text()).get().join(" ");
+    const titles = $(".result__a").map((_i, el) => $(el).text()).get().join(" ");
+    const urls = $(".result__url").map((_i, el) => $(el).text()).get().join(" ");
+    return `${snippets} ${titles} ${urls}`;
+  } catch {
+    return "";
+  }
+}
 
+async function fetchYPContactInfo(businessName: string, location: string): Promise<{ phone?: string; email?: string }> {
+  const result: { phone?: string; email?: string } = {};
+  try {
+    const searchTerm = encodeURIComponent(businessName);
+    const geoLocation = encodeURIComponent(location);
+    const url = `https://www.yellowpages.com/search?search_terms=${searchTerm}&geo_location_terms=${geoLocation}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
-
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
         "User-Agent": getRandomUA(),
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "identity",
       },
     });
     clearTimeout(timeout);
-
-    if (response.status !== 200 && response.status !== 202) return result;
-
+    if (!response.ok) return result;
     const html = await response.text();
     const $ = cheerio.load(html);
-
-    const snippets = $(".result__snippet").map((_i, el) => $(el).text()).get().join(" ");
-    const titles = $(".result__a").map((_i, el) => $(el).text()).get().join(" ");
-    const combined = `${snippets} ${titles}`;
-
-    const phonePatterns = [
-      /\+1[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g,
-      /\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/g,
-    ];
-
-    for (const pattern of phonePatterns) {
-      const matches = combined.match(pattern);
-      if (matches && matches.length > 0) {
-        const cleanPhone = matches[0].replace(/[^0-9+]/g, "");
-        if (cleanPhone.length >= 10) {
-          result.phone = matches[0].trim();
-          break;
-        }
+    const bizNameLower = businessName.toLowerCase().replace(/[^a-z0-9\s]/g, "");
+    $(".result").each((_i, el) => {
+      const name = $(el).find(".business-name a, .business-name span").first().text().trim().toLowerCase().replace(/[^a-z0-9\s]/g, "");
+      if (!name) return;
+      const nameWords = bizNameLower.split(/\s+/).filter(w => w.length > 2);
+      const matchCount = nameWords.filter(w => name.includes(w)).length;
+      if (matchCount < Math.ceil(nameWords.length * 0.5)) return;
+      const phone = $(el).find(".phones.phone.primary").text().trim();
+      if (phone && !result.phone) result.phone = phone;
+      const email = $(el).find("a.email-business").attr("href") || "";
+      if (email.startsWith("mailto:") && !result.email) {
+        result.email = email.replace("mailto:", "").split("?")[0];
       }
-    }
+      if (result.phone) return false;
+    });
+  } catch {}
+  return result;
+}
 
-    const emailPattern = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-    const emailMatches = combined.match(emailPattern);
-    if (emailMatches) {
-      const validEmail = emailMatches.find(e => {
-        const lower = e.toLowerCase();
-        return !lower.includes("example.com") &&
-               !lower.includes("sentry.io") &&
-               !lower.includes("wixpress") &&
-               !lower.includes("@2x") &&
-               !lower.endsWith(".png") &&
-               !lower.endsWith(".jpg") &&
-               !lower.endsWith(".svg");
-      });
-      if (validEmail) {
-        result.email = validEmail;
-      }
-    }
-  } catch (err) {
-    // Enrichment is best-effort, don't fail
-  }
+export async function enrichContactInfo(
+  businessName: string,
+  location: string
+): Promise<{ phone?: string; email?: string }> {
+  const result: { phone?: string; email?: string } = {};
+
+  const searches = await Promise.allSettled([
+    ddgSearchText(`"${businessName}" ${location} phone number contact`),
+    ddgSearchText(`"${businessName}" ${location} email address`),
+    fetchYPContactInfo(businessName, location),
+  ]);
+
+  const ddgPhoneText = searches[0].status === "fulfilled" ? searches[0].value : "";
+  const ddgEmailText = searches[1].status === "fulfilled" ? searches[1].value : "";
+  const ypResult = searches[2].status === "fulfilled" ? searches[2].value : {};
+
+  const combinedText = `${ddgPhoneText} ${ddgEmailText}`;
+
+  result.phone = extractPhoneFromText(combinedText) || (ypResult as any).phone;
+  result.email = extractEmailFromText(combinedText) || (ypResult as any).email;
 
   return result;
 }
