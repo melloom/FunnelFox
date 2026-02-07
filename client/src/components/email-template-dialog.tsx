@@ -8,6 +8,16 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -121,6 +131,7 @@ export function EmailTemplateDialog({
   });
   const [editedTo, setEditedTo] = useState(lead.contactEmail || "");
   const [copied, setCopied] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const { toast } = useToast();
 
   const { data: gmailStatus } = useQuery<{ connected: boolean; email: string | null }>({
@@ -197,6 +208,7 @@ export function EmailTemplateDialog({
   const canSend = editedTo.length > 0 && editedSubject.length > 0 && editedBody.length > 0;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -273,7 +285,7 @@ export function EmailTemplateDialog({
           <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
             {gmailConnected ? (
               <Button
-                onClick={() => sendMutation.mutate()}
+                onClick={() => setShowConfirm(true)}
                 disabled={sendMutation.isPending || !canSend}
                 className="w-full sm:w-auto"
                 data-testid="button-send-email-gmail"
@@ -286,7 +298,7 @@ export function EmailTemplateDialog({
                 {sendMutation.isPending ? "Sending..." : "Send via Gmail"}
               </Button>
             ) : (
-              <Button onClick={handleMailto} disabled={!canSend} className="w-full sm:w-auto" data-testid="button-send-email">
+              <Button onClick={() => setShowConfirm(true)} disabled={!canSend} className="w-full sm:w-auto" data-testid="button-send-email">
                 <Send className="w-4 h-4 mr-1.5" />
                 Open in Email App
               </Button>
@@ -299,5 +311,39 @@ export function EmailTemplateDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Send this email?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {gmailConnected
+              ? `This will send an email to ${editedTo} from your connected Gmail account.`
+              : `This will open your email app with a pre-filled email to ${editedTo}.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="rounded-md bg-muted p-3 my-2">
+          <p className="text-xs font-medium text-muted-foreground mb-1">Subject</p>
+          <p className="text-sm truncate">{editedSubject}</p>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="button-cancel-send">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (gmailConnected) {
+                sendMutation.mutate();
+              } else {
+                handleMailto();
+              }
+            }}
+            data-testid="button-confirm-send"
+          >
+            <Send className="w-4 h-4 mr-1.5" />
+            {gmailConnected ? "Send Now" : "Open Email App"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

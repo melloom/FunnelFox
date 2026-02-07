@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Target, Search, Kanban } from "lucide-react";
+import { LayoutDashboard, Users, Plus, Target, Search, Kanban, HelpCircle } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -20,6 +20,7 @@ const navItems = [
   { title: "Discover Leads", url: "/discover", icon: Search },
   { title: "All Leads", url: "/leads", icon: Users },
   { title: "Add Lead", url: "/add", icon: Plus },
+  { title: "Help", url: "/help", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
