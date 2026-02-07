@@ -10,7 +10,7 @@ import {
   type InsertActivity,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -26,6 +26,7 @@ export interface IStorage {
   getActivities(leadId: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
   getActivitiesForLeads(leadIds: number[]): Promise<Activity[]>;
+  getLeadCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -96,6 +97,11 @@ export class DatabaseStorage implements IStorage {
   async getActivitiesForLeads(leadIds: number[]): Promise<Activity[]> {
     if (leadIds.length === 0) return [];
     return db.select().from(activityLog).where(inArray(activityLog.leadId, leadIds)).orderBy(desc(activityLog.createdAt));
+  }
+
+  async getLeadCount(): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(leads);
+    return Number(result?.count || 0);
   }
 }
 
