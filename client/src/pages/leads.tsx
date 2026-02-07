@@ -359,43 +359,47 @@ function LeadDetailDialog({
               </div>
             )}
 
-            {lead.contactName && (
-              <div className="flex items-center gap-2 text-sm">
-                <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span data-testid="text-contact-name">{lead.contactName}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm">
+              <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span data-testid="text-contact-name">{lead.contactName || <span className="text-muted-foreground italic">Not found</span>}</span>
+            </div>
 
-            {lead.contactEmail && (
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                <button
-                  onClick={() => setEmailDialogOpen(true)}
-                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate"
-                  data-testid="link-contact-email"
-                >
-                  {lead.contactEmail}
-                </button>
-                <CopyButton value={lead.contactEmail} label="Email" />
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm">
+              <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+              {lead.contactEmail ? (
+                <>
+                  <button
+                    onClick={() => setEmailDialogOpen(true)}
+                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate"
+                    data-testid="link-contact-email"
+                  >
+                    {lead.contactEmail}
+                  </button>
+                  <CopyButton value={lead.contactEmail} label="Email" />
+                </>
+              ) : (
+                <span className="text-muted-foreground italic" data-testid="text-no-email">Not found</span>
+              )}
+            </div>
 
-            {lead.contactPhone && (
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2 flex-1" data-testid="link-contact-phone">
-                  {lead.contactPhone}
-                </a>
-                <CopyButton value={lead.contactPhone} label="Phone" />
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+              {lead.contactPhone ? (
+                <>
+                  <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2 flex-1" data-testid="link-contact-phone">
+                    {lead.contactPhone}
+                  </a>
+                  <CopyButton value={lead.contactPhone} label="Phone" />
+                </>
+              ) : (
+                <span className="text-muted-foreground italic" data-testid="text-no-phone">Not found</span>
+              )}
+            </div>
 
-            {lead.location && (
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span data-testid="text-lead-location">{lead.location}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span data-testid="text-lead-location">{lead.location || <span className="text-muted-foreground italic">Not found</span>}</span>
+            </div>
           </div>
 
           {lead.socialMedia && lead.socialMedia.length > 0 && (

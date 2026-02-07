@@ -341,40 +341,44 @@ function PipelineLeadDetailDialog({
                 </a>
               </div>
             )}
-            {lead.contactName && (
-              <div className="flex items-center gap-2 text-sm">
-                <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span>{lead.contactName}</span>
-              </div>
-            )}
-            {lead.contactEmail && (
-              <div className="flex items-center gap-2 text-sm min-w-0">
-                <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                <button
-                  onClick={() => setEmailDialogOpen(true)}
-                  className="text-primary underline underline-offset-2 truncate text-left bg-transparent border-0 cursor-pointer p-0 flex-1"
-                  data-testid="link-pipeline-contact-email"
-                >
-                  {lead.contactEmail}
-                </button>
-                <CopyButton value={lead.contactEmail} label="Email" />
-              </div>
-            )}
-            {lead.contactPhone && (
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2 flex-1">
-                  {lead.contactPhone}
-                </a>
-                <CopyButton value={lead.contactPhone} label="Phone" />
-              </div>
-            )}
-            {lead.location && (
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-                <span>{lead.location}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-sm">
+              <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span>{lead.contactName || <span className="text-muted-foreground italic">Not found</span>}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm min-w-0">
+              <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+              {lead.contactEmail ? (
+                <>
+                  <button
+                    onClick={() => setEmailDialogOpen(true)}
+                    className="text-primary underline underline-offset-2 truncate text-left bg-transparent border-0 cursor-pointer p-0 flex-1"
+                    data-testid="link-pipeline-contact-email"
+                  >
+                    {lead.contactEmail}
+                  </button>
+                  <CopyButton value={lead.contactEmail} label="Email" />
+                </>
+              ) : (
+                <span className="text-muted-foreground italic">Not found</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+              {lead.contactPhone ? (
+                <>
+                  <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2 flex-1">
+                    {lead.contactPhone}
+                  </a>
+                  <CopyButton value={lead.contactPhone} label="Phone" />
+                </>
+              ) : (
+                <span className="text-muted-foreground italic">Not found</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span>{lead.location || <span className="text-muted-foreground italic">Not found</span>}</span>
+            </div>
           </div>
 
           {lead.socialMedia && lead.socialMedia.length > 0 && (
