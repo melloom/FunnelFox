@@ -6,9 +6,67 @@ import {
   Kanban,
   ArrowRight,
   Zap,
+  Mail,
+  BarChart3,
+  Shield,
 } from "lucide-react";
 import { Link } from "wouter";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { motion } from "framer-motion";
 import foxLogo from "@assets/fox_1770439380079.png";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" },
+  }),
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.12 } },
+};
+
+const features = [
+  {
+    icon: Search,
+    title: "Smart Discovery",
+    description: "Search Bing, DuckDuckGo, Yellow Pages, and OpenStreetMap to find businesses in any category and location.",
+  },
+  {
+    icon: Globe,
+    title: "Website Analysis",
+    description: "Auto-score websites on mobile-friendliness, SEO, HTTPS, performance, and detect their tech stack.",
+  },
+  {
+    icon: Kanban,
+    title: "8-Stage Pipeline",
+    description: "Track leads from New Lead through Contacted, Demo, Proposal, Negotiation to Won — all in a Kanban board.",
+  },
+  {
+    icon: Mail,
+    title: "Email Outreach",
+    description: "Send professional outreach emails directly from the app with Gmail integration and activity logging.",
+  },
+  {
+    icon: BarChart3,
+    title: "Lead Scoring",
+    description: "Auto-rank leads as Hot, Warm, Cool, or Cold based on website status, social presence, and contact info.",
+  },
+  {
+    icon: Shield,
+    title: "Business Intel",
+    description: "Enrich leads with BBB ratings, Google reviews, social media links, and technology detection.",
+  },
+];
+
+const stats = [
+  { value: "6+", label: "Data Sources" },
+  { value: "8", label: "Pipeline Stages" },
+  { value: "100%", label: "Automated" },
+];
 
 function FeatureCard({
   icon: Icon,
@@ -20,75 +78,159 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <Card className="hover-elevate">
-      <CardContent className="pt-5 pb-5 space-y-3">
-        <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-          <Icon className="w-5 h-5 text-primary" />
-        </div>
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
-      </CardContent>
-    </Card>
+    <motion.div variants={fadeUp}>
+      <Card className="hover-elevate h-full">
+        <CardContent className="pt-5 pb-5 space-y-3">
+          <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+            <Icon className="w-5 h-5 text-primary" />
+          </div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
 export default function LandingPage() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
-      <header className="flex items-center justify-between px-5 py-4 safe-area-x safe-area-top">
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-between px-5 py-4 safe-area-x safe-area-top sticky top-0 z-[9999] bg-background/80 backdrop-blur-md border-b"
+      >
         <div className="flex items-center gap-2.5">
           <img src={foxLogo} alt="FunnelFox" className="w-8 h-8 rounded-md object-cover" data-testid="img-app-logo" />
           <span className="text-sm font-bold tracking-tight">FunnelFox</span>
         </div>
-        <Link href="/auth">
-          <Button variant="outline" data-testid="button-login-header">
-            Log in
-          </Button>
-        </Link>
-      </header>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link href="/auth">
+            <Button variant="outline" data-testid="button-login-header">
+              Log in
+            </Button>
+          </Link>
+        </div>
+      </motion.header>
 
-      <main className="flex-1 safe-area-x flex flex-col items-center justify-center">
-        <section className="px-5 pt-8 pb-10 sm:pt-12 sm:pb-14 text-center max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-5">
-            <Zap className="w-3 h-3" />
-            Built for web developers
-          </div>
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight leading-tight" data-testid="text-landing-headline">
-            Find businesses that need
-            <span className="text-primary"> your services</span>
-          </h1>
-          <p className="mt-4 text-sm sm:text-base text-muted-foreground max-w-md mx-auto leading-relaxed" data-testid="text-landing-subtitle">
-            Discover local businesses without websites or with outdated ones. Analyze, reach out, and close deals — all in one place.
-          </p>
-          <div className="mt-6">
-            <Link href="/auth">
-              <Button size="lg" data-testid="button-login-nav">
-                Get Started
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
-          </div>
+      <main className="flex-1 safe-area-x">
+        <section className="px-5 pt-16 pb-14 sm:pt-24 sm:pb-20 text-center max-w-2xl mx-auto">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer}
+            className="space-y-5"
+          >
+            <motion.div variants={fadeUp} custom={0}>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                <Zap className="w-3 h-3" />
+                Built for web developers
+              </div>
+            </motion.div>
+
+            <motion.h1
+              variants={fadeUp}
+              custom={1}
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight"
+              data-testid="text-landing-headline"
+            >
+              Find businesses that need
+              <span className="text-primary"> your services</span>
+            </motion.h1>
+
+            <motion.p
+              variants={fadeUp}
+              custom={2}
+              className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto leading-relaxed"
+              data-testid="text-landing-subtitle"
+            >
+              Discover local businesses without websites or with outdated ones.
+              Analyze their web presence, reach out directly, and close deals — all in one place.
+            </motion.p>
+
+            <motion.div variants={fadeUp} custom={3} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Link href="/auth">
+                <Button size="lg" data-testid="button-login-nav">
+                  Get Started Free
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+              <Link href="/pricing">
+                <Button size="lg" variant="outline" data-testid="button-learn-more">
+                  See Pricing
+                </Button>
+              </Link>
+            </motion.div>
+          </motion.div>
         </section>
 
-        <section className="px-5 pb-10 sm:pb-14 max-w-3xl mx-auto w-full">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <FeatureCard
-              icon={Search}
-              title="Smart Discovery"
-              description="Search multiple data sources to find businesses in any category and location."
-            />
-            <FeatureCard
-              icon={Globe}
-              title="Website Analysis"
-              description="Automatically score websites on mobile-friendliness, SEO, HTTPS, and performance."
-            />
-            <FeatureCard
-              icon={Kanban}
-              title="Pipeline Management"
-              description="Track leads through 8 CRM stages from first contact to signed contract."
-            />
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-60px" }}
+          variants={staggerContainer}
+          className="px-5 pb-14 sm:pb-20 max-w-2xl mx-auto w-full"
+        >
+          <div className="flex items-center justify-center gap-8 sm:gap-16">
+            {stats.map((stat, i) => (
+              <motion.div key={stat.label} variants={fadeUp} className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-primary" data-testid={`text-stat-value-${i}`}>{stat.value}</div>
+                <div className="text-xs text-muted-foreground mt-1" data-testid={`text-stat-label-${i}`}>{stat.label}</div>
+              </motion.div>
+            ))}
           </div>
-        </section>
+        </motion.section>
+
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-60px" }}
+          variants={staggerContainer}
+          className="px-5 pb-14 sm:pb-20 max-w-4xl mx-auto w-full"
+        >
+          <motion.div variants={fadeUp} custom={0} className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" data-testid="text-features-heading">
+              Everything you need to land clients
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+              From discovery to signed contract, FunnelFox handles every step of your sales pipeline.
+            </p>
+          </motion.div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {features.map((feature) => (
+              <FeatureCard key={feature.title} {...feature} />
+            ))}
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-60px" }}
+          variants={staggerContainer}
+          className="px-5 pb-16 sm:pb-24 max-w-2xl mx-auto text-center"
+        >
+          <motion.div variants={fadeUp} custom={0}>
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="pt-8 pb-8 space-y-4">
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+                  Ready to find your next client?
+                </h2>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                  Start discovering leads for free. No credit card required.
+                </p>
+                <Link href="/auth">
+                  <Button size="lg" data-testid="button-cta-bottom">
+                    Get Started Free
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.section>
       </main>
 
       <footer className="px-5 py-5 pb-8 safe-area-bottom border-t">

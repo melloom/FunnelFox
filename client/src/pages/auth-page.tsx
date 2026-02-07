@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { ThemeToggle } from "@/components/theme-toggle";
 import foxLogo from "@assets/fox_1770439380079.png";
 
 export default function AuthPage() {
@@ -41,12 +42,13 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
-      <div className="pt-2">
+      <div className="flex items-center justify-between pt-2">
         <Link href="/">
           <Button variant="ghost" size="icon" data-testid="button-back-auth">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
+        <ThemeToggle />
       </div>
       <div className="flex-1 flex flex-col items-center justify-center">
       <div className="w-full max-w-sm space-y-6">
