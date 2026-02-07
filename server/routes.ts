@@ -507,5 +507,41 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/location-search", isAuthenticated, async (req, res) => {
+    try {
+      const q = (req.query.q as string || "").trim();
+      if (q.length < 3) return res.json([]);
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=8&countrycodes=us`,
+        { headers: { "User-Agent": "FunnelFox/1.0" } }
+      );
+      const data = await response.json();
+
+      const qLower = q.toLowerCase();
+      const seen = new Set<string>();
+      const results: Array<{ city: string; state: string; formatted: string }> = [];
+
+      for (const item of data) {
+        const addr = item.address || {};
+        const city = addr.city || addr.town || addr.village || addr.hamlet || "";
+        const state = addr.state || "";
+        if (!city || !state) continue;
+        const formatted = `${city}, ${state}`;
+        const key = formatted.toLowerCase();
+        if (seen.has(key)) continue;
+        if (!key.includes(qLower) && !city.toLowerCase().startsWith(qLower) && !state.toLowerCase().startsWith(qLower)) continue;
+        seen.add(key);
+        results.push({ city, state, formatted });
+        if (results.length >= 6) break;
+      }
+
+      res.json(results);
+    } catch (err) {
+      console.error("Location search error:", err);
+      res.json([]);
+    }
+  });
+
   return httpServer;
 }

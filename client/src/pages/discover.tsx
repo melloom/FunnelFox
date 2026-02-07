@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LocationAutocomplete } from "@/components/location-autocomplete";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -289,16 +290,11 @@ export default function DiscoverPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Location</label>
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder="e.g. Austin, TX or Miami, FL"
-                      value={location}
-                      onChange={(e) => setLocationValue(e.target.value)}
-                      className="pl-9"
-                      data-testid="input-discover-location"
-                    />
-                  </div>
+                  <LocationAutocomplete
+                    value={location}
+                    onChange={setLocationValue}
+                    data-testid="input-discover-location"
+                  />
                   <Button
                     type="button"
                     variant="outline"
