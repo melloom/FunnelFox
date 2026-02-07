@@ -79,6 +79,7 @@ interface DiscoverResult {
   skipped: number;
   leads: Lead[];
   cached?: boolean;
+  page?: number;
 }
 
 function ScoreBadge({ score }: { score: number | null }) {
@@ -109,6 +110,8 @@ export default function DiscoverPage() {
   const [maxResults, setMaxResults] = useState("20");
   const [results, setResults] = useState<DiscoverResult | null>(null);
   const [geolocating, setGeolocating] = useState(false);
+  const [searchPage, setSearchPage] = useState(1);
+  const [lastSearch, setLastSearch] = useState<{ category: string; location: string } | null>(null);
 
   const { data: subscription } = useQuery<{
     planStatus: string;
@@ -156,8 +159,20 @@ export default function DiscoverPage() {
     );
   };
 
+  const startDiscover = (page: number = 1) => {
+    const searchCategory = category === "custom" ? customCategory : category;
+    if (!searchCategory || !location) return;
+
+    const isSameSearch = lastSearch?.category === searchCategory && lastSearch?.location === location;
+    const nextPage = page > 1 ? page : (isSameSearch ? searchPage : 1);
+
+    setLastSearch({ category: searchCategory, location });
+    setSearchPage(nextPage);
+    discoverMutation.mutate(nextPage);
+  };
+
   const discoverMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (page: number) => {
       const searchCategory = category === "custom" ? customCategory : category;
       if (!searchCategory || !location) {
         throw new Error("Please fill in both category and location");
@@ -166,11 +181,14 @@ export default function DiscoverPage() {
         category: searchCategory,
         location,
         maxResults: parseInt(maxResults),
+        page,
       });
       return res.json() as Promise<DiscoverResult>;
     },
     onSuccess: (data) => {
       setResults(data);
+      const nextPage = (data.page || 1) + 1;
+      setSearchPage(nextPage);
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
       toast({
@@ -299,7 +317,7 @@ export default function DiscoverPage() {
               </div>
 
               <Button
-                onClick={() => discoverMutation.mutate()}
+                onClick={() => startDiscover()}
                 disabled={
                   discoverMutation.isPending ||
                   (!category && !customCategory) ||
@@ -391,9 +409,21 @@ export default function DiscoverPage() {
                 <p className="text-sm font-medium">No new leads found</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {results.skipped > 0
-                    ? "All discovered businesses are already in your pipeline. Try a different search."
+                    ? "All discovered businesses are already in your pipeline."
                     : "Try a different category or location to find more prospects."}
                 </p>
+                {searchPage <= 3 && (
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => startDiscover(searchPage)}
+                    disabled={discoverMutation.isPending}
+                    data-testid="button-search-deeper-empty"
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    Search Deeper
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -462,6 +492,33 @@ export default function DiscoverPage() {
                   </CardContent>
                 </Card>
               ))}
+              {searchPage <= 3 && (
+                <Card>
+                  <CardContent className="py-6 text-center">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Want to find more businesses in this area?
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => startDiscover(searchPage)}
+                      disabled={discoverMutation.isPending}
+                      data-testid="button-search-deeper"
+                    >
+                      {discoverMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Searching deeper...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4 mr-2" />
+                          Search Deeper
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </div>

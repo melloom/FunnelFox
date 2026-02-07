@@ -214,16 +214,18 @@ export async function registerRoutes(
         }
       }
 
-      const { category, location, maxResults } = req.body;
+      const { category, location, maxResults, page } = req.body;
       if (!category || !location) {
         return res.status(400).json({ error: "Category and location are required" });
       }
 
+      const searchPage = Math.max(1, Math.min(page || 1, 10));
       const searchStart = Date.now();
       const businesses = await searchBusinesses(
         category,
         location,
-        Math.min(maxResults || 20, 50)
+        Math.min(maxResults || 20, 50),
+        searchPage
       );
       const searchMs = Date.now() - searchStart;
       const cached = searchMs < 500;
@@ -431,6 +433,7 @@ export async function registerRoutes(
         cached,
         remaining: updatedLimit?.remaining,
         limit: updatedLimit?.limit,
+        page: searchPage,
       });
     } catch (err) {
       console.error("Discover error:", err);

@@ -88,8 +88,8 @@ const searchCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 200;
 
-function getCacheKey(category: string, location: string, maxResults: number): string {
-  return `${category.toLowerCase().trim()}|${location.toLowerCase().trim()}|${maxResults}`;
+function getCacheKey(category: string, location: string, maxResults: number, page: number = 1): string {
+  return `${category.toLowerCase().trim()}|${location.toLowerCase().trim()}|${maxResults}|p${page}`;
 }
 
 function pruneCache(): void {
@@ -253,28 +253,81 @@ export async function enrichContactInfo(
 export async function searchBusinesses(
   category: string,
   location: string,
-  maxResults: number = 20
+  maxResults: number = 20,
+  page: number = 1
 ): Promise<ScrapedBusiness[]> {
-  const cacheKey = getCacheKey(category, location, maxResults);
+  const cacheKey = getCacheKey(category, location, maxResults, page);
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    console.log(`[Cache HIT] "${category}" in "${location}" — returning ${cached.results.length} cached results`);
+    console.log(`[Cache HIT] "${category}" in "${location}" p${page} — returning ${cached.results.length} cached results`);
     return cached.results;
   }
 
   const businesses: ScrapedBusiness[] = [];
 
-  const bingQueries = [
-    `${category} ${location}`,
-    `${category} near ${location}`,
-    `best ${category} ${location}`,
-    `${category} business ${location}`,
+  const categoryVariants = [
+    category,
+    `${category} services`,
+    `${category} companies`,
+    `local ${category}`,
+    `${category} contractors`,
+    `affordable ${category}`,
+    `top ${category}`,
+    `${category} professionals`,
+    `reliable ${category}`,
+    `${category} specialists`,
   ];
 
-  const ddgQueries = [
-    `${category} ${location}`,
-    `${category} near ${location}`,
+  const locationParts = location.split(/[,\s]+/).filter(Boolean);
+  const stateAbbr = locationParts.length >= 2 ? locationParts[locationParts.length - 1] : "";
+  const cityName = locationParts.slice(0, -1).join(" ") || location;
+  const locationVariants = [
+    location,
+    `near ${location}`,
+    `in ${cityName} ${stateAbbr}`,
+    `${cityName} area`,
+    `around ${cityName} ${stateAbbr}`,
   ];
+
+  const querySetIndex = ((page - 1) % 3);
+
+  let bingQueries: string[];
+  let ddgQueries: string[];
+
+  if (querySetIndex === 0) {
+    bingQueries = [
+      `${categoryVariants[0]} ${locationVariants[0]}`,
+      `${categoryVariants[0]} ${locationVariants[1]}`,
+      `best ${categoryVariants[0]} ${locationVariants[0]}`,
+      `${categoryVariants[0]} business ${locationVariants[0]}`,
+    ];
+    ddgQueries = [
+      `${categoryVariants[0]} ${locationVariants[0]}`,
+      `${categoryVariants[0]} ${locationVariants[1]}`,
+    ];
+  } else if (querySetIndex === 1) {
+    bingQueries = [
+      `${categoryVariants[1]} ${locationVariants[0]}`,
+      `${categoryVariants[2]} ${locationVariants[0]}`,
+      `${categoryVariants[3]} ${locationVariants[0]}`,
+      `${categoryVariants[0]} ${locationVariants[2]}`,
+    ];
+    ddgQueries = [
+      `${categoryVariants[1]} ${locationVariants[0]}`,
+      `${categoryVariants[3]} ${locationVariants[2]}`,
+    ];
+  } else {
+    bingQueries = [
+      `${categoryVariants[4]} ${locationVariants[0]}`,
+      `${categoryVariants[5]} ${locationVariants[0]}`,
+      `${categoryVariants[0]} ${locationVariants[3]}`,
+      `${categoryVariants[6]} ${locationVariants[4]}`,
+    ];
+    ddgQueries = [
+      `${categoryVariants[4]} ${locationVariants[0]}`,
+      `${categoryVariants[0]} ${locationVariants[3]}`,
+    ];
+  }
 
   const searchFns: (() => Promise<ScrapedBusiness[]>)[] = [];
 
@@ -285,9 +338,11 @@ export async function searchBusinesses(
     searchFns.push(() => searchDuckDuckGo(query, maxResults, category));
   }
   searchFns.push(() => searchSocialMediaOnly(category, location, maxResults));
-  searchFns.push(() => searchGoogleMaps(category, location, maxResults));
-  searchFns.push(() => searchYellowPages(category, location, maxResults));
-  searchFns.push(() => searchYelp(category, location, maxResults));
+  if (page <= 2) {
+    searchFns.push(() => searchGoogleMaps(category, location, maxResults));
+    searchFns.push(() => searchYellowPages(category, location, maxResults));
+    searchFns.push(() => searchYelp(category, location, maxResults));
+  }
   searchFns.push(() => searchFacebookPages(category, location, maxResults));
   searchFns.push(() => searchBBB(category, location, maxResults));
 
@@ -355,7 +410,7 @@ export async function searchBusinesses(
 
   searchCache.set(cacheKey, { results: finalResults, timestamp: Date.now() });
   pruneCache();
-  console.log(`[Cache STORE] "${category}" in "${location}" — cached ${finalResults.length} results`);
+  console.log(`[Cache STORE] "${category}" in "${location}" p${page} — cached ${finalResults.length} results`);
 
   return finalResults;
 }
