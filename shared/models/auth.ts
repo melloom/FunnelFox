@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar, integer } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, timestamp, varchar, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   planStatus: varchar("plan_status").default("free"),
+  isAdmin: boolean("is_admin").default(false),
   monthlyDiscoveriesUsed: integer("monthly_discoveries_used").default(0),
   usageResetDate: timestamp("usage_reset_date"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -37,6 +38,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   stripeCustomerId: true,
   stripeSubscriptionId: true,
   planStatus: true,
+  isAdmin: true,
   monthlyDiscoveriesUsed: true,
   usageResetDate: true,
 });

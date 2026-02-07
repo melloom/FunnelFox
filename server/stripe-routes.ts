@@ -31,6 +31,8 @@ export function registerStripeRoutes(app: Express) {
         }
       }
 
+      const isPro = user.isAdmin || user.planStatus === "pro";
+
       if (resetNeeded) {
         const nextReset = getNextResetDate();
         await db.update(users).set({
@@ -39,20 +41,22 @@ export function registerStripeRoutes(app: Express) {
         }).where(eq(users.id, userId));
 
         return res.json({
-          planStatus: user.planStatus || "free",
+          planStatus: isPro ? "pro" : "free",
           monthlyDiscoveriesUsed: 0,
-          discoveryLimit: user.planStatus === "pro" ? 50 : 5,
-          leadLimit: user.planStatus === "pro" ? null : 25,
+          discoveryLimit: isPro ? 999 : 5,
+          leadLimit: isPro ? null : 25,
           stripeSubscriptionId: user.stripeSubscriptionId,
+          isAdmin: user.isAdmin || false,
         });
       }
 
       res.json({
-        planStatus: user.planStatus || "free",
+        planStatus: isPro ? "pro" : "free",
         monthlyDiscoveriesUsed: user.monthlyDiscoveriesUsed || 0,
-        discoveryLimit: user.planStatus === "pro" ? 50 : 5,
-        leadLimit: user.planStatus === "pro" ? null : 25,
+        discoveryLimit: isPro ? 999 : 5,
+        leadLimit: isPro ? null : 25,
         stripeSubscriptionId: user.stripeSubscriptionId,
+        isAdmin: user.isAdmin || false,
       });
     } catch (err) {
       console.error("Error getting subscription:", err);
@@ -195,6 +199,8 @@ export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: bo
   const [user] = await db.select().from(users).where(eq(users.id, userId));
   if (!user) return { allowed: false, remaining: 0, limit: 0 };
 
+  if (user.isAdmin) return { allowed: true, remaining: 999, limit: 999 };
+
   if (user.usageResetDate && new Date() > new Date(user.usageResetDate)) {
     const nextReset = getNextResetDate();
     await db.update(users).set({
@@ -222,6 +228,6 @@ export async function checkLeadLimit(userId: string, currentLeadCount: number): 
   const [user] = await db.select().from(users).where(eq(users.id, userId));
   if (!user) return { allowed: false, limit: 0 };
 
-  if (user.planStatus === "pro") return { allowed: true, limit: null };
+  if (user.isAdmin || user.planStatus === "pro") return { allowed: true, limit: null };
   return { allowed: currentLeadCount < 25, limit: 25 };
 }

@@ -40,6 +40,10 @@ export class WebhookHandlers {
 
         const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
         if (user) {
+          if (user.isAdmin) {
+            console.log(`Skipping plan update for admin user ${user.id}`);
+            break;
+          }
           const isActive = status === 'active' || status === 'trialing';
           const planStatus = isActive ? 'pro' : 'free';
           const nextReset = user.usageResetDate || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
@@ -62,6 +66,10 @@ export class WebhookHandlers {
 
         const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
         if (user) {
+          if (user.isAdmin) {
+            console.log(`Skipping downgrade for admin user ${user.id}`);
+            break;
+          }
           await db.update(users).set({
             stripeSubscriptionId: null,
             planStatus: 'free',
