@@ -39,7 +39,7 @@ export async function registerRoutes(
 
   app.post("/api/leads", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.session.userId;
       if (userId) {
         const existingLeads = await storage.getLeads();
         const leadCheck = await checkLeadLimit(userId, existingLeads.length);
@@ -201,7 +201,7 @@ export async function registerRoutes(
 
   app.post("/api/discover", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.session.userId;
       if (userId) {
         const limit = await checkDiscoveryLimit(userId);
         if (!limit.allowed) {

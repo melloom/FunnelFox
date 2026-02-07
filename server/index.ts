@@ -97,6 +97,32 @@ app.use((req, res, next) => {
     stripeSync.syncBackfill()
       .then(() => console.log("Stripe data synced"))
       .catch((err: any) => console.error("Error syncing Stripe data:", err));
+
+    try {
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const stripe = await getUncachableStripeClient();
+      const products = await stripe.products.list({ active: true, limit: 20 });
+      const existing = products.data.find((p: any) => p.name === "LeadHunter Pro");
+      if (!existing) {
+        const product = await stripe.products.create({
+          name: "LeadHunter Pro",
+          description: "Unlock 50 lead discoveries/month, unlimited saved leads, all data sources, Gmail integration, and full website analysis.",
+          metadata: { plan: "pro", discoveryLimit: "50", leadLimit: "unlimited" },
+        });
+        await stripe.prices.create({
+          product: product.id,
+          unit_amount: 2000,
+          currency: "usd",
+          recurring: { interval: "month" },
+          lookup_key: "pro_monthly",
+        });
+        console.log("Stripe product 'LeadHunter Pro' seeded with $20/month price");
+      } else {
+        console.log("Stripe product exists:", existing.id);
+      }
+    } catch (seedErr) {
+      console.error("Stripe product seed check (non-fatal):", seedErr);
+    }
   } catch (err) {
     console.error("Stripe initialization failed (non-fatal):", err);
   }
