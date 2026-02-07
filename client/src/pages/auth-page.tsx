@@ -91,7 +91,7 @@ export default function AuthPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-[11px] text-muted-foreground">
+        <p className="text-center text-[11px] text-muted-foreground pb-6">
           By signing in, you agree to our{" "}
           <Link href="/terms">
             <span className="underline cursor-pointer" data-testid="link-auth-terms">Terms of Service</span>

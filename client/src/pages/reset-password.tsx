@@ -149,7 +149,7 @@ export default function ResetPasswordPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm">
+        <p className="text-center text-sm pb-6">
           <Link href="/auth">
             <span className="text-muted-foreground cursor-pointer hover:underline" data-testid="link-back-to-login">
               <ArrowLeft className="w-3.5 h-3.5 inline mr-1" />

@@ -91,7 +91,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="px-5 py-5 safe-area-bottom border-t">
+      <footer className="px-5 py-5 pb-8 safe-area-bottom border-t">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-muted-foreground">
           <span>FunnelFox by MellowSites</span>
           <div className="flex items-center gap-3">
