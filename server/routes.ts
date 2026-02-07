@@ -6,6 +6,7 @@ import { users as usersTable } from "@shared/models/auth";
 import { z } from "zod";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache, enrichContactInfo } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sendEmail, isGmailConnected, getGmailAddress } from "./gmail";
@@ -109,6 +110,10 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
       const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
       if (!user?.isAdmin) return res.status(403).json({ error: "Admin only" });
+      const { password } = req.body || {};
+      if (!password) return res.status(400).json({ error: "Password confirmation required" });
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) return res.status(403).json({ error: "Incorrect password" });
       await db.delete(activityLog);
       await db.delete(leadsTable);
       res.json({ success: true, message: "All leads and activity logs cleared" });
