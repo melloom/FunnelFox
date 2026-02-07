@@ -301,11 +301,13 @@ function getNextResetDate(): Date {
   return nextMonth;
 }
 
-export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: boolean; remaining: number; limit: number }> {
+export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: boolean; remaining: number; limit: number; isPro: boolean; maxResultsPerSearch: number }> {
   const [user] = await db.select().from(users).where(eq(users.id, userId));
-  if (!user) return { allowed: false, remaining: 0, limit: 0 };
+  if (!user) return { allowed: false, remaining: 0, limit: 0, isPro: false, maxResultsPerSearch: 5 };
 
-  if (user.isAdmin) return { allowed: true, remaining: 999, limit: 999 };
+  const isPro = user.planStatus === "pro" || user.isAdmin === true;
+
+  if (user.isAdmin) return { allowed: true, remaining: 999, limit: 999, isPro: true, maxResultsPerSearch: 50 };
 
   if (user.usageResetDate && new Date() > new Date(user.usageResetDate)) {
     const nextReset = getNextResetDate();
@@ -313,14 +315,14 @@ export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: bo
       monthlyDiscoveriesUsed: 0,
       usageResetDate: nextReset,
     }).where(eq(users.id, userId));
-    const limit = user.planStatus === "pro" ? 50 : 5;
-    return { allowed: true, remaining: limit, limit };
+    const limit = isPro ? 50 : 5;
+    return { allowed: true, remaining: limit, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
   }
 
-  const limit = user.planStatus === "pro" ? 50 : 5;
+  const limit = isPro ? 50 : 5;
   const used = user.monthlyDiscoveriesUsed || 0;
   const remaining = Math.max(0, limit - used);
-  return { allowed: remaining > 0, remaining, limit };
+  return { allowed: remaining > 0, remaining, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
 }
 
 export async function incrementDiscoveryUsage(userId: string): Promise<void> {

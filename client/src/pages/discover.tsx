@@ -117,12 +117,13 @@ export default function DiscoverPage() {
   const [category, setCategory] = useState("");
   const [customCategory, setCustomCategory] = useState("");
   const [location, setLocationValue] = useState("");
-  const [maxResults, setMaxResults] = useState("20");
+  const [maxResults, setMaxResults] = useState("5");
   const [results, setResults] = useState<DiscoverResult | null>(null);
   const [geolocating, setGeolocating] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [lastSearch, setLastSearch] = useState<{ category: string; location: string } | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [maxResultsInitialized, setMaxResultsInitialized] = useState(false);
 
   const { data: subscription } = useQuery<{
     planStatus: string;
@@ -132,6 +133,11 @@ export default function DiscoverPage() {
   }>({
     queryKey: ["/api/subscription"],
   });
+
+  if (subscription && !maxResultsInitialized) {
+    setMaxResults(subscription.planStatus === "pro" ? "20" : "5");
+    setMaxResultsInitialized(true);
+  }
 
   const handleGeolocate = () => {
     if (!navigator.geolocation) {
@@ -319,10 +325,19 @@ export default function DiscoverPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="30">30</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
+                    {subscription?.planStatus === "pro" ? (
+                      <>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="30">30</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </>
+                    ) : (
+                      <>
+                        <SelectItem value="3">3</SelectItem>
+                        <SelectItem value="5">5</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
