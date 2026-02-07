@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ThemeToggle } from "@/components/theme-toggle";
 import foxLogo from "@assets/fox_1770439380079.png";
 
 export default function ForgotPasswordPage() {
@@ -35,11 +34,7 @@ export default function ForgotPasswordPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-background p-4">
-        <div className="flex items-center justify-end pt-2">
-          <ThemeToggle />
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex items-center justify-center mb-4">
             <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary">
@@ -60,20 +55,18 @@ export default function ForgotPasswordPage() {
             </Button>
           </Link>
         </div>
-        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
-      <div className="flex items-center justify-between pt-2">
+      <div className="pt-2">
         <Link href="/auth">
           <Button variant="ghost" size="icon" data-testid="button-back-forgot">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
-        <ThemeToggle />
       </div>
       <div className="flex-1 flex flex-col items-center justify-center">
       <div className="w-full max-w-sm space-y-6">
