@@ -45,6 +45,10 @@ import {
   Camera,
   Flame,
   NotebookPen,
+  Zap,
+  SearchCode,
+  Eye,
+  Shield,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -468,19 +472,76 @@ function PipelineLeadDetailDialog({
 
           {lead.websiteIssues && lead.websiteIssues.length > 0 && (
             <div>
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-xs font-medium text-muted-foreground">Website Issues</p>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-xs font-medium text-muted-foreground">Website Analysis</p>
                 {lead.websiteScore !== null && lead.websiteScore !== undefined && (
                   <ScoreBadge score={lead.websiteScore} />
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {lead.websiteIssues.map((issue, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {issue}
-                  </Badge>
-                ))}
-              </div>
+              {(() => {
+                const catConfig = [
+                  { key: "Performance", icon: Zap, maxDeductions: 40 },
+                  { key: "SEO", icon: SearchCode, maxDeductions: 25 },
+                  { key: "Accessibility", icon: Eye, maxDeductions: 25 },
+                  { key: "Security", icon: Shield, maxDeductions: 30 },
+                  { key: "Other", icon: Globe, maxDeductions: 20 },
+                ] as const;
+                const categories: Record<string, string[]> = {
+                  "Performance": [], "SEO": [], "Accessibility": [], "Security": [], "Other": [],
+                };
+                for (const issue of lead.websiteIssues) {
+                  const lower = issue.toLowerCase();
+                  if (lower.includes("performance") || lower.includes("load time") || lower.includes("page size") || lower.includes("lazy") || lower.includes("minif") || lower.includes("resources") || lower.includes("slow") || lower.includes("render-blocking") || lower.includes("first paint") || lower.includes("inline css") || lower.includes("inline javascript") || lower.includes("layout shift") || lower.includes("preload") || lower.includes("preconnect") || lower.includes("image format") || lower.includes("webp") || lower.includes("font-display") || lower.includes("width/height")) {
+                    categories["Performance"].push(issue);
+                  } else if (lower.includes("seo") || lower.includes("meta") || lower.includes("title") || lower.includes("canonical") || lower.includes("structured data") || lower.includes("h1") || lower.includes("heading") || lower.includes("open graph") || lower.includes("sitemap") || lower.includes("favicon") || lower.includes("social sharing") || lower.includes("crawlability") || lower.includes("twitter")) {
+                    categories["SEO"].push(issue);
+                  } else if (lower.includes("accessibility") || lower.includes("aria") || lower.includes("alt text") || lower.includes("label") || lower.includes("lang") || lower.includes("focus") || lower.includes("tabindex") || lower.includes("screen reader") || lower.includes("keyboard") || lower.includes("iframe")) {
+                    categories["Accessibility"].push(issue);
+                  } else if (lower.includes("https") || lower.includes("security") || lower.includes("csp") || lower.includes("x-frame") || lower.includes("x-content") || lower.includes("hsts") || lower.includes("mixed content") || lower.includes("clickjacking")) {
+                    categories["Security"].push(issue);
+                  } else {
+                    categories["Other"].push(issue);
+                  }
+                }
+                function getCategoryScore(issueCount: number, maxDeductions: number): number {
+                  const deductionPerIssue = maxDeductions / 8;
+                  return Math.max(0, Math.round(100 - issueCount * deductionPerIssue));
+                }
+                return (
+                  <div className="space-y-3">
+                    {catConfig.map(({ key, icon: Icon, maxDeductions }) => {
+                      const issues = categories[key];
+                      if (issues.length === 0) return null;
+                      const catScore = getCategoryScore(issues.length, maxDeductions);
+                      const grade = getGrade(catScore);
+                      return (
+                        <details key={key} className="group">
+                          <summary className="flex items-center gap-2 mb-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                            <ChevronDown className="w-3 h-3 text-muted-foreground transition-transform group-open:rotate-0 -rotate-90" />
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-xs font-medium flex-1">{key}</span>
+                            <span className={`text-[10px] font-bold ${grade.color}`}>{grade.letter}</span>
+                            <span className="text-[10px] text-muted-foreground">{issues.length} {issues.length === 1 ? "issue" : "issues"}</span>
+                          </summary>
+                          <div className="w-full h-1.5 rounded-full bg-muted mb-2 ml-6">
+                            <div
+                              className={`h-full rounded-full transition-all ${catScore >= 80 ? "bg-emerald-500" : catScore >= 60 ? "bg-yellow-500" : catScore >= 40 ? "bg-orange-500" : "bg-red-500"}`}
+                              style={{ width: `${catScore}%` }}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-1 ml-6">
+                            {issues.map((issue, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px]">
+                                {issue}
+                              </Badge>
+                            ))}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
