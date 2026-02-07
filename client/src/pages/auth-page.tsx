@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Target, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -83,6 +84,17 @@ export default function AuthPage() {
             </form>
           </CardContent>
         </Card>
+
+        <p className="text-center text-[11px] text-muted-foreground">
+          By signing in, you agree to our{" "}
+          <Link href="/terms">
+            <span className="underline cursor-pointer" data-testid="link-auth-terms">Terms of Service</span>
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy">
+            <span className="underline cursor-pointer" data-testid="link-auth-privacy">Privacy Policy</span>
+          </Link>
+        </p>
       </div>
     </div>
   );

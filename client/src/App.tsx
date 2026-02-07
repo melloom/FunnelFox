@@ -22,6 +22,8 @@ import HelpPage from "@/pages/help";
 import PricingPage from "@/pages/pricing";
 import LandingPage from "@/pages/landing";
 import AuthPage from "@/pages/auth-page";
+import TermsPage from "@/pages/terms";
+import PrivacyPage from "@/pages/privacy";
 
 function Router() {
   return (
@@ -33,6 +35,8 @@ function Router() {
       <Route path="/add" component={AddLeadPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/help" component={HelpPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/privacy" component={PrivacyPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -100,6 +104,8 @@ function AppContent() {
     return (
       <Switch>
         <Route path="/auth" component={AuthPage} />
+        <Route path="/terms" component={TermsPage} />
+        <Route path="/privacy" component={PrivacyPage} />
         <Route component={LandingPage} />
       </Switch>
     );

@@ -107,6 +107,14 @@ export function AppSidebar() {
         {!subscription && (
           <p className="text-xs text-muted-foreground">Web Dev Lead Generator</p>
         )}
+        <div className="flex items-center gap-3 pt-2 border-t mt-2">
+          <Link href="/terms" onClick={handleNavClick}>
+            <span className="text-[10px] text-muted-foreground underline cursor-pointer" data-testid="link-sidebar-terms">Terms</span>
+          </Link>
+          <Link href="/privacy" onClick={handleNavClick}>
+            <span className="text-[10px] text-muted-foreground underline cursor-pointer" data-testid="link-sidebar-privacy">Privacy</span>
+          </Link>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

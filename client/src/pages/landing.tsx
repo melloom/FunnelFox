@@ -93,8 +93,19 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="px-5 py-5 text-center text-xs text-muted-foreground safe-area-bottom">
-        LeadHunter — Built for web developers
+      <footer className="px-5 py-5 safe-area-bottom border-t">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-muted-foreground">
+          <span>LeadHunter by MellowSites</span>
+          <div className="flex items-center gap-3">
+            <Link href="/terms">
+              <span className="underline cursor-pointer" data-testid="link-footer-terms">Terms of Service</span>
+            </Link>
+            <Link href="/privacy">
+              <span className="underline cursor-pointer" data-testid="link-footer-privacy">Privacy Policy</span>
+            </Link>
+            <a href="mailto:contact@mellowsites.com" className="underline" data-testid="link-footer-contact">Contact</a>
+          </div>
+        </div>
       </footer>
     </div>
   );
