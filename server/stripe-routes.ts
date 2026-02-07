@@ -17,7 +17,7 @@ export function registerStripeRoutes(app: Express) {
 
   app.get("/api/subscription", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.session.userId;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
       const [user] = await db.select().from(users).where(eq(users.id, userId));
@@ -62,7 +62,7 @@ export function registerStripeRoutes(app: Express) {
 
   app.post("/api/checkout", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.session.userId;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
       const [user] = await db.select().from(users).where(eq(users.id, userId));
@@ -123,7 +123,7 @@ export function registerStripeRoutes(app: Express) {
 
   app.post("/api/billing-portal", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.session.userId;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
       const [user] = await db.select().from(users).where(eq(users.id, userId));
@@ -147,7 +147,7 @@ export function registerStripeRoutes(app: Express) {
 
   app.post("/api/stripe/sync-subscription", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.session.userId;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
       const [user] = await db.select().from(users).where(eq(users.id, userId));
