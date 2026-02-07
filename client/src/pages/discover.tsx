@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,6 +110,15 @@ export default function DiscoverPage() {
   const [results, setResults] = useState<DiscoverResult | null>(null);
   const [geolocating, setGeolocating] = useState(false);
 
+  const { data: subscription } = useQuery<{
+    planStatus: string;
+    monthlyDiscoveriesUsed: number;
+    discoveryLimit: number;
+    leadLimit: number | null;
+  }>({
+    queryKey: ["/api/subscription"],
+  });
+
   const handleGeolocate = () => {
     if (!navigator.geolocation) {
       toast({ title: "Geolocation not supported", description: "Your browser doesn't support location detection", variant: "destructive" });
@@ -163,6 +172,7 @@ export default function DiscoverPage() {
     onSuccess: (data) => {
       setResults(data);
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
       toast({
         title: `Found ${data.new} new leads`,
         description: data.cached
@@ -188,6 +198,21 @@ export default function DiscoverPage() {
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Search for businesses by category and location. We'll analyze their websites and add prospects to your pipeline.
         </p>
+        {subscription && (
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <Badge variant={subscription.planStatus === "pro" ? "default" : "secondary"} data-testid="badge-plan-status">
+              {subscription.planStatus === "pro" ? "Pro" : "Free"} Plan
+            </Badge>
+            <span className="text-xs text-muted-foreground" data-testid="text-discovery-usage">
+              {subscription.monthlyDiscoveriesUsed} / {subscription.discoveryLimit} discoveries used this month
+            </span>
+            {subscription.planStatus !== "pro" && subscription.monthlyDiscoveriesUsed >= subscription.discoveryLimit && (
+              <a href="/pricing" className="text-xs text-primary hover:underline" data-testid="link-upgrade">
+                Upgrade for more
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       <Card>

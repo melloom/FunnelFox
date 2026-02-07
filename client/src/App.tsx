@@ -19,6 +19,7 @@ import AddLeadPage from "@/pages/add-lead";
 import DiscoverPage from "@/pages/discover";
 import PipelinePage from "@/pages/pipeline";
 import HelpPage from "@/pages/help";
+import PricingPage from "@/pages/pricing";
 import LandingPage from "@/pages/landing";
 import AuthPage from "@/pages/auth-page";
 
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/discover" component={DiscoverPage} />
       <Route path="/leads" component={LeadsPage} />
       <Route path="/add" component={AddLeadPage} />
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/help" component={HelpPage} />
       <Route component={NotFound} />
     </Switch>

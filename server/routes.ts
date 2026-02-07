@@ -6,6 +6,7 @@ import { z } from "zod";
 import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sendEmail, isGmailConnected, getGmailAddress } from "./gmail";
+import { registerStripeRoutes, checkDiscoveryLimit, incrementDiscoveryUsage, checkLeadLimit } from "./stripe-routes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -13,6 +14,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupAuth(app);
   registerAuthRoutes(app);
+  registerStripeRoutes(app);
 
   app.get("/api/leads", isAuthenticated, async (_req, res) => {
     try {
@@ -37,6 +39,18 @@ export async function registerRoutes(
 
   app.post("/api/leads", isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user?.id;
+      if (userId) {
+        const existingLeads = await storage.getLeads();
+        const leadCheck = await checkLeadLimit(userId, existingLeads.length);
+        if (!leadCheck.allowed) {
+          return res.status(403).json({
+            error: `Free plan limited to ${leadCheck.limit} saved leads. Upgrade to Pro for unlimited.`,
+            limitReached: true,
+          });
+        }
+      }
+
       const parsed = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(parsed);
       await storage.createActivity({ leadId: lead.id, action: "created", details: "Lead created" });
@@ -187,6 +201,19 @@ export async function registerRoutes(
 
   app.post("/api/discover", isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).user?.id;
+      if (userId) {
+        const limit = await checkDiscoveryLimit(userId);
+        if (!limit.allowed) {
+          return res.status(403).json({
+            error: `You've used all ${limit.limit} discoveries this month. Upgrade to Pro for more.`,
+            limitReached: true,
+            remaining: limit.remaining,
+            limit: limit.limit,
+          });
+        }
+      }
+
       const { category, location, maxResults } = req.body;
       if (!category || !location) {
         return res.status(400).json({ error: "Category and location are required" });
@@ -372,12 +399,20 @@ export async function registerRoutes(
         }
       }
 
+      if (userId && results.length > 0) {
+        await incrementDiscoveryUsage(userId);
+      }
+
+      const updatedLimit = userId ? await checkDiscoveryLimit(userId) : null;
+
       res.json({
         found: businesses.length,
         new: results.length,
         skipped: businesses.length - newBusinesses.length,
         leads: results,
         cached,
+        remaining: updatedLimit?.remaining,
+        limit: updatedLimit?.limit,
       });
     } catch (err) {
       console.error("Discover error:", err);

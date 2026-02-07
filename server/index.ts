@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { WebhookHandlers } from "./webhookHandlers";
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,6 +12,23 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    if (!signature) return res.status(400).json({ error: "Missing signature" });
+    try {
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error("Webhook error:", error.message);
+      res.status(400).json({ error: "Webhook processing error" });
+    }
+  }
+);
 
 app.use(
   express.json({
@@ -60,6 +78,29 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  try {
+    const { runMigrations } = await import("stripe-replit-sync");
+    const { getStripeSync } = await import("./stripeClient");
+
+    console.log("Initializing Stripe schema...");
+    await runMigrations({ databaseUrl: process.env.DATABASE_URL! });
+    console.log("Stripe schema ready");
+
+    const stripeSync = await getStripeSync();
+
+    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+    const webhookResult = await stripeSync.findOrCreateManagedWebhook(
+      `${webhookBaseUrl}/api/stripe/webhook`
+    );
+    console.log("Stripe webhook configured:", webhookResult?.webhook?.url || "OK");
+
+    stripeSync.syncBackfill()
+      .then(() => console.log("Stripe data synced"))
+      .catch((err: any) => console.error("Error syncing Stripe data:", err));
+  } catch (err) {
+    console.error("Stripe initialization failed (non-fatal):", err);
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

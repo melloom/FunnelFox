@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, timestamp, varchar, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -20,6 +20,11 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  planStatus: varchar("plan_status").default("free"),
+  monthlyDiscoveriesUsed: integer("monthly_discoveries_used").default(0),
+  usageResetDate: timestamp("usage_reset_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -29,6 +34,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   updatedAt: true,
   profileImageUrl: true,
+  stripeCustomerId: true,
+  stripeSubscriptionId: true,
+  planStatus: true,
+  monthlyDiscoveriesUsed: true,
+  usageResetDate: true,
 });
 
 export const loginSchema = z.object({
