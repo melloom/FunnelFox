@@ -4,10 +4,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useTheme } from "@/components/theme-provider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +30,15 @@ import {
   Trash2,
   AlertTriangle,
   Shield,
+  Sun,
+  Moon,
+  CreditCard,
+  Search,
+  BarChart3,
+  Lock,
+  ArrowRight,
+  CheckCircle,
+  ExternalLink,
 } from "lucide-react";
 
 interface SubscriptionInfo {
@@ -34,17 +46,51 @@ interface SubscriptionInfo {
   isAdmin: boolean;
   stripeSubscriptionId: string | null;
   memberSince: string | null;
+  monthlyDiscoveriesUsed: number;
+  discoveryLimit: number;
+  leadCount?: number;
+  leadLimit?: number;
 }
 
 export default function AccountPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { theme, toggleTheme } = useTheme();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
-  const { data: subscription } = useQuery<SubscriptionInfo>({
+  const { data: subscription, isLoading: subLoading } = useQuery<SubscriptionInfo>({
     queryKey: ["/api/subscription"],
+  });
+
+  const { data: gmailStatus } = useQuery<{ connected: boolean; email?: string }>({
+    queryKey: ["/api/gmail/status"],
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const res = await apiRequest("POST", "/api/auth/change-password", data);
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.message || "Failed to change password");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Password updated", description: "Your password has been changed successfully." });
+      setShowPasswordDialog(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteAccountMutation = useMutation({
@@ -97,11 +143,15 @@ export default function AccountPage() {
     return <Badge variant="secondary" data-testid="badge-plan-free">Free</Badge>;
   }
 
+  const discoveriesUsed = subscription?.monthlyDiscoveriesUsed ?? 0;
+  const discoveryLimit = subscription?.discoveryLimit ?? 5;
+  const discoveriesPercent = discoveryLimit === 999 ? 0 : Math.min(100, (discoveriesUsed / discoveryLimit) * 100);
+
   return (
-    <div className="container max-w-2xl mx-auto p-6 space-y-6">
+    <div className="container max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-account-title">Account Settings</h1>
-        <p className="text-muted-foreground">Manage your profile and account</p>
+        <p className="text-sm text-muted-foreground">Manage your profile, preferences, and account</p>
       </div>
 
       <Card>
@@ -135,11 +185,231 @@ export default function AccountPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Usage This Month
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {subLoading ? (
+            <div className="h-12 rounded-md bg-muted animate-pulse" />
+          ) : (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm">Discoveries</span>
+                  <span className="text-sm text-muted-foreground">
+                    {discoveriesUsed} / {discoveryLimit === 999 ? "Unlimited" : discoveryLimit}
+                  </span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${discoveryLimit === 999 ? 0 : discoveriesPercent}%` }}
+                  />
+                </div>
+                {discoveriesPercent >= 80 && discoveryLimit !== 999 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {discoveriesPercent >= 100 ? "Limit reached." : "Running low."}{" "}
+                    {!isPro && (
+                      <button onClick={() => setLocation("/subscription")} className="text-primary underline cursor-pointer" data-testid="link-upgrade-usage">
+                        Upgrade for more
+                      </button>
+                    )}
+                  </p>
+                )}
+              </div>
+              {subscription?.leadCount !== undefined && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm">Saved Leads</span>
+                    <span className="text-sm text-muted-foreground">
+                      {subscription.leadCount} / {isPro ? "Unlimited" : (subscription.leadLimit ?? 25)}
+                    </span>
+                  </div>
+                  {!isPro && (
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all"
+                        style={{ width: `${Math.min(100, ((subscription.leadCount || 0) / (subscription.leadLimit || 25)) * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setLocation("/subscription")} data-testid="button-manage-plan">
+                  <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                  {isPro ? "Manage Plan" : "Upgrade to Pro"}
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {theme === "light" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            Preferences
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Appearance</p>
+              <p className="text-xs text-muted-foreground">Switch between light and dark mode</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={toggleTheme} data-testid="button-toggle-theme">
+              {theme === "light" ? <Moon className="w-3.5 h-3.5 mr-1.5" /> : <Sun className="w-3.5 h-3.5 mr-1.5" />}
+              {theme === "light" ? "Dark Mode" : "Light Mode"}
+            </Button>
+          </div>
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Gmail Integration</p>
+                <p className="text-xs text-muted-foreground">
+                  {gmailStatus?.connected
+                    ? `Connected as ${gmailStatus.email || "your account"}`
+                    : "Connect Gmail to send emails from the app"}
+                </p>
+              </div>
+              {gmailStatus?.connected ? (
+                <Badge variant="secondary">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="outline">Not connected</Badge>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            Security
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Password</p>
+              <p className="text-xs text-muted-foreground">Change your account password</p>
+            </div>
+            <AlertDialog open={showPasswordDialog} onOpenChange={(open) => {
+              setShowPasswordDialog(open);
+              if (!open) { setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }
+            }}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-change-password">
+                  <Lock className="w-3.5 h-3.5 mr-1.5" />
+                  Change Password
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Change Password</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Enter your current password and choose a new one.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-3 py-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="current-password" className="text-sm">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      data-testid="input-current-password"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-password" className="text-sm">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      data-testid="input-new-password"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-password" className="text-sm">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      data-testid="input-confirm-password"
+                    />
+                  </div>
+                  {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                    <p className="text-xs text-destructive">Passwords do not match</p>
+                  )}
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-password">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={
+                      !currentPassword || !newPassword || newPassword !== confirmPassword || newPassword.length < 6 || changePasswordMutation.isPending
+                    }
+                    onClick={(e) => {
+                      e.preventDefault();
+                      changePasswordMutation.mutate({ currentPassword, newPassword });
+                    }}
+                    data-testid="button-save-password"
+                  >
+                    {changePasswordMutation.isPending ? "Updating..." : "Update Password"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ExternalLink className="w-4 h-4" />
+            Quick Links
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => setLocation("/subscription")} data-testid="button-quick-subscription">
+              <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+              Subscription
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => setLocation("/help")} data-testid="button-quick-help">
+              <Search className="w-3.5 h-3.5 mr-1.5" />
+              Help & Guide
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => setLocation("/terms")} data-testid="button-quick-terms">
+              Terms of Service
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => setLocation("/privacy")} data-testid="button-quick-privacy">
+              Privacy Policy
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Trash2 className="w-4 h-4" />
-            Delete Account
+            Danger Zone
           </CardTitle>
           <CardDescription>
             Permanently delete your account and all associated data. This action cannot be undone.

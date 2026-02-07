@@ -23,7 +23,7 @@ export default function TermsPage() {
             <section className="space-y-2">
               <h2 className="text-base font-semibold">1. Agreement to Terms</h2>
               <p>
-                By accessing or using LeadHunter ("the Service"), operated by MellowSites ("we", "us", or "our"), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service.
+                By accessing or using FunnelFox ("the Service"), operated by MellowSites ("we", "us", or "our"), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service.
               </p>
               <p>
                 The Service is available at funnelfox.org and any associated subdomains. By creating an account, you confirm that you are at least 18 years of age and have the legal capacity to enter into this agreement.
@@ -33,7 +33,7 @@ export default function TermsPage() {
             <section className="space-y-2">
               <h2 className="text-base font-semibold">2. Description of Service</h2>
               <p>
-                LeadHunter is a lead generation and customer relationship management tool designed for web developers and digital service providers. The Service allows users to discover potential business clients, analyze their web presence, manage outreach through a sales pipeline, and send communications.
+                FunnelFox is a lead generation and customer relationship management tool designed for web developers and digital service providers. The Service allows users to discover potential business clients, analyze their web presence, manage outreach through a sales pipeline, and send communications.
               </p>
               <p>
                 We provide information about businesses gathered from publicly available sources. The accuracy, completeness, or reliability of this data is not guaranteed. Users are responsible for verifying information before taking action.
@@ -53,7 +53,7 @@ export default function TermsPage() {
             <section className="space-y-2">
               <h2 className="text-base font-semibold">4. Subscription Plans and Billing</h2>
               <p>
-                LeadHunter offers a free tier and a paid Pro subscription plan. The Pro plan is billed monthly at the rate displayed on our pricing page (currently $30/month). All prices are in US dollars.
+                FunnelFox offers a free tier and a paid Pro subscription plan. The Pro plan is billed monthly at the rate displayed on our pricing page (currently $30/month). All prices are in US dollars.
               </p>
               <p>
                 Subscriptions automatically renew each billing cycle unless canceled. You may cancel your subscription at any time through the billing portal. Upon cancellation, you retain access to Pro features until the end of your current billing period. No partial refunds are provided for unused time within a billing cycle.

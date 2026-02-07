@@ -639,7 +639,7 @@ async function geocodeLocation(location: string): Promise<{ lat: number; lon: nu
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "LeadHunter/1.0 (lead-discovery-app)",
+        "User-Agent": "FunnelFox/1.0 (lead-discovery-app)",
       },
     });
     clearTimeout(timeout);
@@ -701,7 +701,7 @@ async function searchOpenStreetMap(
       signal: controller.signal,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "LeadHunter/1.0 (lead-discovery-app)",
+        "User-Agent": "FunnelFox/1.0 (lead-discovery-app)",
       },
       body: `data=${encodeURIComponent(query)}`,
     });

@@ -1,6 +1,6 @@
 {
-  "name": "LeadHunter",
-  "short_name": "LeadHunter",
+  "name": "FunnelFox",
+  "short_name": "FunnelFox",
   "description": "Find your next web development client. Discover businesses, analyze websites, and manage your sales pipeline.",
   "start_url": "/",
   "display": "standalone",

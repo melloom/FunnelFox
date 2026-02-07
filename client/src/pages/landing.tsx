@@ -40,7 +40,7 @@ export default function LandingPage() {
           <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
             <Target className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="text-sm font-bold tracking-tight">LeadHunter</span>
+          <span className="text-sm font-bold tracking-tight">FunnelFox</span>
         </div>
         <Link href="/auth">
           <Button variant="outline" size="sm" data-testid="button-login-header">
@@ -95,7 +95,7 @@ export default function LandingPage() {
 
       <footer className="px-5 py-5 safe-area-bottom border-t">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-muted-foreground">
-          <span>LeadHunter by MellowSites</span>
+          <span>FunnelFox by MellowSites</span>
           <div className="flex items-center gap-3">
             <Link href="/terms">
               <span className="underline cursor-pointer" data-testid="link-footer-terms">Terms of Service</span>

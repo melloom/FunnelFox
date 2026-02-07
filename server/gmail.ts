@@ -93,7 +93,7 @@ function buildHtmlEmail(body: string, fromName?: string): string {
           <tr>
             <td style="padding:20px 0;text-align:center;">
               <p style="margin:0;color:#9ca3af;font-size:11px;line-height:1.5;">
-                Sent via LeadHunter by MellowSites
+                Sent via FunnelFox by MellowSites
               </p>
             </td>
           </tr>

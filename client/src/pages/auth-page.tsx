@@ -42,7 +42,7 @@ export default function AuthPage() {
             </div>
           </div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-auth-title">
-            LeadHunter
+            FunnelFox
           </h1>
           <p className="text-sm text-muted-foreground">
             Sign in to continue

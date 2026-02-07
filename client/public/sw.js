@@ -1,4 +1,4 @@
-const CACHE_NAME = 'leadhunter-v2';
+const CACHE_NAME = 'funnelfox-v1';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

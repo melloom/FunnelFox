@@ -130,7 +130,7 @@ export default function DiscoverPage() {
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&zoom=10`,
-            { headers: { "User-Agent": "LeadHunter/1.0" } }
+            { headers: { "User-Agent": "FunnelFox/1.0" } }
           );
           const data = await res.json();
           const addr = data.address || {};

@@ -54,12 +54,12 @@ export function AppSidebar() {
         <div className="flex items-center gap-2">
           <img
             src="/favicon-32x32.png"
-            alt="LeadHunter"
+            alt="FunnelFox"
             className="w-8 h-8 rounded-md"
             data-testid="img-sidebar-logo"
           />
           <div>
-            <h2 className="text-sm font-semibold" data-testid="text-app-title">LeadHunter</h2>
+            <h2 className="text-sm font-semibold" data-testid="text-app-title">FunnelFox</h2>
             <p className="text-xs text-muted-foreground">Find your next client</p>
           </div>
         </div>

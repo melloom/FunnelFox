@@ -1,9 +1,11 @@
-# LeadHunter - Web Development Lead Generator
+# FunnelFox - Web Development Lead Generator
 
 ## Overview
-A lead generation web application designed for web developers to discover, track, and manage potential clients. The app searches the web for businesses, analyzes their websites for quality issues, and provides a CRM-style pipeline to manage outreach from discovery through conversion.
+A lead generation web application (FunnelFox, formerly LeadHunter) designed for web developers to discover, track, and manage potential clients. The app searches the web for businesses, analyzes their websites for quality issues, and provides a CRM-style pipeline to manage outreach from discovery through conversion. Domain: funnelfox.org.
 
 ## Recent Changes
+- 2026-02-07: Renamed app from LeadHunter to FunnelFox across all files (HTML meta, manifest, service worker, sidebar, landing, auth, help, terms, privacy, email templates, server user-agents, Stripe product names). Stripe product lookup uses fallback to find existing "LeadHunter Pro" product.
+- 2026-02-07: Enhanced Account Settings page with 5 sections: Profile, Usage This Month (progress bars + plan link), Preferences (theme toggle, Gmail status), Security (change password with dialog), Quick Links, and Danger Zone (delete account). Added POST /api/auth/change-password endpoint with bcrypt verification. Files: client/src/pages/account.tsx, server/replit_integrations/auth/routes.ts.
 - 2026-02-07: Dedicated Subscription page (/subscription) with full plan management. Cancel subscription (sets cancel_at_period_end via Stripe API), resume subscription (removes cancel_at_period_end), upgrade via checkout, manage billing portal. Usage progress bars, plan comparison grid, status badges (Active/Canceling/Admin). API endpoints: POST /api/subscription/cancel, POST /api/subscription/resume. Price changed to $30/month. /pricing redirects to /subscription. Files: client/src/pages/subscription.tsx, server/stripe-routes.ts.
 - 2026-02-07: Sidebar restructure: replaced Target icon logo with favicon image, moved Help to bottom nav group. Nav split into main (Dashboard, Pipeline, Discover, All Leads, Add Lead) and bottom (Subscription, Account, Help). Sidebar footer links to /subscription. Files: client/src/components/app-sidebar.tsx.
 - 2026-02-07: Updated Help page with comprehensive documentation. 15 FAQ items covering discovery, scoring, export, bulk actions, Gmail, subscription management, business intelligence, manual leads. 12 key features listed. Pages overview includes Subscription and Account. Subscription plans section with Free vs Pro ($30/mo) comparison. Contact email at bottom. Files: client/src/pages/help.tsx.

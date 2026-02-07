@@ -126,7 +126,7 @@ export function registerStripeRoutes(app: Express) {
         priceId = prices.data[0].id;
       } else {
         const products = await stripe.products.list({ active: true, limit: 10 });
-        const proProduct = products.data.find(p => p.name === "LeadHunter Pro");
+        const proProduct = products.data.find(p => p.name === "FunnelFox Pro" || p.name === "LeadHunter Pro");
         if (proProduct) {
           const productPrices = await stripe.prices.list({ product: proProduct.id, active: true, limit: 1 });
           if (productPrices.data.length > 0) {

@@ -15,7 +15,7 @@ interface FAQItem {
 const faqs: FAQItem[] = [
   {
     question: "How does lead discovery work?",
-    answer: "When you search for a business category and location on the Discover page, LeadHunter searches multiple sources including Bing, DuckDuckGo, OpenStreetMap, Google Places, Yelp, and more. It finds real businesses, checks if they have websites, and analyzes their online presence automatically. Results are automatically saved as leads in your database.",
+    answer: "When you search for a business category and location on the Discover page, FunnelFox searches multiple sources including Bing, DuckDuckGo, OpenStreetMap, Google Places, Yelp, and more. It finds real businesses, checks if they have websites, and analyzes their online presence automatically. Results are automatically saved as leads in your database.",
   },
   {
     question: "What does the website score mean?",
@@ -27,7 +27,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: "Can I send emails directly from the app?",
-    answer: "Yes! If you connect your Gmail account through the app, you can send professional outreach emails directly from LeadHunter using pre-built templates. Templates include Introduction, Free Audit, Follow Up, No Website Pitch, Proposal, and Social to Website. Each email uses a professional HTML layout with your name and branding. If Gmail isn't connected, you can copy the email content or open it in your default email client.",
+    answer: "Yes! If you connect your Gmail account through the app, you can send professional outreach emails directly from FunnelFox using pre-built templates. Templates include Introduction, Free Audit, Follow Up, No Website Pitch, Proposal, and Social to Website. Each email uses a professional HTML layout with your name and branding. If Gmail isn't connected, you can copy the email content or open it in your default email client.",
   },
   {
     question: "What are the pipeline stages?",
@@ -35,7 +35,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: "How do I avoid contacting the same business twice?",
-    answer: "LeadHunter has built-in smart deduplication that runs automatically during discovery. It checks business names (with fuzzy matching using Levenshtein similarity), website domains, phone numbers, and email addresses to prevent duplicate entries. If a match is found, the existing lead is updated with any new information rather than creating a duplicate.",
+    answer: "FunnelFox has built-in smart deduplication that runs automatically during discovery. It checks business names (with fuzzy matching using Levenshtein similarity), website domains, phone numbers, and email addresses to prevent duplicate entries. If a match is found, the existing lead is updated with any new information rather than creating a duplicate.",
   },
   {
     question: "What technologies does it detect?",
@@ -67,11 +67,11 @@ const faqs: FAQItem[] = [
   },
   {
     question: "What business intelligence is shown for leads?",
-    answer: "LeadHunter enriches leads with BBB (Better Business Bureau) ratings and accreditation status, Google ratings and review counts, sitemap availability, and robots.txt status. These indicators appear as compact badges on lead cards and as a detailed section in the lead detail view.",
+    answer: "FunnelFox enriches leads with BBB (Better Business Bureau) ratings and accreditation status, Google ratings and review counts, sitemap availability, and robots.txt status. These indicators appear as compact badges on lead cards and as a detailed section in the lead detail view.",
   },
   {
     question: "Can I add leads manually?",
-    answer: "Yes! Use the Add Lead page to enter a business website URL. LeadHunter will automatically analyze the website, check quality, extract contact information (emails, phone numbers), detect technologies, capture a screenshot, and calculate a website score. You can also fill in details manually.",
+    answer: "Yes! Use the Add Lead page to enter a business website URL. FunnelFox will automatically analyze the website, check quality, extract contact information (emails, phone numbers), detect technologies, capture a screenshot, and calculate a website score. You can also fill in details manually.",
   },
 ];
 
@@ -103,7 +103,7 @@ const sections = [
   {
     icon: Search,
     title: "Discover Leads",
-    description: "Search for businesses by category (like 'restaurants' or 'dentists') and location. LeadHunter searches multiple directories and analyzes each business's online presence, website quality, contact info, and social media. Results are saved as leads automatically.",
+    description: "Search for businesses by category (like 'restaurants' or 'dentists') and location. FunnelFox searches multiple directories and analyzes each business's online presence, website quality, contact info, and social media. Results are saved as leads automatically.",
   },
   {
     icon: Kanban,
@@ -118,7 +118,7 @@ const sections = [
   {
     icon: Plus,
     title: "Add Lead",
-    description: "Manually add a business you've found on your own. Enter their website URL and LeadHunter will automatically analyze it, checking the site's quality, extracting contact info, detecting technologies, and capturing a screenshot.",
+    description: "Manually add a business you've found on your own. Enter their website URL and FunnelFox will automatically analyze it, checking the site's quality, extracting contact info, detecting technologies, and capturing a screenshot.",
   },
   {
     icon: Mail,
@@ -161,7 +161,7 @@ export default function HelpPage() {
           Help & Guide
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Everything you need to know about using LeadHunter to find and manage web development leads.
+          Everything you need to know about using FunnelFox to find and manage web development leads.
         </p>
       </div>
 
@@ -174,14 +174,14 @@ export default function HelpPage() {
                 <Badge variant="secondary" className="shrink-0 h-6 w-6 flex items-center justify-center rounded-full p-0 text-xs">1</Badge>
                 <div>
                   <p className="text-sm font-medium">Discover leads</p>
-                  <p className="text-sm text-muted-foreground">Go to Discover Leads and search for a business type in your area, for example "plumbers in Baltimore" or "restaurants in Austin". LeadHunter searches across multiple sources simultaneously.</p>
+                  <p className="text-sm text-muted-foreground">Go to Discover Leads and search for a business type in your area, for example "plumbers in Baltimore" or "restaurants in Austin". FunnelFox searches across multiple sources simultaneously.</p>
                 </div>
               </div>
               <div className="flex gap-3">
                 <Badge variant="secondary" className="shrink-0 h-6 w-6 flex items-center justify-center rounded-full p-0 text-xs">2</Badge>
                 <div>
                   <p className="text-sm font-medium">Review results</p>
-                  <p className="text-sm text-muted-foreground">LeadHunter finds businesses, checks their websites, and scores them. Look for low scores or businesses without websites. Those are your best prospects. Each lead shows a priority badge (Hot, Warm, Cool, Cold).</p>
+                  <p className="text-sm text-muted-foreground">FunnelFox finds businesses, checks their websites, and scores them. Look for low scores or businesses without websites. Those are your best prospects. Each lead shows a priority badge (Hot, Warm, Cool, Cold).</p>
                 </div>
               </div>
               <div className="flex gap-3">

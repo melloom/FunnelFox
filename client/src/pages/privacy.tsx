@@ -23,10 +23,10 @@ export default function PrivacyPage() {
             <section className="space-y-2">
               <h2 className="text-base font-semibold">1. Introduction</h2>
               <p>
-                MellowSites ("we", "us", or "our") operates LeadHunter, accessible at funnelfox.org. This Privacy Policy explains how we collect, use, disclose, and protect your personal information when you use our Service.
+                MellowSites ("we", "us", or "our") operates FunnelFox, accessible at funnelfox.org. This Privacy Policy explains how we collect, use, disclose, and protect your personal information when you use our Service.
               </p>
               <p>
-                By using LeadHunter, you agree to the collection and use of information as described in this policy.
+                By using FunnelFox, you agree to the collection and use of information as described in this policy.
               </p>
             </section>
 
@@ -82,7 +82,7 @@ export default function PrivacyPage() {
             <section className="space-y-2">
               <h2 className="text-base font-semibold">5. Cookies and Tracking</h2>
               <p>
-                LeadHunter uses the following types of cookies and similar technologies:
+                FunnelFox uses the following types of cookies and similar technologies:
               </p>
 
               <h3 className="text-sm font-medium mt-3">5.1 Essential Cookies</h3>
