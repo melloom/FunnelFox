@@ -84,13 +84,13 @@ export default function AuthPage() {
 
   if (showVerification) {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
-        <div className="pt-2">
+      <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
+        <div className="pt-1">
           <Button variant="ghost" size="icon" onClick={() => setShowVerification(false)} data-testid="button-back-verification">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto">
           <div className="w-full max-w-sm space-y-6">
             <div className="text-center space-y-4">
               <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -135,15 +135,15 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
-      <div className="pt-2">
+    <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
+      <div className="pt-1">
         <Link href="/">
           <Button variant="ghost" size="icon" data-testid="button-back-auth">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center mb-4">
@@ -167,6 +167,7 @@ export default function AuthPage() {
                     <Input
                       id="firstName"
                       type="text"
+                      autoComplete="given-name"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
@@ -178,6 +179,7 @@ export default function AuthPage() {
                     <Input
                       id="lastName"
                       type="text"
+                      autoComplete="family-name"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       data-testid="input-last-name"
@@ -190,6 +192,8 @@ export default function AuthPage() {
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
+                  autoComplete={isRegister ? "email" : "username"}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -210,6 +214,7 @@ export default function AuthPage() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete={isRegister ? "new-password" : "current-password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required

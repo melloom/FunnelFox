@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex items-center justify-center mb-4">
             <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary">
@@ -60,15 +60,15 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
-      <div className="pt-2">
+    <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
+      <div className="pt-1">
         <Link href="/auth">
           <Button variant="ghost" size="icon" data-testid="button-back-forgot">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center mb-4">
@@ -90,6 +90,8 @@ export default function ForgotPasswordPage() {
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

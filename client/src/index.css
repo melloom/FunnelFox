@@ -7,6 +7,10 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+input, textarea, select, button, a {
+  touch-action: manipulation;
+}
+
 .safe-area-top {
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }

@@ -43,7 +43,7 @@ export default function VerifyEmailPage() {
   }, [token, queryClient]);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 safe-area-x">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center mb-4">

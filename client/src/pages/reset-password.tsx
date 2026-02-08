@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex items-center justify-center mb-4">
             <img src={foxLogo} alt="FunnelFox" className="w-12 h-12 rounded-md object-cover" data-testid="img-app-logo" />
@@ -69,7 +69,7 @@ export default function ResetPasswordPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="flex items-center justify-center mb-4">
             <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary">
@@ -89,15 +89,15 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x">
-      <div className="pt-2">
+    <div className="min-h-[100dvh] flex flex-col bg-background p-4 safe-area-x safe-area-top safe-area-bottom">
+      <div className="pt-1">
         <Link href="/auth">
           <Button variant="ghost" size="icon" data-testid="button-back-reset">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center mb-4">
@@ -119,6 +119,7 @@ export default function ResetPasswordPage() {
                 <Input
                   id="new-password"
                   type="password"
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
@@ -131,6 +132,7 @@ export default function ResetPasswordPage() {
                 <Input
                   id="confirm-password"
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
