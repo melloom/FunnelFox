@@ -2884,6 +2884,51 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
           }
         }
       }
+
+      if (result.websiteUrl) {
+        try {
+          const ctrl2 = new AbortController();
+          const t2 = setTimeout(() => ctrl2.abort(), 10000);
+          const resp2 = await fetch(result.websiteUrl, {
+            signal: ctrl2.signal,
+            headers: { "User-Agent": getRandomUA(), Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+            redirect: "follow",
+          });
+          clearTimeout(t2);
+          if (resp2.ok) {
+            const html2 = await resp2.text();
+            const $2 = cheerio.load(html2);
+            if (!result.companyName) {
+              const t = $2('meta[property="og:title"]').attr("content")?.trim() || $2("title").text().trim();
+              const clean = t?.replace(/\s*[-|].{0,50}$/, "").trim();
+              if (clean && clean.length > 1 && clean.length < 80) result.companyName = clean;
+            }
+            const ci = extractContactInfo(html2, $2, result.websiteUrl);
+            if (!result.contactEmail && ci.emails?.length) result.contactEmail = ci.emails[0];
+            if (!result.contactPhone && ci.phones?.length) result.contactPhone = ci.phones[0];
+            if (!result.description) {
+              const d = $2('meta[property="og:description"]').attr("content")?.trim() || $2('meta[name="description"]').attr("content")?.trim();
+              if (d) result.description = d.slice(0, 300);
+            }
+            if (!result.location) {
+              const schemas = $2('script[type="application/ld+json"]').toArray();
+              for (const s of schemas) {
+                try {
+                  const j = JSON.parse($2(s).text());
+                  const addr = j.address || j?.["@graph"]?.[0]?.address;
+                  if (addr) {
+                    const parts = [addr.streetAddress, addr.addressLocality, addr.addressRegion, addr.postalCode].filter(Boolean);
+                    if (parts.length > 0) { result.location = parts.join(", ").slice(0, 100); break; }
+                  }
+                } catch {}
+              }
+            }
+            const ws = extractSocialLinksFromHtml(html2, $2);
+            const ex = new Set(result.socialMedia || []);
+            for (const s of ws) { if (!ex.has(s)) { if (!result.socialMedia) result.socialMedia = []; result.socialMedia.push(s); ex.add(s); } }
+          }
+        } catch {}
+      }
     } else {
       const title = $("title").text().trim();
       const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();

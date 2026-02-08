@@ -214,14 +214,50 @@ export default function AddLeadPage() {
     setNameSearchLoading(false);
   }, [form]);
 
-  const selectSearchResult = useCallback((result: BusinessSearchResult) => {
+  const selectSearchResult = useCallback(async (result: BusinessSearchResult) => {
     form.setValue("companyName", result.name);
     if (result.url) form.setValue("websiteUrl", result.url);
     if (result.phone && !form.getValues("contactPhone")) form.setValue("contactPhone", result.phone);
     if (result.address && !form.getValues("location")) form.setValue("location", result.address);
     setShowNameResults(false);
     setNameSearchResults([]);
-    toast({ title: `Selected: ${result.name}` });
+
+    if (result.url) {
+      setUrlLookupLoading(true);
+      setUrlLookupResult(null);
+      toast({ title: `Selected: ${result.name} — scraping for details...` });
+      try {
+        const res = await apiRequest("POST", "/api/lookup-url", { url: result.url });
+        const data: UrlLookupResult = await res.json();
+        setUrlLookupResult(data);
+
+        if (data.companyName && data.companyName.length > result.name.length) {
+          form.setValue("companyName", data.companyName);
+        }
+        if (data.websiteUrl) form.setValue("websiteUrl", data.websiteUrl);
+        if (data.contactEmail && !form.getValues("contactEmail")) form.setValue("contactEmail", data.contactEmail);
+        if (data.contactPhone && !form.getValues("contactPhone")) form.setValue("contactPhone", data.contactPhone);
+        if (data.location && !form.getValues("location")) form.setValue("location", data.location);
+
+        const fieldsFound = [
+          data.contactEmail && "email",
+          data.contactPhone && "phone",
+          data.location && "location",
+          data.description && "description",
+        ].filter(Boolean);
+
+        if (fieldsFound.length > 0) {
+          toast({ title: `Scraped: found ${fieldsFound.join(", ")}` });
+        } else {
+          toast({ title: `Selected: ${result.name}` });
+        }
+      } catch {
+        toast({ title: `Selected: ${result.name}` });
+      }
+      setUrlLookupLoading(false);
+    } else {
+      toast({ title: `Selected: ${result.name}` });
+    }
   }, [form, toast]);
 
   const createMutation = useMutation({
