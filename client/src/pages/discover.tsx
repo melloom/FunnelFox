@@ -565,56 +565,60 @@ export default function DiscoverPage() {
       )}
 
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-        <DialogContent className="sm:max-w-lg max-sm:text-sm">
+        <DialogContent className="sm:max-w-lg max-sm:p-3 max-sm:pt-3">
           {selectedLead && (() => {
             const lead = selectedLead;
             const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
             const discoverScreenshotUrl = lead.screenshotUrl || (!noWebsite ? `https://image.thum.io/get/width/1280/crop/800/noanimate/${lead.websiteUrl!.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}` : null);
             return (
               <>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2 flex-wrap">
-                    <Building2 className="w-5 h-5 text-primary shrink-0" />
-                    <span className="break-words min-w-0">{lead.companyName}</span>
-                  </DialogTitle>
-                  <DialogDescription className="max-sm:text-xs">Newly discovered lead</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 sm:space-y-4 mt-1 sm:mt-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className="bg-chart-1/15 text-chart-1 border-0 text-xs">New Lead</Badge>
-                    <ScoreBadge score={lead.websiteScore} />
-                    {noWebsite && <Badge variant="secondary" className="text-xs">No website</Badge>}
+                <DialogHeader className="pr-8">
+                  <div className="flex items-start gap-2">
+                    <Building2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <DialogTitle className="text-base sm:text-lg break-words leading-tight">
+                        {lead.companyName}
+                      </DialogTitle>
+                      <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                        <Badge variant="outline" className="bg-chart-1/15 text-chart-1 border-0 text-[10px] sm:text-xs">New Lead</Badge>
+                        <ScoreBadge score={lead.websiteScore} />
+                        {noWebsite && <Badge variant="secondary" className="text-[10px] sm:text-xs">No website</Badge>}
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2.5">
+                  <DialogDescription className="sr-only">Lead details</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2.5 sm:space-y-4 mt-1">
+                  <div className="space-y-1.5 sm:space-y-2.5">
                     {!noWebsite && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground shrink-0" />
                         <a href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 truncate" data-testid="link-discover-lead-website">{lead.websiteUrl}</a>
                       </div>
                     )}
                     {lead.contactEmail && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground shrink-0" />
                         <a href={`mailto:${lead.contactEmail}`} className="text-primary underline underline-offset-2 truncate">{lead.contactEmail}</a>
                       </div>
                     )}
                     {lead.contactPhone && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground shrink-0" />
                         <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2">{lead.contactPhone}</a>
                       </div>
                     )}
                     {lead.location && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground shrink-0" />
                         <span>{lead.location}</span>
                       </div>
                     )}
                   </div>
                   {lead.websiteIssues && lead.websiteIssues.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Website Issues</p>
-                      <div className="flex flex-wrap gap-1.5">
+                      <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1.5">Website Issues</p>
+                      <div className="flex flex-wrap gap-1">
                         {lead.websiteIssues.map((issue, i) => (
                           <Badge key={i} variant="secondary" className="text-[10px]">{issue}</Badge>
                         ))}
@@ -623,11 +627,11 @@ export default function DiscoverPage() {
                   )}
                   {!noWebsite && discoverScreenshotUrl && (
                     <div data-testid="section-discover-screenshot">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Camera className="w-3.5 h-3.5 text-muted-foreground" />
-                        <p className="text-xs font-medium text-muted-foreground">Website Screenshot</p>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Camera className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground" />
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground">Website Screenshot</p>
                       </div>
-                      <div className="rounded-md border overflow-hidden">
+                      <div className="rounded-md border overflow-hidden max-h-40 sm:max-h-none">
                         <img
                           src={discoverScreenshotUrl}
                           alt={`Screenshot of ${lead.companyName}`}

@@ -2769,3 +2769,237 @@ function cleanBusinessName(title: string): string {
 
   return name.slice(0, 80);
 }
+
+export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
+  companyName?: string;
+  websiteUrl?: string;
+  location?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  socialMedia?: string[];
+  description?: string;
+}> {
+  let fullUrl = inputUrl.trim();
+  if (!fullUrl.startsWith("http")) {
+    fullUrl = `https://${fullUrl}`;
+  }
+
+  const result: {
+    companyName?: string;
+    websiteUrl?: string;
+    location?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    socialMedia?: string[];
+    description?: string;
+  } = {};
+
+  const socialDetected = detectSocialMediaUrl(fullUrl);
+  if (socialDetected) {
+    result.socialMedia = [socialDetected];
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const response = await fetch(fullUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getRandomUA(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return result;
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    const parsedUrl = new URL(fullUrl);
+    const host = parsedUrl.hostname.replace(/^www\./, "").replace(/^m\./, "");
+    const isSocialMedia = Object.keys(SOCIAL_MEDIA_DOMAINS).some(
+      (d) => host === d || host.endsWith(`.${d}`)
+    );
+
+    if (isSocialMedia) {
+      const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
+      const twitterTitle = $('meta[name="twitter:title"]').attr("content")?.trim();
+      const pageTitle = $("title").text().trim();
+      let name = ogTitle || twitterTitle || pageTitle || "";
+      name = name
+        .replace(/\s*[-|]\s*(Facebook|Instagram|Twitter|X|LinkedIn|TikTok|YouTube|Pinterest).*$/i, "")
+        .replace(/\s*on\s+(Facebook|Instagram|Twitter|X|LinkedIn)$/i, "")
+        .trim();
+      if (name && name.length > 1 && name.length < 80) {
+        result.companyName = name;
+      }
+
+      const ogDesc = $('meta[property="og:description"]').attr("content")?.trim();
+      if (ogDesc) result.description = ogDesc.slice(0, 300);
+
+      const bodyText = $("body").text();
+      const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+      const emailMatches = bodyText.match(emailRegex) || [];
+      for (const email of emailMatches) {
+        const lo = email.toLowerCase();
+        if (lo.endsWith(".png") || lo.endsWith(".jpg") || lo.includes("example.com") || lo.includes("facebook.com")) continue;
+        result.contactEmail = email;
+        break;
+      }
+
+      const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+      const phoneMatches = bodyText.match(phoneRegex) || [];
+      if (phoneMatches.length > 0) result.contactPhone = phoneMatches[0];
+
+      const websiteLink = $('a[href]').filter((_i, el) => {
+        const href = $(el).attr("href") || "";
+        const text = $(el).text().toLowerCase();
+        return (text.includes("website") || text.includes("visit") || text.includes("site")) &&
+          href.startsWith("http") && !detectSocialMediaUrl(href);
+      }).first().attr("href");
+      if (websiteLink) result.websiteUrl = websiteLink;
+
+      const locationPatterns = [
+        /(?:located|based)\s+(?:in|at)\s+([^.!?<]+)/i,
+        /(\d+\s+[A-Z][a-z]+\s+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl)\b[^,]*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?,?\s*[A-Z]{2}\s*\d{5})/,
+      ];
+      for (const pattern of locationPatterns) {
+        const match = bodyText.match(pattern);
+        if (match && match[1]) {
+          result.location = match[1].trim().slice(0, 100);
+          break;
+        }
+      }
+
+      const moreSocials = extractSocialLinksFromHtml(html, $);
+      if (moreSocials.length > 0) {
+        const existing = new Set(result.socialMedia || []);
+        for (const s of moreSocials) {
+          if (!existing.has(s)) {
+            if (!result.socialMedia) result.socialMedia = [];
+            result.socialMedia.push(s);
+            existing.add(s);
+          }
+        }
+      }
+    } else {
+      const title = $("title").text().trim();
+      const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
+      let name = ogTitle || title || "";
+      name = name.replace(/\s*[-|].{0,50}$/, "").trim();
+      if (name && name.length > 1 && name.length < 80) {
+        result.companyName = name;
+      }
+      result.websiteUrl = parsedUrl.origin;
+
+      const contactInfo = extractContactInfo(html, $, fullUrl);
+      if (contactInfo.emails?.length) result.contactEmail = contactInfo.emails[0];
+      if (contactInfo.phones?.length) result.contactPhone = contactInfo.phones[0];
+
+      const socials = extractSocialLinksFromHtml(html, $);
+      if (socials.length > 0) {
+        result.socialMedia = [...(result.socialMedia || []), ...socials];
+      }
+
+      const ogDesc = $('meta[property="og:description"]').attr("content")?.trim();
+      const metaDesc = $('meta[name="description"]').attr("content")?.trim();
+      if (ogDesc) result.description = ogDesc.slice(0, 300);
+      else if (metaDesc) result.description = metaDesc.slice(0, 300);
+
+      const addrSchema = $('script[type="application/ld+json"]').toArray();
+      for (const script of addrSchema) {
+        try {
+          const json = JSON.parse($(script).text());
+          const addr = json.address || json?.["@graph"]?.[0]?.address;
+          if (addr) {
+            const parts = [addr.streetAddress, addr.addressLocality, addr.addressRegion, addr.postalCode].filter(Boolean);
+            if (parts.length > 0) {
+              result.location = parts.join(", ").slice(0, 100);
+              break;
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.error("[scrapeUrlForBusinessInfo] Error:", err);
+  }
+
+  return result;
+}
+
+export async function searchBusinessesByName(
+  name: string,
+  location?: string
+): Promise<Array<{
+  name: string;
+  url?: string;
+  phone?: string;
+  address?: string;
+  source: string;
+}>> {
+  const results: Array<{
+    name: string;
+    url?: string;
+    phone?: string;
+    address?: string;
+    source: string;
+  }> = [];
+  const seen = new Set<string>();
+
+  const addResult = (r: typeof results[0]) => {
+    const key = r.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (seen.has(key)) return;
+    seen.add(key);
+    results.push(r);
+  };
+
+  const query = location ? `${name} ${location}` : name;
+
+  try {
+    const encodedQuery = encodeURIComponent(`${query} business`);
+    const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(ddgUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getRandomUA(),
+        Accept: "text/html,application/xhtml+xml",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      $(".result").each((_i, el) => {
+        if (results.length >= 8) return;
+        const title = $(el).find(".result__title").text().trim();
+        const href = $(el).find(".result__url").text().trim();
+        const snippet = $(el).find(".result__snippet").text().trim();
+        if (!title) return;
+
+        const phoneMatch = snippet.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+        const addressMatch = snippet.match(/(\d+\s+[A-Z][a-z]+[\w\s]+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl)\b[^,]*(?:,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?))/);
+
+        let cleanName = title.replace(/\s*[-|].{0,40}$/, "").trim();
+        if (cleanName.length > 60) cleanName = cleanName.slice(0, 60);
+
+        addResult({
+          name: cleanName,
+          url: href || undefined,
+          phone: phoneMatch?.[0],
+          address: addressMatch?.[1]?.trim(),
+          source: "web",
+        });
+      });
+    }
+  } catch (err) {
+    console.error("[searchBusinessesByName] DuckDuckGo error:", err);
+  }
+
+  return results;
+}

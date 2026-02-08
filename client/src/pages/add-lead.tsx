@@ -25,10 +25,23 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { Plus, Loader2, Sparkles, AlertTriangle, ChevronDown, ChevronUp, Building2 } from "lucide-react";
+import {
+  Loader2,
+  Sparkles,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Building2,
+  Link as LinkIcon,
+  Search,
+  Globe,
+  Phone,
+  MapPin,
+  CheckCircle2,
+} from "lucide-react";
 import { insertLeadSchema } from "@shared/schema";
 import type { Lead } from "@shared/schema";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 
 const formSchema = insertLeadSchema.pick({
   companyName: true,
@@ -45,6 +58,24 @@ const formSchema = insertLeadSchema.pick({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+interface UrlLookupResult {
+  companyName?: string;
+  websiteUrl?: string;
+  location?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  socialMedia?: string[];
+  description?: string;
+}
+
+interface BusinessSearchResult {
+  name: string;
+  url?: string;
+  phone?: string;
+  address?: string;
+  source: string;
+}
 
 function normalizeForCompare(str: string): string {
   return str
@@ -75,11 +106,23 @@ function findDuplicates(name: string, website: string, leads: Lead[]): Lead[] {
   });
 }
 
+function looksLikeUrl(str: string): boolean {
+  if (!str) return false;
+  const trimmed = str.trim();
+  return /^(https?:\/\/|www\.|[a-z0-9-]+\.(com|org|net|io|co|biz|info|me|us|uk|ca|facebook|instagram|yelp|bbb))/.test(trimmed.toLowerCase());
+}
+
 export default function AddLeadPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showMore, setShowMore] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [urlLookupLoading, setUrlLookupLoading] = useState(false);
+  const [urlLookupResult, setUrlLookupResult] = useState<UrlLookupResult | null>(null);
+  const [nameSearchLoading, setNameSearchLoading] = useState(false);
+  const [nameSearchResults, setNameSearchResults] = useState<BusinessSearchResult[]>([]);
+  const [showNameResults, setShowNameResults] = useState(false);
+  const nameSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: existingLeads = [] } = useQuery<Lead[]>({
     queryKey: ["/api/leads"],
@@ -106,6 +149,80 @@ export default function AddLeadPage() {
     () => findDuplicates(watchedName || "", watchedUrl || "", existingLeads),
     [watchedName, watchedUrl, existingLeads]
   );
+
+  const handleUrlLookup = useCallback(async () => {
+    const url = form.getValues("websiteUrl")?.trim();
+    if (!url) return;
+    setUrlLookupLoading(true);
+    setUrlLookupResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/lookup-url", { url });
+      const data: UrlLookupResult = await res.json();
+      setUrlLookupResult(data);
+
+      if (data.companyName && !form.getValues("companyName")) {
+        form.setValue("companyName", data.companyName);
+      }
+      if (data.websiteUrl && data.websiteUrl !== url) {
+        form.setValue("websiteUrl", data.websiteUrl);
+      }
+      if (data.contactEmail && !form.getValues("contactEmail")) {
+        form.setValue("contactEmail", data.contactEmail);
+      }
+      if (data.contactPhone && !form.getValues("contactPhone")) {
+        form.setValue("contactPhone", data.contactPhone);
+      }
+      if (data.location && !form.getValues("location")) {
+        form.setValue("location", data.location);
+      }
+
+      const fieldsFound = [
+        data.companyName && "company name",
+        data.contactEmail && "email",
+        data.contactPhone && "phone",
+        data.location && "location",
+        data.websiteUrl && "website",
+      ].filter(Boolean);
+
+      if (fieldsFound.length > 0) {
+        toast({ title: `Found: ${fieldsFound.join(", ")}` });
+      } else {
+        toast({ title: "No info found from that URL", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to look up URL", variant: "destructive" });
+    }
+    setUrlLookupLoading(false);
+  }, [form, toast]);
+
+  const handleNameSearch = useCallback(async (searchName: string) => {
+    if (!searchName || searchName.length < 3) {
+      setNameSearchResults([]);
+      setShowNameResults(false);
+      return;
+    }
+    setNameSearchLoading(true);
+    try {
+      const loc = form.getValues("location") || "";
+      const res = await apiRequest("POST", "/api/search-business", { name: searchName, location: loc });
+      const data: BusinessSearchResult[] = await res.json();
+      setNameSearchResults(data);
+      setShowNameResults(data.length > 0);
+    } catch {
+      setNameSearchResults([]);
+    }
+    setNameSearchLoading(false);
+  }, [form]);
+
+  const selectSearchResult = useCallback((result: BusinessSearchResult) => {
+    form.setValue("companyName", result.name);
+    if (result.url) form.setValue("websiteUrl", result.url);
+    if (result.phone && !form.getValues("contactPhone")) form.setValue("contactPhone", result.phone);
+    if (result.address && !form.getValues("location")) form.setValue("location", result.address);
+    setShowNameResults(false);
+    setNameSearchResults([]);
+    toast({ title: `Selected: ${result.name}` });
+  }, [form, toast]);
 
   const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -151,7 +268,7 @@ export default function AddLeadPage() {
       <div className="mb-5 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-add-lead-title">Add Lead</h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          Add a company and we'll automatically scrape their website for details
+          Paste a URL or enter a company name — we'll find the details
         </p>
       </div>
 
@@ -161,45 +278,159 @@ export default function AddLeadPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="companyName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company Name *</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g. Joe's Pizza"
-                        autoComplete="organization"
-                        {...field}
-                        data-testid="input-company-name"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="websiteUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Website URL</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="www.example.com (optional)"
-                        autoComplete="url"
-                        inputMode="url"
-                        {...field}
-                        data-testid="input-website-url"
-                      />
-                    </FormControl>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <LinkIcon className="w-3.5 h-3.5" />
+                      Paste a URL
+                    </FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input
+                          placeholder="facebook.com/joes-pizza or www.joespizza.com"
+                          autoComplete="url"
+                          inputMode="url"
+                          {...field}
+                          data-testid="input-website-url"
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleUrlLookup}
+                        disabled={urlLookupLoading || !field.value?.trim()}
+                        data-testid="button-lookup-url"
+                      >
+                        {urlLookupLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Search className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Leave blank if they don't have one — that's a great lead
+                      Works with Facebook pages, Yelp listings, any business URL — we'll scrape it for info
                     </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {urlLookupResult && Object.keys(urlLookupResult).length > 0 && (
+                <div className="flex items-start gap-2 p-2.5 rounded-md bg-chart-2/10 border border-chart-2/20" data-testid="url-lookup-result">
+                  <CheckCircle2 className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1 text-xs space-y-0.5">
+                    <p className="font-medium text-chart-2">Info extracted from URL</p>
+                    {urlLookupResult.companyName && <p>Name: <strong>{urlLookupResult.companyName}</strong></p>}
+                    {urlLookupResult.contactEmail && <p>Email: {urlLookupResult.contactEmail}</p>}
+                    {urlLookupResult.contactPhone && <p>Phone: {urlLookupResult.contactPhone}</p>}
+                    {urlLookupResult.location && <p>Location: {urlLookupResult.location}</p>}
+                    {urlLookupResult.description && (
+                      <p className="text-muted-foreground line-clamp-2">{urlLookupResult.description}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="relative">
+                <FormField
+                  control={form.control}
+                  name="companyName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Name *</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input
+                            placeholder="e.g. Joe's Pizza"
+                            autoComplete="organization"
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              if (nameSearchTimeout.current) clearTimeout(nameSearchTimeout.current);
+                            }}
+                            data-testid="input-company-name"
+                          />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleNameSearch(form.getValues("companyName"))}
+                          disabled={nameSearchLoading || !form.getValues("companyName")?.trim()}
+                          data-testid="button-search-name"
+                        >
+                          {nameSearchLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Globe className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Not sure? Hit the search icon to find matching businesses online
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {showNameResults && nameSearchResults.length > 0 && (
+                  <div className="mt-1.5 border rounded-md bg-background shadow-md max-h-52 overflow-y-auto" data-testid="name-search-results">
+                    <div className="p-2 border-b bg-muted/30">
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {nameSearchResults.length} result{nameSearchResults.length !== 1 ? "s" : ""} found — tap to select
+                      </p>
+                    </div>
+                    {nameSearchResults.map((result, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="w-full text-left p-2.5 border-b last:border-b-0 hover-elevate cursor-pointer bg-transparent"
+                        onClick={() => selectSearchResult(result)}
+                        data-testid={`button-search-result-${i}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{result.name}</p>
+                            <div className="flex items-center gap-3 flex-wrap mt-0.5">
+                              {result.url && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 truncate max-w-[180px]">
+                                  <Globe className="w-2.5 h-2.5 shrink-0" />
+                                  {result.url}
+                                </span>
+                              )}
+                              {result.phone && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Phone className="w-2.5 h-2.5 shrink-0" />
+                                  {result.phone}
+                                </span>
+                              )}
+                              {result.address && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 truncate max-w-[180px]">
+                                  <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                  {result.address}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="w-full text-center p-2 text-xs text-muted-foreground bg-transparent cursor-pointer"
+                      onClick={() => setShowNameResults(false)}
+                      data-testid="button-dismiss-search-results"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {duplicates.length > 0 && (
                 <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20" data-testid="duplicate-warning">
