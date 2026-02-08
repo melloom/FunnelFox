@@ -529,8 +529,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/gmail/status", isAuthenticated, async (_req, res) => {
+  app.get("/api/gmail/status", isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).session?.userId;
+      const user = userId ? await storage.getUser(userId) : null;
+      if (!user?.isAdmin) {
+        return res.json({ connected: false, email: null });
+      }
       const connected = await isGmailConnected();
       const email = connected ? await getGmailAddress() : null;
       res.json({ connected, email });
@@ -548,8 +553,13 @@ export async function registerRoutes(
 
   app.post("/api/gmail/send", isAuthenticated, async (req, res) => {
     try {
+      const userId = (req as any).session?.userId;
+      const user = userId ? await storage.getUser(userId) : null;
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Gmail sending is only available through the admin's connected account. Use 'Open in Email App' to send from your own email." });
+      }
       const data = sendEmailSchema.parse(req.body);
-      const senderName = "Melvin Peralta";
+      const senderName = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || "FunnelFox";
       const result = await sendEmail(data.to, data.subject, data.body, senderName);
 
       if (data.leadId) {

@@ -219,7 +219,7 @@ export function EmailTemplateDialog({
           <DialogDescription>
             {gmailConnected
               ? `Sending from ${gmailStatus?.email || "your Gmail"}`
-              : "Choose a template, customize it, then send or copy"}
+              : "Choose a template, customize it, then open in your email app or copy"}
           </DialogDescription>
         </DialogHeader>
 
