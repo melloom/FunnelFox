@@ -12,6 +12,19 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { sendEmail, isGmailConnected, getGmailAddress } from "./gmail";
 import { registerStripeRoutes, checkDiscoveryLimit, incrementDiscoveryUsage, checkLeadLimit } from "./stripe-routes";
 
+function escapeHtmlForEmail(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function buildOutreachHtml(body: string, fromName?: string): string {
+  const paragraphs = body.split('\n').map(line => {
+    if (!line.trim()) return '';
+    return `<p style="margin:0 0 12px 0;line-height:1.6;color:#374151;font-size:15px;">${escapeHtmlForEmail(line)}</p>`;
+  }).join('\n');
+  const sig = fromName ? `<p style="margin:24px 0 0;color:#6B7280;font-size:14px;">Best regards,<br/><strong style="color:#374151;">${escapeHtmlForEmail(fromName)}</strong></p>` : '';
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f9fafb;"><div style="max-width:600px;margin:0 auto;padding:32px 24px;">${paragraphs}${sig}</div></body></html>`;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -533,14 +546,128 @@ export async function registerRoutes(
     try {
       const userId = (req as any).session?.userId;
       const user = userId ? await storage.getUser(userId) : null;
-      if (!user?.isAdmin) {
-        return res.json({ connected: false, email: null });
+      if (!user) return res.json({ connected: false, email: null, method: null });
+
+      if (user.smtpHost && user.smtpUser) {
+        return res.json({
+          connected: true,
+          email: user.smtpFromEmail || user.smtpUser,
+          method: "smtp",
+        });
       }
-      const connected = await isGmailConnected();
-      const email = connected ? await getGmailAddress() : null;
-      res.json({ connected, email });
+
+      if (user.isAdmin) {
+        const connected = await isGmailConnected();
+        const email = connected ? await getGmailAddress() : null;
+        return res.json({ connected, email, method: connected ? "gmail" : null });
+      }
+
+      res.json({ connected: false, email: null, method: null });
     } catch (err) {
-      res.json({ connected: false, email: null });
+      res.json({ connected: false, email: null, method: null });
+    }
+  });
+
+  app.get("/api/email-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      const user = userId ? await storage.getUser(userId) : null;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+      res.json({
+        smtpHost: user.smtpHost || "",
+        smtpPort: user.smtpPort || 587,
+        smtpUser: user.smtpUser || "",
+        smtpPass: user.smtpPass ? "••••••••" : "",
+        smtpFromName: user.smtpFromName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        smtpFromEmail: user.smtpFromEmail || "",
+        smtpSecure: user.smtpSecure ?? true,
+        hasPassword: !!user.smtpPass,
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to get email settings" });
+    }
+  });
+
+  const smtpSettingsSchema = z.object({
+    smtpHost: z.string().min(1, "SMTP host is required"),
+    smtpPort: z.number().min(1).max(65535),
+    smtpUser: z.string().min(1, "SMTP username is required"),
+    smtpPass: z.string().optional(),
+    smtpFromName: z.string().optional(),
+    smtpFromEmail: z.string().email("Invalid from email"),
+    smtpSecure: z.boolean().optional(),
+  });
+
+  app.post("/api/email-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const data = smtpSettingsSchema.parse(req.body);
+      const updateData: Record<string, any> = {
+        smtpHost: data.smtpHost,
+        smtpPort: data.smtpPort,
+        smtpUser: data.smtpUser,
+        smtpFromName: data.smtpFromName || "",
+        smtpFromEmail: data.smtpFromEmail,
+        smtpSecure: data.smtpSecure ?? true,
+      };
+      if (data.smtpPass && data.smtpPass !== "••••••••") {
+        updateData.smtpPass = data.smtpPass;
+      }
+      await db.update(usersTable).set(updateData).where(eq(usersTable.id, userId));
+      res.json({ success: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: err.errors[0].message });
+      }
+      res.status(500).json({ error: "Failed to save email settings" });
+    }
+  });
+
+  app.delete("/api/email-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      await db.update(usersTable).set({
+        smtpHost: null,
+        smtpPort: null,
+        smtpUser: null,
+        smtpPass: null,
+        smtpFromName: null,
+        smtpFromEmail: null,
+        smtpSecure: true,
+      }).where(eq(usersTable.id, userId));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to disconnect email" });
+    }
+  });
+
+  app.post("/api/email-settings/test", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      const user = userId ? await storage.getUser(userId) : null;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      const settings = smtpSettingsSchema.parse(req.body);
+      const password = (settings.smtpPass && settings.smtpPass !== "••••••••") ? settings.smtpPass : user.smtpPass;
+      if (!password) return res.status(400).json({ error: "SMTP password is required" });
+
+      const nodemailer = await import("nodemailer");
+      const transporter = nodemailer.default.createTransport({
+        host: settings.smtpHost,
+        port: settings.smtpPort,
+        secure: settings.smtpSecure ?? (settings.smtpPort === 465),
+        auth: { user: settings.smtpUser, pass: password },
+        connectionTimeout: 10000,
+        socketTimeout: 10000,
+      });
+
+      await transporter.verify();
+      res.json({ success: true, message: "Connection successful" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Connection failed";
+      res.status(400).json({ error: `Connection failed: ${message}` });
     }
   });
 
@@ -555,22 +682,53 @@ export async function registerRoutes(
     try {
       const userId = (req as any).session?.userId;
       const user = userId ? await storage.getUser(userId) : null;
-      if (!user?.isAdmin) {
-        return res.status(403).json({ error: "Gmail sending is only available through the admin's connected account. Use 'Open in Email App' to send from your own email." });
-      }
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
       const data = sendEmailSchema.parse(req.body);
-      const senderName = user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || "FunnelFox";
-      const result = await sendEmail(data.to, data.subject, data.body, senderName);
+      const senderName = user.smtpFromName || (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || "FunnelFox");
 
-      if (data.leadId) {
-        await storage.createActivity({
-          leadId: data.leadId,
-          action: "email_sent",
-          details: `Email sent to ${data.to}: "${data.subject}"`,
+      if (user.smtpHost && user.smtpUser && user.smtpPass) {
+        const nodemailer = await import("nodemailer");
+        const transporter = nodemailer.default.createTransport({
+          host: user.smtpHost,
+          port: user.smtpPort || 587,
+          secure: user.smtpSecure ?? (user.smtpPort === 465),
+          auth: { user: user.smtpUser, pass: user.smtpPass },
         });
+
+        const fromEmail = user.smtpFromEmail || user.smtpUser;
+        const info = await transporter.sendMail({
+          from: `"${senderName}" <${fromEmail}>`,
+          to: data.to,
+          subject: data.subject,
+          text: data.body,
+          html: buildOutreachHtml(data.body, senderName),
+        });
+
+        if (data.leadId) {
+          await storage.createActivity({
+            leadId: data.leadId,
+            action: "email_sent",
+            details: `Email sent to ${data.to}: "${data.subject}"`,
+          });
+        }
+
+        return res.json({ success: true, messageId: info.messageId });
       }
 
-      res.json({ success: true, messageId: result.messageId });
+      if (user.isAdmin) {
+        const result = await sendEmail(data.to, data.subject, data.body, senderName);
+        if (data.leadId) {
+          await storage.createActivity({
+            leadId: data.leadId,
+            action: "email_sent",
+            details: `Email sent to ${data.to}: "${data.subject}"`,
+          });
+        }
+        return res.json({ success: true, messageId: result.messageId });
+      }
+
+      return res.status(403).json({ error: "No email provider connected. Go to Account Settings to connect your email." });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: err.errors[0].message });

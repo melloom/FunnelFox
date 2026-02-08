@@ -31,6 +31,13 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").default(false),
   emailVerificationToken: varchar("email_verification_token"),
   emailVerificationExpiry: timestamp("email_verification_expiry"),
+  smtpHost: varchar("smtp_host"),
+  smtpPort: integer("smtp_port"),
+  smtpUser: varchar("smtp_user"),
+  smtpPass: varchar("smtp_pass"),
+  smtpFromName: varchar("smtp_from_name"),
+  smtpFromEmail: varchar("smtp_from_email"),
+  smtpSecure: boolean("smtp_secure").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -51,6 +58,13 @@ export const insertUserSchema = createInsertSchema(users).omit({
   emailVerified: true,
   emailVerificationToken: true,
   emailVerificationExpiry: true,
+  smtpHost: true,
+  smtpPort: true,
+  smtpUser: true,
+  smtpPass: true,
+  smtpFromName: true,
+  smtpFromEmail: true,
+  smtpSecure: true,
 });
 
 export const loginSchema = z.object({

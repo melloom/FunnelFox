@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -37,8 +37,15 @@ import {
   BarChart3,
   Lock,
   ArrowRight,
+  ArrowLeft,
   CheckCircle,
   ExternalLink,
+  Loader2,
+  Send,
+  Unplug,
+  Server,
+  Settings,
+  Info,
 } from "lucide-react";
 
 interface SubscriptionInfo {
@@ -52,6 +59,41 @@ interface SubscriptionInfo {
   leadLimit?: number;
 }
 
+interface EmailSettings {
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFromName: string;
+  smtpFromEmail: string;
+  smtpSecure: boolean;
+  hasPassword: boolean;
+}
+
+interface EmailPreset {
+  id: string;
+  label: string;
+  host: string;
+  port: number;
+  secure: boolean;
+  helpText: string;
+  category: "personal" | "business";
+}
+
+const EMAIL_PRESETS: EmailPreset[] = [
+  { id: "gmail", label: "Gmail", host: "smtp.gmail.com", port: 587, secure: false, category: "personal", helpText: "Use an App Password: Google Account > Security > 2-Step Verification > App Passwords" },
+  { id: "outlook", label: "Outlook", host: "smtp.office365.com", port: 587, secure: false, category: "personal", helpText: "Use your regular Outlook password. Enable POP/IMAP in Outlook settings if needed." },
+  { id: "yahoo", label: "Yahoo", host: "smtp.mail.yahoo.com", port: 465, secure: true, category: "personal", helpText: "Generate an App Password: Yahoo Account > Security > Generate App Password" },
+  { id: "zoho", label: "Zoho", host: "smtp.zoho.com", port: 465, secure: true, category: "personal", helpText: "Use your Zoho password. Enable IMAP access in Zoho Mail settings." },
+  { id: "hostinger", label: "Hostinger", host: "smtp.hostinger.com", port: 465, secure: true, category: "business", helpText: "Use your Hostinger email password. Find settings in hPanel > Emails." },
+  { id: "godaddy", label: "GoDaddy", host: "smtpout.secureserver.net", port: 465, secure: true, category: "business", helpText: "Use your GoDaddy Workspace email password." },
+  { id: "namecheap", label: "Namecheap", host: "mail.privateemail.com", port: 465, secure: true, category: "business", helpText: "Use your Private Email password from Namecheap." },
+  { id: "bluehost", label: "Bluehost", host: "mail.your-domain.com", port: 465, secure: true, category: "business", helpText: "Replace 'your-domain.com' with your actual domain. Use your email password." },
+  { id: "siteground", label: "SiteGround", host: "mail.your-domain.com", port: 465, secure: true, category: "business", helpText: "Replace 'your-domain.com' with your actual domain. Find settings in Site Tools > Email." },
+  { id: "ionos", label: "IONOS (1&1)", host: "smtp.ionos.com", port: 465, secure: true, category: "business", helpText: "Use your IONOS email password." },
+  { id: "other", label: "Other", host: "", port: 587, secure: false, category: "business", helpText: "Check your hosting provider's documentation for the mail server, port, and password." },
+];
+
 export default function AccountPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -63,14 +105,47 @@ export default function AccountPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showEmailSetup, setShowEmailSetup] = useState(false);
+  const [emailSetupStep, setEmailSetupStep] = useState<"pick" | "credentials">("pick");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPass, setSmtpPass] = useState("");
+  const [smtpFromName, setSmtpFromName] = useState("");
+  const [smtpFromEmail, setSmtpFromEmail] = useState("");
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [emailSettingsLoaded, setEmailSettingsLoaded] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [showAdvancedEmail, setShowAdvancedEmail] = useState(false);
 
   const { data: subscription, isLoading: subLoading } = useQuery<SubscriptionInfo>({
     queryKey: ["/api/subscription"],
   });
 
-  const { data: gmailStatus } = useQuery<{ connected: boolean; email?: string }>({
+  const { data: gmailStatus } = useQuery<{ connected: boolean; email?: string; method?: string }>({
     queryKey: ["/api/gmail/status"],
   });
+
+  const { data: emailSettings } = useQuery<EmailSettings>({
+    queryKey: ["/api/email-settings"],
+  });
+
+  useEffect(() => {
+    if (emailSettings && !emailSettingsLoaded) {
+      setSmtpHost(emailSettings.smtpHost);
+      setSmtpPort(emailSettings.smtpPort);
+      setSmtpUser(emailSettings.smtpUser);
+      setSmtpPass(emailSettings.smtpPass);
+      setSmtpFromName(emailSettings.smtpFromName);
+      setSmtpFromEmail(emailSettings.smtpFromEmail);
+      setSmtpSecure(emailSettings.smtpSecure);
+      setEmailSettingsLoaded(true);
+      const match = EMAIL_PRESETS.find(p => p.host === emailSettings.smtpHost && p.id !== "other");
+      setSelectedPreset(match ? match.id : emailSettings.smtpHost ? "other" : null);
+    }
+  }, [emailSettings, emailSettingsLoaded]);
 
   const changePasswordMutation = useMutation({
     mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
@@ -258,7 +333,7 @@ export default function AccountPage() {
             Preferences
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Appearance</p>
@@ -269,26 +344,347 @@ export default function AccountPage() {
               {theme === "light" ? "Dark Mode" : "Light Mode"}
             </Button>
           </div>
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between">
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-4 h-4" />
+            Email Provider
+          </CardTitle>
+          {gmailStatus?.connected ? (
+            <Badge variant="secondary">
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Connected
+            </Badge>
+          ) : (
+            <Badge variant="outline">Not connected</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {gmailStatus?.connected && (
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <p className="text-sm font-medium">Gmail Integration</p>
+                <p className="text-sm font-medium">Sending as</p>
                 <p className="text-xs text-muted-foreground">
-                  {gmailStatus?.connected
-                    ? `Connected as ${gmailStatus.email || "your account"}`
-                    : "Connect Gmail to send emails from the app"}
+                  {gmailStatus.email} via {gmailStatus.method === "smtp" ? (EMAIL_PRESETS.find(p => p.id === selectedPreset)?.label || "Email Provider") : "Gmail API"}
                 </p>
               </div>
-              {gmailStatus?.connected ? (
-                <Badge variant="secondary">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge variant="outline">Not connected</Badge>
+              {gmailStatus.method === "smtp" && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowEmailSetup(true);
+                      setEmailSetupStep("credentials");
+                    }}
+                    data-testid="button-edit-email"
+                  >
+                    <Settings className="w-3.5 h-3.5 mr-1.5" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await apiRequest("DELETE", "/api/email-settings");
+                        queryClient.invalidateQueries({ queryKey: ["/api/gmail/status"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/email-settings"] });
+                        setEmailSettingsLoaded(false);
+                        setSmtpHost(""); setSmtpPort(587); setSmtpUser(""); setSmtpPass("");
+                        setSmtpFromName(""); setSmtpFromEmail(""); setSmtpSecure(false);
+                        setSelectedPreset(null);
+                        setShowEmailSetup(false);
+                        toast({ title: "Email disconnected" });
+                      } catch {
+                        toast({ title: "Failed to disconnect", variant: "destructive" });
+                      }
+                    }}
+                    data-testid="button-disconnect-email"
+                  >
+                    <Unplug className="w-3.5 h-3.5 mr-1.5" />
+                    Disconnect
+                  </Button>
+                </div>
               )}
             </div>
-          </div>
+          )}
+
+          {!gmailStatus?.connected && !showEmailSetup && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Connect your email to send outreach directly from FunnelFox. Works with Gmail, Outlook, Yahoo, or business email from any hosting provider.
+              </p>
+              <Button variant="outline" onClick={() => { setShowEmailSetup(true); setEmailSetupStep("pick"); }} data-testid="button-setup-email">
+                <Mail className="w-4 h-4 mr-1.5" />
+                Connect Your Email
+              </Button>
+            </div>
+          )}
+
+          {showEmailSetup && emailSetupStep === "pick" && (
+            <div className="space-y-4 border-t pt-4">
+              <div>
+                <p className="text-sm font-medium mb-1">Choose your email provider</p>
+                <p className="text-xs text-muted-foreground">Select the service you use for email. FunnelFox will send outreach from your account.</p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Personal Email</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {EMAIL_PRESETS.filter(p => p.category === "personal").map((preset) => (
+                      <Button
+                        key={preset.id}
+                        variant="outline"
+                        className={`h-auto py-3 flex flex-col items-center gap-1 ${selectedPreset === preset.id ? "border-primary ring-1 ring-primary" : ""}`}
+                        onClick={() => {
+                          setSelectedPreset(preset.id);
+                          setSmtpHost(preset.host);
+                          setSmtpPort(preset.port);
+                          setSmtpSecure(preset.secure);
+                          setEmailSetupStep("credentials");
+                        }}
+                        data-testid={`button-preset-${preset.id}`}
+                      >
+                        <Mail className="w-5 h-5" />
+                        <span className="text-xs">{preset.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Business / Hosting Email</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {EMAIL_PRESETS.filter(p => p.category === "business").map((preset) => (
+                      <Button
+                        key={preset.id}
+                        variant="outline"
+                        className={`h-auto py-3 flex flex-col items-center gap-1 ${selectedPreset === preset.id ? "border-primary ring-1 ring-primary" : ""}`}
+                        onClick={() => {
+                          setSelectedPreset(preset.id);
+                          if (preset.host) {
+                            setSmtpHost(preset.host);
+                            setSmtpPort(preset.port);
+                            setSmtpSecure(preset.secure);
+                          }
+                          setEmailSetupStep("credentials");
+                        }}
+                        data-testid={`button-preset-${preset.id}`}
+                      >
+                        <Server className="w-5 h-5" />
+                        <span className="text-xs">{preset.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {!gmailStatus?.connected && (
+                <Button variant="ghost" size="sm" onClick={() => setShowEmailSetup(false)} data-testid="button-cancel-email-setup">
+                  Cancel
+                </Button>
+              )}
+            </div>
+          )}
+
+          {showEmailSetup && emailSetupStep === "credentials" && (() => {
+            const preset = EMAIL_PRESETS.find(p => p.id === selectedPreset);
+            const needsServerField = !preset || preset.id === "other" || preset.host.includes("your-domain.com");
+            return (
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setEmailSetupStep("pick"); setShowAdvancedEmail(false); }}
+                    data-testid="button-back-to-providers"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Back
+                  </Button>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {preset ? `Connect ${preset.label}` : "Connect Email"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Enter your email login details below</p>
+                  </div>
+                </div>
+
+                {preset?.helpText && (
+                  <div className="bg-muted/50 rounded-md p-3">
+                    <p className="text-xs text-muted-foreground">
+                      <Info className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                      {preset.helpText}
+                    </p>
+                  </div>
+                )}
+
+                {(needsServerField || showAdvancedEmail) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Mail Server</Label>
+                      <Input
+                        placeholder={preset?.host.includes("your-domain.com") ? "mail.yourdomain.com" : "smtp.example.com"}
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
+                        data-testid="input-smtp-host"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        {preset?.host.includes("your-domain.com") ? "Replace with your actual domain name" : "Your email provider's outgoing mail server"}
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Port</Label>
+                      <Input
+                        type="number"
+                        placeholder="465"
+                        value={smtpPort}
+                        onChange={(e) => setSmtpPort(parseInt(e.target.value) || 587)}
+                        data-testid="input-smtp-port"
+                      />
+                      <p className="text-[11px] text-muted-foreground">Usually 465 or 587</p>
+                    </div>
+                  </div>
+                )}
+
+                {!needsServerField && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setShowAdvancedEmail(!showAdvancedEmail)}
+                    data-testid="button-advanced-email"
+                  >
+                    {showAdvancedEmail ? "Hide advanced settings" : "Show advanced settings"}
+                  </button>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Email Address</Label>
+                  <Input
+                    placeholder="you@example.com"
+                    value={smtpUser}
+                    onChange={(e) => {
+                      setSmtpUser(e.target.value);
+                      if (!smtpFromEmail || smtpFromEmail === smtpUser) {
+                        setSmtpFromEmail(e.target.value);
+                      }
+                    }}
+                    autoComplete="email"
+                    inputMode="email"
+                    data-testid="input-smtp-user"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    {preset?.id === "gmail" ? "App Password" : preset?.id === "yahoo" ? "App Password" : "Password"}
+                  </Label>
+                  <Input
+                    type="password"
+                    placeholder={emailSettings?.hasPassword ? "Leave blank to keep current" : preset?.id === "gmail" ? "16-character app password" : "Your email password"}
+                    value={smtpPass}
+                    onChange={(e) => setSmtpPass(e.target.value)}
+                    autoComplete="current-password"
+                    data-testid="input-smtp-pass"
+                  />
+                  {preset?.id === "gmail" && (
+                    <p className="text-[11px] text-muted-foreground">
+                      This is NOT your Google password. Create an App Password at myaccount.google.com/apppasswords
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Your Name (shown in emails)</Label>
+                    <Input
+                      placeholder="John Smith"
+                      value={smtpFromName}
+                      onChange={(e) => setSmtpFromName(e.target.value)}
+                      data-testid="input-smtp-from-name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Send From (email address)</Label>
+                    <Input
+                      placeholder="you@example.com"
+                      value={smtpFromEmail}
+                      onChange={(e) => setSmtpFromEmail(e.target.value)}
+                      autoComplete="email"
+                      inputMode="email"
+                      data-testid="input-smtp-from-email"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={testingEmail || !smtpHost || !smtpUser || !smtpFromEmail}
+                    onClick={async () => {
+                      setTestingEmail(true);
+                      try {
+                        const res = await apiRequest("POST", "/api/email-settings/test", {
+                          smtpHost, smtpPort, smtpUser,
+                          smtpPass: smtpPass || "••••••••",
+                          smtpFromName, smtpFromEmail, smtpSecure,
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          toast({ title: "Connection successful", description: "Your email is working correctly." });
+                        } else {
+                          toast({ title: "Connection failed", description: data.error, variant: "destructive" });
+                        }
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : "Test failed";
+                        toast({ title: "Connection failed", description: msg, variant: "destructive" });
+                      }
+                      setTestingEmail(false);
+                    }}
+                    data-testid="button-test-email"
+                  >
+                    {testingEmail ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
+                    {testingEmail ? "Testing..." : "Test Connection"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={savingEmail || !smtpHost || !smtpUser || !smtpFromEmail}
+                    onClick={async () => {
+                      setSavingEmail(true);
+                      try {
+                        await apiRequest("POST", "/api/email-settings", {
+                          smtpHost, smtpPort, smtpUser,
+                          smtpPass: smtpPass || "••••••••",
+                          smtpFromName, smtpFromEmail, smtpSecure,
+                        });
+                        queryClient.invalidateQueries({ queryKey: ["/api/gmail/status"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/email-settings"] });
+                        setShowEmailSetup(false);
+                        toast({ title: "Email connected", description: "You can now send outreach emails directly from FunnelFox." });
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : "Save failed";
+                        toast({ title: "Failed to save", description: msg, variant: "destructive" });
+                      }
+                      setSavingEmail(false);
+                    }}
+                    data-testid="button-save-email"
+                  >
+                    {savingEmail ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1.5" />}
+                    {savingEmail ? "Connecting..." : "Connect Email"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setShowEmailSetup(false); setEmailSetupStep("pick"); }} data-testid="button-cancel-email-setup">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

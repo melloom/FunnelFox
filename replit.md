@@ -24,7 +24,7 @@ The application follows a client-server architecture.
     - **Contact Extraction**: Enhanced contact extraction follows multiple pages (About, Contact, Team) to find emails and phone numbers.
     - **Deduplication**: Fuzzy name matching, phone-based, and cross-key lookup for robust lead deduplication.
     - **Social Media Detection**: Scrapes and stores social media links from websites and via DuckDuckGo, highlighting businesses without websites but with social presence.
-    - **Email Integration**: Gmail integration allows sending outreach emails directly from the app, utilizing a professional HTML email template. Emails are logged in the activity timeline.
+    - **Email Integration**: Per-user SMTP email integration allows each user to connect their own email provider (Gmail, Outlook, Yahoo, Zoho, or any SMTP host including business email). Users configure SMTP settings in Account Settings with presets and test connection. Admin retains Gmail API access. Outreach emails are sent from the user's own connected email, with fallback to "Open in Email App" (mailto) if no provider is connected. Emails are logged in the activity timeline.
     - **Business Intelligence**: Lead detail dialogs include BBB rating, Google rating/reviews, sitemap, and robots.txt status.
     - **SaaS Subscription**: Implemented with Stripe for subscription management, including a Free tier and a Pro plan ($30/month) with usage limits (discoveries, leads) and plan comparison. Includes subscription cancellation, resumption, and billing portal access.
     - **Legal Pages**: Dedicated Terms of Service and Privacy Policy pages.

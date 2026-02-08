@@ -134,7 +134,7 @@ export function EmailTemplateDialog({
   const [showConfirm, setShowConfirm] = useState(false);
   const { toast } = useToast();
 
-  const { data: gmailStatus } = useQuery<{ connected: boolean; email: string | null }>({
+  const { data: gmailStatus } = useQuery<{ connected: boolean; email: string | null; method?: string }>({
     queryKey: ["/api/gmail/status"],
     enabled: open,
     staleTime: 60000,
@@ -228,7 +228,7 @@ export function EmailTemplateDialog({
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700">
                 <Check className="w-3 h-3 mr-1" />
-                Gmail Connected
+                {gmailStatus?.method === "smtp" ? "Email Connected" : "Gmail Connected"}
               </Badge>
               {gmailStatus?.email && (
                 <span className="text-xs text-muted-foreground truncate">{gmailStatus.email}</span>
@@ -295,7 +295,7 @@ export function EmailTemplateDialog({
                 ) : (
                   <Send className="w-4 h-4 mr-1.5" />
                 )}
-                {sendMutation.isPending ? "Sending..." : "Send via Gmail"}
+                {sendMutation.isPending ? "Sending..." : gmailStatus?.method === "smtp" ? "Send Email" : "Send via Gmail"}
               </Button>
             ) : (
               <Button onClick={() => setShowConfirm(true)} disabled={!canSend} className="w-full sm:w-auto" data-testid="button-send-email">
