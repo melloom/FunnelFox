@@ -322,6 +322,8 @@ function LeadDetailDialog({
   const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
   const leadScore = calculateLeadScore(lead);
 
+  const screenshotUrl = lead.screenshotUrl || (!noWebsite ? `https://image.thum.io/get/width/1280/crop/800/noanimate/${lead.websiteUrl!.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}` : null);
+
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
@@ -637,20 +639,23 @@ function LeadDetailDialog({
             </div>
           )}
 
-          {!noWebsite && lead.screenshotUrl && (
-            <div>
+          {!noWebsite && screenshotUrl && (
+            <div data-testid="section-website-screenshot">
               <div className="flex items-center gap-1.5 mb-2">
                 <Camera className="w-3.5 h-3.5 text-muted-foreground" />
                 <p className="text-xs font-medium text-muted-foreground">Website Screenshot</p>
               </div>
               <div className="rounded-md border overflow-hidden">
                 <img
-                  src={lead.screenshotUrl}
+                  src={screenshotUrl}
                   alt={`Screenshot of ${lead.companyName}'s website`}
-                  className="w-full h-auto max-h-40 sm:max-h-60 object-cover object-top"
+                  className="w-full h-auto object-cover object-top"
                   loading="lazy"
                   data-testid="img-website-screenshot"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  onError={(e) => {
+                    const section = (e.target as HTMLImageElement).closest('[data-testid="section-website-screenshot"]');
+                    if (section) (section as HTMLElement).style.display = "none";
+                  }}
                 />
               </div>
             </div>

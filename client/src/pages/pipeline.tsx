@@ -333,6 +333,8 @@ function PipelineLeadDetailDialog({
   const currentStageIndex = PIPELINE_STAGES.findIndex((s) => s.value === lead.status);
   const currentStage = PIPELINE_STAGES[currentStageIndex];
 
+  const screenshotUrl = lead.screenshotUrl || (!noWebsite ? `https://image.thum.io/get/width/1280/crop/800/noanimate/${lead.websiteUrl!.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}` : null);
+
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
@@ -619,17 +621,20 @@ function PipelineLeadDetailDialog({
             </div>
           )}
 
-          {!noWebsite && lead.screenshotUrl && (
-            <div>
+          {!noWebsite && screenshotUrl && (
+            <div data-testid="section-pipeline-screenshot">
               <p className="text-xs font-medium text-muted-foreground mb-2">Screenshot</p>
               <div className="rounded-md border overflow-hidden">
                 <img
-                  src={lead.screenshotUrl}
+                  src={screenshotUrl}
                   alt={`Screenshot of ${lead.companyName}'s website`}
-                  className="w-full h-auto max-h-40 sm:max-h-60 object-cover object-top"
+                  className="w-full h-auto object-cover object-top"
                   loading="lazy"
                   data-testid="img-pipeline-screenshot"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  onError={(e) => {
+                    const section = (e.target as HTMLImageElement).closest('[data-testid="section-pipeline-screenshot"]');
+                    if (section) (section as HTMLElement).style.display = "none";
+                  }}
                 />
               </div>
             </div>

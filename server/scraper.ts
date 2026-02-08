@@ -2147,7 +2147,7 @@ function formatTechnologies(tech: TechnologyDetection): string[] {
 function generateScreenshotUrl(targetUrl: string): string {
   let url = targetUrl;
   if (!url.startsWith("http")) url = `https://${url}`;
-  return `https://image.thum.io/get/width/1280/crop/800/noanimate/${encodeURIComponent(url)}`;
+  return `https://image.thum.io/get/width/1280/crop/800/noanimate/${url}`;
 }
 
 export async function analyzeWebsite(targetUrl: string, businessName?: string, location?: string): Promise<WebsiteAnalysis & { socialMedia?: string[]; contactInfo?: ExtractedContact; technologies?: string[]; screenshotUrl?: string; googleRating?: number; googleReviewCount?: number; hasSitemap?: boolean; hasRobotsTxt?: boolean; sitemapIssues?: string[] }> {

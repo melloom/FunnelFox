@@ -569,6 +569,7 @@ export default function DiscoverPage() {
           {selectedLead && (() => {
             const lead = selectedLead;
             const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
+            const discoverScreenshotUrl = lead.screenshotUrl || (!noWebsite ? `https://image.thum.io/get/width/1280/crop/800/noanimate/${lead.websiteUrl!.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}` : null);
             return (
               <>
                 <DialogHeader>
@@ -620,14 +621,23 @@ export default function DiscoverPage() {
                       </div>
                     </div>
                   )}
-                  {!noWebsite && lead.screenshotUrl && (
-                    <div>
+                  {!noWebsite && discoverScreenshotUrl && (
+                    <div data-testid="section-discover-screenshot">
                       <div className="flex items-center gap-1.5 mb-2">
                         <Camera className="w-3.5 h-3.5 text-muted-foreground" />
                         <p className="text-xs font-medium text-muted-foreground">Website Screenshot</p>
                       </div>
                       <div className="rounded-md border overflow-hidden">
-                        <img src={lead.screenshotUrl} alt={`Screenshot of ${lead.companyName}`} className="w-full h-auto max-h-40 sm:max-h-60 object-cover object-top" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        <img
+                          src={discoverScreenshotUrl}
+                          alt={`Screenshot of ${lead.companyName}`}
+                          className="w-full h-auto object-cover object-top"
+                          loading="lazy"
+                          onError={(e) => {
+                            const section = (e.target as HTMLImageElement).closest('[data-testid="section-discover-screenshot"]');
+                            if (section) (section as HTMLElement).style.display = "none";
+                          }}
+                        />
                       </div>
                     </div>
                   )}
