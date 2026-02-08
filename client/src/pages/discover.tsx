@@ -565,7 +565,7 @@ export default function DiscoverPage() {
       )}
 
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-        <DialogContent className="sm:max-w-lg max-sm:text-sm max-sm:pb-[calc(1rem+env(safe-area-inset-bottom,16px))]">
+        <DialogContent className="sm:max-w-lg max-sm:text-sm">
           {selectedLead && (() => {
             const lead = selectedLead;
             const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";

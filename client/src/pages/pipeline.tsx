@@ -338,7 +338,7 @@ function PipelineLeadDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-sm:text-sm max-sm:pb-[calc(1rem+env(safe-area-inset-bottom,16px))]">
+      <DialogContent className="sm:max-w-lg max-sm:text-sm">
         <div className="flex items-center gap-2 sm:hidden mb-2">
           <Button
             variant="ghost"

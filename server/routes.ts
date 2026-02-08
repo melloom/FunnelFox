@@ -221,6 +221,46 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/leads/:id/enrich", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+      const lead = await storage.getLead(id);
+      if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+      const websiteUrl = lead.websiteUrl && lead.websiteUrl !== "none" ? lead.websiteUrl : null;
+      const analysis = await analyzeWebsite(websiteUrl || "", lead.companyName, lead.location || "");
+
+      const updateData: Record<string, any> = {
+        websiteScore: analysis.score,
+        websiteIssues: analysis.issues,
+      };
+      if (analysis.screenshotUrl) updateData.screenshotUrl = analysis.screenshotUrl;
+      if (analysis.socialMedia && analysis.socialMedia.length > 0) updateData.socialMedia = analysis.socialMedia;
+      if (analysis.technologies && analysis.technologies.length > 0) updateData.detectedTechnologies = analysis.technologies;
+      if (analysis.contactInfo) {
+        if (analysis.contactInfo.emails?.length && !lead.contactEmail) {
+          updateData.contactEmail = analysis.contactInfo.emails[0];
+        }
+        if (analysis.contactInfo.phones?.length && !lead.contactPhone) {
+          updateData.contactPhone = analysis.contactInfo.phones[0];
+        }
+      }
+      if (analysis.googleRating != null) updateData.googleRating = analysis.googleRating;
+      if (analysis.googleReviewCount != null) updateData.googleReviewCount = analysis.googleReviewCount;
+      if (analysis.hasSitemap != null) updateData.hasSitemap = analysis.hasSitemap;
+      if (analysis.hasRobotsTxt != null) updateData.hasRobotsTxt = analysis.hasRobotsTxt;
+      if (analysis.sitemapIssues) updateData.sitemapIssues = analysis.sitemapIssues;
+
+      const updated = await storage.updateLead(id, updateData);
+      await storage.createActivity({ leadId: id, action: "notes_updated", details: "Lead enriched with website analysis" });
+      res.json(updated);
+    } catch (err) {
+      console.error("Enrich error:", err);
+      res.status(500).json({ error: "Failed to enrich lead" });
+    }
+  });
+
   app.post("/api/discover", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId;
