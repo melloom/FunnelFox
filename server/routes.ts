@@ -301,7 +301,7 @@ export async function registerRoutes(
   app.post("/api/discover", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId;
-      let planMaxResults = 10;
+      let planMaxResults = 50;
       if (userId) {
         const limit = await checkDiscoveryLimit(userId);
         if (!limit.allowed) {
