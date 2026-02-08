@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +13,20 @@ import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import foxLogo from "@assets/fox_1770439380079.png";
 
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          renderButton: (element: HTMLElement, config: any) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
+
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -22,9 +37,69 @@ export default function AuthPage() {
   const [showVerification, setShowVerification] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState("");
   const [resending, setResending] = useState(false);
-  const { login, register } = useAuth();
+  const { login, register, googleLogin } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const [googleReady, setGoogleReady] = useState(false);
+
+  const { data: googleConfig } = useQuery<{ clientId: string | null }>({
+    queryKey: ["/api/auth/google-client-id"],
+    staleTime: Infinity,
+  });
+
+  const handleGoogleResponse = useCallback(async (response: any) => {
+    try {
+      await googleLogin.mutateAsync({ credential: response.credential });
+      setLocation("/");
+    } catch (err: any) {
+      const msg = err?.message || "Google sign-in failed";
+      let parsed = msg;
+      try { const j = JSON.parse(msg); parsed = j.message || msg; } catch {}
+      toast({ title: "Error", description: parsed, variant: "destructive" });
+    }
+  }, [googleLogin, setLocation, toast]);
+
+  useEffect(() => {
+    const clientId = googleConfig?.clientId;
+    if (!clientId) return;
+
+    const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existingScript && window.google?.accounts) {
+      setGoogleReady(true);
+      return;
+    }
+
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = () => setGoogleReady(true);
+      document.head.appendChild(script);
+    }
+  }, [googleConfig?.clientId]);
+
+  useEffect(() => {
+    const clientId = googleConfig?.clientId;
+    if (!googleReady || !clientId || !window.google?.accounts || !googleButtonRef.current) return;
+
+    (window as any).__handleGoogleResponse = handleGoogleResponse;
+
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleResponse,
+    });
+
+    googleButtonRef.current.innerHTML = "";
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      theme: "outline",
+      size: "large",
+      width: googleButtonRef.current.offsetWidth,
+      text: "continue_with",
+      shape: "rectangular",
+    });
+  }, [googleReady, googleConfig?.clientId, handleGoogleResponse, mode, showVerification]);
 
   const isRegister = mode === "register";
   const isPending = login.isPending || register.isPending;
@@ -254,6 +329,19 @@ export default function AuthPage() {
                 )}
               </Button>
             </form>
+            {googleConfig?.clientId && (
+              <>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">or</span>
+                  </div>
+                </div>
+                <div ref={googleButtonRef} className="w-full flex justify-center" data-testid="google-signin-button" />
+              </>
+            )}
             <div className="mt-4 text-center">
               <button
                 type="button"

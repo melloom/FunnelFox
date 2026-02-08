@@ -11,6 +11,7 @@ import { z } from "zod";
 import { db } from "../../db";
 import { eq, and, gt } from "drizzle-orm";
 import { sendEmail, isGmailConnected } from "../../gmail";
+import { OAuth2Client } from "google-auth-library";
 
 declare module "express-session" {
   interface SessionData {
@@ -173,6 +174,86 @@ export async function setupAuth(app: Express) {
       }
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
+
+  app.get("/api/auth/google-client-id", (_req, res) => {
+    res.json({ clientId: googleClientId || null });
+  });
+
+  app.post("/api/auth/google", loginLimiter, async (req, res) => {
+    try {
+      if (!googleClientId || !googleClient) {
+        return res.status(503).json({ message: "Google sign-in is not configured" });
+      }
+
+      const { credential } = req.body;
+      if (!credential) {
+        return res.status(400).json({ message: "Google credential is required" });
+      }
+
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: googleClientId,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(400).json({ message: "Invalid Google token" });
+      }
+
+      if (!payload.email_verified) {
+        return res.status(400).json({ message: "Your Google email address is not verified. Please verify it with Google first." });
+      }
+
+      const email = payload.email.toLowerCase();
+      const firstName = payload.given_name || payload.name?.split(" ")[0] || "User";
+      const lastName = payload.family_name || null;
+      const profileImageUrl = payload.picture || null;
+
+      let user = await authStorage.getUserByEmail(email);
+
+      if (user) {
+        const updates: Record<string, any> = {};
+        if (!user.emailVerified) updates.emailVerified = true;
+        if (profileImageUrl && !user.profileImageUrl) updates.profileImageUrl = profileImageUrl;
+        if (Object.keys(updates).length > 0) {
+          await db.update(users).set(updates).where(eq(users.id, user.id));
+          Object.assign(user, updates);
+        }
+      } else {
+        const randomPassword = crypto.randomBytes(32).toString("hex");
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+        user = await authStorage.createUser({
+          email,
+          password: hashedPassword,
+          firstName,
+          lastName,
+          profileImageUrl,
+          emailVerified: true,
+        });
+      }
+
+      if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        const adminUpdates: Record<string, any> = {};
+        if (!user.isAdmin) adminUpdates.isAdmin = true;
+        if (user.planStatus !== "pro") adminUpdates.planStatus = "pro";
+        if (!user.emailVerified) adminUpdates.emailVerified = true;
+        if (Object.keys(adminUpdates).length > 0) {
+          await db.update(users).set(adminUpdates).where(eq(users.id, user.id));
+          Object.assign(user, adminUpdates);
+        }
+      }
+
+      req.session.userId = user.id;
+      const { password: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error: any) {
+      console.error("Google auth error:", error);
+      res.status(401).json({ message: "Google authentication failed" });
     }
   });
 
