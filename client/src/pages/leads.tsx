@@ -79,7 +79,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplateDialog } from "@/components/email-template-dialog";
 import { calculateLeadScore, getScoreColor } from "@/lib/lead-scoring";
-import * as XLSX from "xlsx";
 
 const STAGE_TEXT_COLORS: Record<string, string> = {
   "chart-1": "text-chart-1",
@@ -934,15 +933,28 @@ export default function LeadsPage() {
   function exportToExcel(leadsToExport?: Lead[]) {
     const rows = getExportData(leadsToExport);
     if (rows.length === 0) return;
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const colWidths = Object.keys(rows[0]).map((key) => ({
-      wch: Math.max(key.length, ...rows.map((r) => String(r[key as keyof typeof r] ?? "").length).slice(0, 50)) + 2,
-    }));
-    ws["!cols"] = colWidths;
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Leads");
-    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    downloadFile(buffer, `leads_${new Date().toISOString().slice(0, 10)}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const headers = Object.keys(rows[0]);
+    const escapeXml = (val: any) => String(val ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const headerRow = headers.map((h) => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join("");
+    const dataRows = rows.map((r) => {
+      const cells = headers.map((h) => {
+        const v = r[h as keyof typeof r];
+        return `<Cell><Data ss:Type="String">${escapeXml(v)}</Data></Cell>`;
+      }).join("");
+      return `<Row>${cells}</Row>`;
+    }).join("\n");
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Worksheet ss:Name="Leads">
+<Table>
+<Row>${headerRow}</Row>
+${dataRows}
+</Table>
+</Worksheet>
+</Workbook>`;
+    downloadFile(xml, `leads_${new Date().toISOString().slice(0, 10)}.xls`, "application/vnd.ms-excel");
     toast({ title: "Excel exported", description: `${rows.length} leads exported to Excel.` });
     setShowExportMenu(false);
   }
