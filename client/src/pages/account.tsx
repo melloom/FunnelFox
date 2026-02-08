@@ -368,7 +368,7 @@ export default function AccountPage() {
               <div>
                 <p className="text-sm font-medium">Sending as</p>
                 <p className="text-xs text-muted-foreground">
-                  {gmailStatus.email} via {gmailStatus.method === "smtp" ? (EMAIL_PRESETS.find(p => p.id === selectedPreset)?.label || "Email Provider") : "Gmail API"}
+                  {gmailStatus.email} via {gmailStatus.method === "smtp" ? (EMAIL_PRESETS.find(p => p.id === selectedPreset)?.label || "Email Provider") : gmailStatus.method === "system_smtp" ? "Hostinger (System)" : "Email Provider"}
                 </p>
               </div>
               {gmailStatus.method === "smtp" && (
@@ -407,6 +407,22 @@ export default function AccountPage() {
                   >
                     <Unplug className="w-3.5 h-3.5 mr-1.5" />
                     Disconnect
+                  </Button>
+                </div>
+              )}
+              {gmailStatus.method === "system_smtp" && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowEmailSetup(true);
+                      setEmailSetupStep("pick");
+                    }}
+                    data-testid="button-change-email"
+                  >
+                    <Settings className="w-3.5 h-3.5 mr-1.5" />
+                    Change Provider
                   </Button>
                 </div>
               )}

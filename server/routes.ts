@@ -559,7 +559,7 @@ export async function registerRoutes(
       if (user.isAdmin) {
         const connected = await isGmailConnected();
         const email = connected ? await getGmailAddress() : null;
-        return res.json({ connected, email, method: connected ? "gmail" : null });
+        return res.json({ connected, email, method: connected ? "system_smtp" : null });
       }
 
       res.json({ connected: false, email: null, method: null });
