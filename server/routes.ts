@@ -301,7 +301,7 @@ export async function registerRoutes(
   app.post("/api/discover", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId;
-      let planMaxResults = 50;
+      let planMaxResults = 10;
       if (userId) {
         const limit = await checkDiscoveryLimit(userId);
         if (!limit.allowed) {
@@ -325,7 +325,7 @@ export async function registerRoutes(
       const businesses = await searchBusinesses(
         category,
         location,
-        Math.min(maxResults || 20, planMaxResults),
+        Math.min(maxResults || 10, planMaxResults),
         searchPage
       );
       const searchMs = Date.now() - searchStart;
