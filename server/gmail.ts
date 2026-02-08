@@ -1,47 +1,25 @@
-// Gmail integration via Replit Connector (google-mail)
-import { google } from 'googleapis';
+// Email integration via Hostinger SMTP (nodemailer)
+import nodemailer from 'nodemailer';
 
-let connectionSettings: any;
+const smtpHost = process.env.SMTP_HOST || 'smtp.hostinger.com';
+const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
+const smtpUser = process.env.SMTP_USER || '';
+const smtpPass = process.env.SMTP_PASSWORD || '';
+const smtpFromEmail = process.env.SMTP_FROM_EMAIL || smtpUser;
+const smtpFromName = process.env.SMTP_FROM_NAME || 'FunnelFox';
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? 'repl ' + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-mail',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Gmail not connected');
-  }
-  return accessToken;
-}
-
-async function getUncachableGmailClient() {
-  const accessToken = await getAccessToken();
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
-  return google.gmail({ version: 'v1', auth: oauth2Client });
+function getTransporter() {
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+    connectionTimeout: 10000,
+    socketTimeout: 10000,
+  });
 }
 
 function escapeHtml(str: string): string {
@@ -105,68 +83,41 @@ function buildHtmlEmail(body: string, fromName?: string): string {
 </html>`;
 }
 
-function buildRawEmail(to: string, subject: string, body: string, fromName?: string): string {
-  const boundary = 'boundary_' + Date.now();
-  const htmlContent = buildHtmlEmail(body, fromName);
-  const lines = [
-    fromName ? `From: ${fromName}` : '',
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    'Content-Transfer-Encoding: 7bit',
-    '',
-    body + (fromName ? `\n\nBest regards,\n${fromName}` : ''),
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset="UTF-8"',
-    'Content-Transfer-Encoding: 7bit',
-    '',
-    htmlContent,
-    '',
-    `--${boundary}--`,
-  ].filter(l => l !== undefined);
-
-  const raw = lines.join('\r\n');
-  return Buffer.from(raw).toString('base64url');
-}
-
 export async function sendEmail(to: string, subject: string, body: string, fromName?: string): Promise<{ messageId: string; threadId: string }> {
-  const gmail = await getUncachableGmailClient();
-  const raw = buildRawEmail(to, subject, body, fromName);
+  const transporter = getTransporter();
+  const senderName = fromName || smtpFromName;
+  const htmlContent = buildHtmlEmail(body, senderName);
+  const textContent = body + (senderName ? `\n\nBest regards,\n${senderName}` : '');
 
-  const result = await gmail.users.messages.send({
-    userId: 'me',
-    requestBody: { raw },
+  const info = await transporter.sendMail({
+    from: `"${senderName}" <${smtpFromEmail}>`,
+    to,
+    subject,
+    text: textContent,
+    html: htmlContent,
   });
 
   return {
-    messageId: result.data.id || '',
-    threadId: result.data.threadId || '',
+    messageId: info.messageId || '',
+    threadId: '',
   };
 }
 
 export async function isGmailConnected(): Promise<boolean> {
+  if (!smtpUser || !smtpPass) {
+    return false;
+  }
   try {
-    await getAccessToken();
+    const transporter = getTransporter();
+    await transporter.verify();
     return true;
   } catch (err) {
-    console.error("Gmail connection check failed:", err instanceof Error ? err.message : err);
+    console.error("SMTP connection check failed:", err instanceof Error ? err.message : err);
     return false;
   }
 }
 
 export async function getGmailAddress(): Promise<string | null> {
-  try {
-    await getAccessToken();
-    if (connectionSettings?.settings?.email) {
-      return connectionSettings.settings.email;
-    }
-    return connectionSettings?.settings?.login_hint || null;
-  } catch {
-    return null;
-  }
+  if (!smtpUser) return null;
+  return smtpFromEmail || smtpUser;
 }

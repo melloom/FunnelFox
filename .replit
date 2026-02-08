@@ -40,3 +40,12 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "google-mail:1.0.0", "stripe:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+SMTP_HOST = "smtp.hostinger.com"
+SMTP_PORT = "465"
+SMTP_USER = "Contact@mellowsites.com"
+SMTP_FROM_EMAIL = "Contact@mellowsites.com"
+SMTP_FROM_NAME = "FunnelFox"
