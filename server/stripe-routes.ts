@@ -315,19 +315,19 @@ export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: bo
       monthlyDiscoveriesUsed: 0,
       usageResetDate: nextReset,
     }).where(eq(users.id, userId));
-    const limit = isPro ? 50 : 5;
-    return { allowed: true, remaining: limit, limit, isPro, maxResultsPerSearch: isPro ? 50 : 10 };
+    const limit = isPro ? 300 : 25;
+    return { allowed: true, remaining: limit, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
   }
 
-  const limit = isPro ? 50 : 5;
+  const limit = isPro ? 300 : 25;
   const used = user.monthlyDiscoveriesUsed || 0;
   const remaining = isPro ? Math.max(0, limit - used) : Math.min(Math.max(0, limit - used), limit);
-  return { allowed: remaining > 0, remaining, limit, isPro, maxResultsPerSearch: isPro ? 50 : 10 };
+  return { allowed: remaining > 0, remaining, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
 }
 
-export async function incrementDiscoveryUsage(userId: string): Promise<void> {
+export async function incrementDiscoveryUsage(userId: string, count: number = 1): Promise<void> {
   await db.update(users).set({
-    monthlyDiscoveriesUsed: sql`COALESCE(${users.monthlyDiscoveriesUsed}, 0) + 1`,
+    monthlyDiscoveriesUsed: sql`COALESCE(${users.monthlyDiscoveriesUsed}, 0) + ${count}`,
     usageResetDate: sql`COALESCE(${users.usageResetDate}, ${getNextResetDate().toISOString()}::timestamp)`,
   }).where(eq(users.id, userId));
 }
