@@ -306,7 +306,7 @@ export async function registerRoutes(
         const limit = await checkDiscoveryLimit(userId);
         if (!limit.allowed) {
           return res.status(403).json({
-            error: `You've used all ${limit.limit} discoveries this month. Upgrade to Pro for more.`,
+            error: `You've reached your monthly limit of ${limit.limit} leads. Upgrade to Pro for more.`,
             limitReached: true,
             remaining: limit.remaining,
             limit: limit.limit,
@@ -521,7 +521,7 @@ export async function registerRoutes(
       }
 
       if (userId && results.length > 0) {
-        await incrementDiscoveryUsage(userId);
+        await incrementDiscoveryUsage(userId, results.length);
       }
 
       const updatedLimit = userId ? await checkDiscoveryLimit(userId) : null;
