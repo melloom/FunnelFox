@@ -274,7 +274,7 @@ export default function AccountPage() {
             <>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm">Discoveries</span>
+                  <span className="text-sm">Monthly Leads</span>
                   <span className="text-sm text-muted-foreground">
                     {discoveriesUsed} / {discoveryLimit === 999 ? "Unlimited" : discoveryLimit}
                   </span>

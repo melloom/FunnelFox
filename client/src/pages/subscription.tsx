@@ -181,7 +181,7 @@ export default function SubscriptionPage() {
   const isCanceling = stripe?.cancelAtPeriodEnd;
 
   const discoveryPercent = subscription
-    ? Math.min(100, (subscription.monthlyDiscoveriesUsed / (subscription.discoveryLimit === 999 ? 50 : subscription.discoveryLimit)) * 100)
+    ? Math.min(100, (subscription.monthlyDiscoveriesUsed / (subscription.discoveryLimit === 999 ? 300 : subscription.discoveryLimit)) * 100)
     : 0;
   const leadPercent = subscription?.leadLimit
     ? Math.min(100, ((subscription.totalLeads || 0) / subscription.leadLimit) * 100)
@@ -219,7 +219,7 @@ export default function SubscriptionPage() {
   }
 
   const freeFeatures = [
-    { text: "5 lead discoveries / month", included: true },
+    { text: "25 leads / month", included: true },
     { text: "25 saved leads max", included: true },
     { text: "Basic website analysis", included: true },
     { text: "Pipeline management", included: true },
@@ -230,7 +230,7 @@ export default function SubscriptionPage() {
   ];
 
   const proFeatures = [
-    { text: "50 lead discoveries / month", included: true },
+    { text: "300 leads / month", included: true },
     { text: "Unlimited saved leads", included: true },
     { text: "Full website analysis & scoring", included: true },
     { text: "Pipeline management", included: true },
@@ -281,10 +281,10 @@ export default function SubscriptionPage() {
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5 text-sm font-medium">
                   <Search className="w-3.5 h-3.5 text-muted-foreground" />
-                  Discoveries This Month
+                  Leads This Month
                 </div>
                 <span className="text-sm text-muted-foreground" data-testid="text-discovery-usage">
-                  {subscription?.monthlyDiscoveriesUsed || 0} / {subscription?.discoveryLimit === 999 ? "Unlimited" : subscription?.discoveryLimit || 5}
+                  {subscription?.monthlyDiscoveriesUsed || 0} / {subscription?.discoveryLimit === 999 ? "Unlimited" : subscription?.discoveryLimit || 25}
                 </span>
               </div>
               <Progress value={subscription?.discoveryLimit === 999 ? 5 : discoveryPercent} className="h-2" />

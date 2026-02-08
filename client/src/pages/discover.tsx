@@ -240,7 +240,7 @@ export default function DiscoverPage() {
               {subscription.planStatus === "pro" ? "Pro" : "Free"} Plan
             </Badge>
             <span className="text-xs text-muted-foreground" data-testid="text-discovery-usage">
-              {subscription.monthlyDiscoveriesUsed} / {subscription.discoveryLimit} discoveries used this month
+              {subscription.monthlyDiscoveriesUsed} / {subscription.discoveryLimit} leads used this month
             </span>
             {subscription.planStatus !== "pro" && subscription.monthlyDiscoveriesUsed >= subscription.discoveryLimit && (
               <a href="/pricing" className="text-xs text-primary hover:underline" data-testid="link-upgrade">

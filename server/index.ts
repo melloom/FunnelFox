@@ -106,8 +106,8 @@ app.use((req, res, next) => {
       if (!existing) {
         const product = await stripe.products.create({
           name: "FunnelFox Pro",
-          description: "Unlock 50 lead discoveries/month, unlimited saved leads, all data sources, Gmail integration, and full website analysis.",
-          metadata: { plan: "pro", discoveryLimit: "50", leadLimit: "unlimited" },
+          description: "Unlock 300 leads/month, unlimited saved leads, all data sources, Gmail integration, and full website analysis.",
+          metadata: { plan: "pro", discoveryLimit: "300", leadLimit: "unlimited" },
         });
         await stripe.prices.create({
           product: product.id,

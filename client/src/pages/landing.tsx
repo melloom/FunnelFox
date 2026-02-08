@@ -214,7 +214,7 @@ export default function LandingPage() {
                   Your next client is one search away
                 </h2>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  5 free discoveries a month. No credit card needed. Start landing clients today.
+                  25 free leads a month. No credit card needed. Start landing clients today.
                 </p>
                 <Link href="/auth">
                   <Button size="lg" data-testid="button-cta-bottom">

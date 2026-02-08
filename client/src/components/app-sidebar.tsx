@@ -124,7 +124,7 @@ export function AppSidebar() {
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  {subscription.monthlyDiscoveriesUsed}/{subscription.discoveryLimit === 999 ? "Unlimited" : subscription.discoveryLimit} discoveries
+                  {subscription.monthlyDiscoveriesUsed}/{subscription.discoveryLimit === 999 ? "Unlimited" : subscription.discoveryLimit} leads this month
                 </p>
               </div>
             </div>

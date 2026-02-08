@@ -15,10 +15,10 @@ async function seedStripeProducts() {
 
   const product = await stripe.products.create({
     name: "FunnelFox Pro",
-    description: "Unlock 50 lead discoveries/month, unlimited saved leads, all data sources, Gmail integration, and full website analysis.",
+    description: "Unlock 300 leads/month, unlimited saved leads, all data sources, Gmail integration, and full website analysis.",
     metadata: {
       plan: "pro",
-      discoveryLimit: "50",
+      discoveryLimit: "300",
       leadLimit: "unlimited",
     },
   });

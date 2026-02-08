@@ -110,7 +110,7 @@ export function registerStripeRoutes(app: Express) {
       res.json({
         planStatus: isPro ? "pro" : "free",
         monthlyDiscoveriesUsed,
-        discoveryLimit: isPro ? (user.isAdmin ? 999 : 50) : 5,
+        discoveryLimit: isPro ? (user.isAdmin ? 999 : 300) : 25,
         leadLimit: isPro ? null : 25,
         totalLeads,
         stripeSubscriptionId: currentSubId,

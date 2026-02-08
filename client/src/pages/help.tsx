@@ -55,11 +55,11 @@ const faqs: FAQItem[] = [
   },
   {
     question: "What's included in the Free plan?",
-    answer: "The Free plan includes 5 lead discoveries per month, up to 25 saved leads, basic website analysis, and full pipeline management. Discovery limits reset on the first of each month.",
+    answer: "The Free plan includes up to 25 leads per month, up to 25 saved leads, basic website analysis, and full pipeline management. Limits reset on the first of each month.",
   },
   {
     question: "What's included in the Pro plan?",
-    answer: "The Pro plan ($30/month) includes 50 lead discoveries per month, unlimited saved leads, full website analysis and scoring, all data sources (BBB, Google, Yelp), Gmail integration for direct outreach, bulk actions and export, and technology detection for 50+ platforms.",
+    answer: "The Pro plan ($30/month) includes up to 300 leads per month, unlimited saved leads, full website analysis and scoring, all data sources (BBB, Google, Yelp), Gmail integration for direct outreach, bulk actions and export, and technology detection for 50+ platforms.",
   },
   {
     question: "How do I cancel or change my subscription?",
@@ -292,7 +292,7 @@ export default function HelpPage() {
                   <p className="text-sm font-medium">Free Plan</p>
                 </div>
                 <ul className="text-sm text-muted-foreground space-y-1 pl-6">
-                  <li>5 lead discoveries per month</li>
+                  <li>25 leads per month</li>
                   <li>25 saved leads maximum</li>
                   <li>Basic website analysis</li>
                   <li>Full pipeline management</li>
@@ -304,7 +304,7 @@ export default function HelpPage() {
                   <p className="text-sm font-medium">Pro Plan - $30/month</p>
                 </div>
                 <ul className="text-sm text-muted-foreground space-y-1 pl-6">
-                  <li>50 lead discoveries per month</li>
+                  <li>300 leads per month</li>
                   <li>Unlimited saved leads</li>
                   <li>Full website scoring & analysis</li>
                   <li>All data sources (BBB, Google, Yelp)</li>
