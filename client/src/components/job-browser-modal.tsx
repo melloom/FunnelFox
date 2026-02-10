@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Link } from "wouter";
 import {
   Briefcase,
   Search,
@@ -179,13 +180,17 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
                   and apply to jobs directly through our platform. Never miss the perfect opportunity again.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <Button size="lg" className="bg-gradient-to-r from-primary to-primary/90">
-                    Start Scraping Jobs
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                  <Button variant="outline" size="lg">
-                    Learn More
-                  </Button>
+                  <Link to="/auth">
+                    <Button size="lg" className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary">
+                      Sign Up
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                  <Link to="/auth">
+                    <Button variant="outline" size="lg">
+                      Sign In
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </CardContent>
