@@ -1,0 +1,36 @@
+When I add a lead and enter a URL, the scraper currently only analyzes that exact link. It should scrape the link first, then use the extracted business name, phone, or address to search the web and enrich the lead with additional data (official website, Google Business profile, business category, etc.).
+
+Instagram links are a special case. Many require authentication, so screenshots and previews often fail. Because of this:
+	•	Instagram links should never be treated as the company’s main website
+	•	The system should attempt to find the real website via web search
+	•	If data is missing or incorrect, I should be able to edit all lead fields directly from Pipeline and All Leads
+
+Right now, the “Add Lead” scraper incorrectly assumes Instagram links are the client’s website.
+
+The duplicate detection is also unreliable. Leads are frequently flagged as “possible duplicates” even when they are clearly unique. The deduplication logic should be refined to account for:
+	•	Different domains but same business
+	•	Social links vs real websites
+	•	Partial name matches vs exact matches
+
+On the Discover page, the scraper needs advanced filters, such as:
+	•	No website
+	•	Has website
+	•	Social-only presence
+	•	Missing phone or email
+	•	Industry/category
+	•	Location (city/state)
+
+This would make the lead list far more usable and targeted.
+
+On the Add Lead page, I currently cannot enter a full address. This needs to be fixed so street, city, state, and ZIP can all be added and saved properly.
+
+Additional improvements needed:
+	•	Allow manual refresh / re-scrape of a lead after editing fields
+	•	Show scrape confidence or data source (Google, website, Instagram, etc.)
+	•	Prevent auto-overwriting manually edited fields when re-scraping
+	•	Improve scraping speed and reliability (it feels inconsistent and slow at times)
+	•	Add clearer error handling when a page cannot be scraped
+	•	Normalize scraped data (phone formats, addresses, business names)
+	•	Better mobile support when selecting, editing, exporting, or deleting leads
+
+Overall, the scraper should act more like a lead enrichment engine, not just a link analyzer. It needs better accuracy, smarter logic, and more control for the user.
