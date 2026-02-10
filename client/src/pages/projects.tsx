@@ -468,6 +468,37 @@ function AddProjectDialog() {
               </div>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+    </Dialog>
+  );
+}
+
+export default function ProjectsPage() {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const queryClient = useQueryClient();
+
+  const { data: projects = [], isLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+    queryFn: async () => {
+      const response = await fetch('/api/projects');
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      return response.json();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete project');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+    },
+  });
+
   const stats = {
     total: projects.length,
     planning: projects.filter((p: Project) => p.status === 'planning').length,
@@ -476,7 +507,6 @@ function AddProjectDialog() {
   };
 
   const handleEdit = (project: Project) => {
-    // TODO: Implement edit functionality
     console.log('Edit project:', project);
   };
 
@@ -562,25 +592,6 @@ function AddProjectDialog() {
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.map((project: Project) => (
-          <ProjectCard
-            key={project.id}
-            project={project}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ))}
-                <SelectItem key={value} value={value}>
-                  {config.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {filteredProjects.length === 0 ? (
