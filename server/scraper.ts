@@ -3575,6 +3575,8 @@ export async function searchBusinessesByName(
   address?: string;
   source: string;
 }>> {
+  console.log(`[searchBusinessesByName] Searching for: "${name}"${location ? ` in "${location}"` : ''}`);
+  
   const results: Array<{
     name: string;
     url?: string;
@@ -3591,52 +3593,129 @@ export async function searchBusinessesByName(
     results.push(r);
   };
 
-  const query = location ? `${name} ${location}` : name;
+  // Generate multiple search queries for better results
+  const baseQuery = location ? `${name} ${location}` : name;
+  const searchQueries = [
+    `${baseQuery} business`,
+    `${baseQuery} official website`,
+    `${baseQuery} facebook`,
+    `${baseQuery} instagram`, 
+    `${baseQuery} yelp`,
+    `${name} ${location ? location : ''}`
+  ];
 
-  try {
-    const encodedQuery = encodeURIComponent(`${query} business`);
-    const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const response = await fetch(ddgUrl, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": getRandomUA(),
-        Accept: "text/html,application/xhtml+xml",
-      },
-    });
-    clearTimeout(timeout);
-
-    if (response.ok) {
-      const html = await response.text();
-      const $ = cheerio.load(html);
-      $(".result").each((_i, el) => {
-        if (results.length >= 8) return;
-        const title = $(el).find(".result__title").text().trim();
-        const href = $(el).find(".result__url").text().trim();
-        const snippet = $(el).find(".result__snippet").text().trim();
-        if (!title) return;
-
-        const phoneMatch = snippet.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
-        const addressMatch = snippet.match(/(\d+\s+[A-Z][a-z]+[\w\s]+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl)\b[^,]*(?:,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?))/);
-
-        let cleanName = title.replace(/\s*[-|].{0,40}$/, "").trim();
-        if (cleanName.length > 60) cleanName = cleanName.slice(0, 60);
-
-        addResult({
-          name: cleanName,
-          url: href || undefined,
-          phone: phoneMatch?.[0],
-          address: addressMatch?.[1]?.trim(),
-          source: "web",
-        });
+  // Search multiple sources
+  const searchPromises = searchQueries.map(async (query, index) => {
+    try {
+      const encodedQuery = encodeURIComponent(query);
+      const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodedQuery}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(ddgUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": getRandomUA(),
+          Accept: "text/html,application/xhtml+xml",
+        },
       });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const queryResults: typeof results = [];
+        
+        $(".result").each((_i, el) => {
+          if (queryResults.length >= 5) return; // Limit per query
+          const title = $(el).find(".result__title").text().trim();
+          const href = $(el).find(".result__url").text().trim();
+          const snippet = $(el).find(".result__snippet").text().trim();
+          
+          if (!title) return;
+
+          // Enhanced phone extraction with multiple patterns
+          const phonePatterns = [
+            /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
+            /(?:\+?1[-.\s]?)?\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/g
+          ];
+          let phoneMatch = null;
+          for (const pattern of phonePatterns) {
+            const match = snippet.match(pattern);
+            if (match && match[0]) {
+              phoneMatch = match[0];
+              break;
+            }
+          }
+
+          // Enhanced address extraction
+          const addressPatterns = [
+            /(\d+\s+[A-Z][a-z]+[\w\s]+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl)\b[^,]*(?:,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?))/,
+            /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2}\s*\d{5})/,
+            /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2})/
+          ];
+          let addressMatch = null;
+          for (const pattern of addressPatterns) {
+            const match = snippet.match(pattern);
+            if (match && match[1]) {
+              addressMatch = match[1].trim();
+              break;
+            }
+          }
+
+          let cleanName = title.replace(/\s*[-|–—].{0,60}$/, "").trim();
+          if (cleanName.length > 60) cleanName = cleanName.slice(0, 60);
+
+          // Determine source based on query and URL
+          let source = "web";
+          if (query.includes("facebook") || href?.includes("facebook.com")) source = "facebook";
+          else if (query.includes("instagram") || href?.includes("instagram.com")) source = "instagram";
+          else if (query.includes("yelp") || href?.includes("yelp.com")) source = "yelp";
+          else if (query.includes("official")) source = "official";
+
+          queryResults.push({
+            name: cleanName,
+            url: href || undefined,
+            phone: phoneMatch || undefined,
+            address: addressMatch || undefined,
+            source: source,
+          });
+        });
+        
+        return queryResults;
+      }
+      return [];
+    } catch (err) {
+      console.error(`[searchBusinessesByName] Query ${index} error:`, err);
+      return [];
     }
-  } catch (err) {
-    console.error("[searchBusinessesByName] DuckDuckGo error:", err);
+  });
+
+  // Execute searches in parallel with delays to avoid rate limiting
+  const allResults = [];
+  for (let i = 0; i < searchPromises.length; i++) {
+    const queryResults = await searchPromises[i];
+    allResults.push(...queryResults);
+    
+    // Add delay between queries to avoid rate limiting
+    if (i < searchPromises.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
 
-  return results;
+  // Sort results by relevance (official/social media first, then by name match)
+  allResults.sort((a, b) => {
+    const aScore = (a.source === 'official' ? 3 : a.source !== 'web' ? 2 : 0) + 
+                   (a.name.toLowerCase().includes(name.toLowerCase()) ? 1 : 0);
+    const bScore = (b.source === 'official' ? 3 : b.source !== 'web' ? 2 : 0) + 
+                   (b.name.toLowerCase().includes(name.toLowerCase()) ? 1 : 0);
+    return bScore - aScore;
+  });
+
+  // Add results with deduplication
+  allResults.forEach(result => addResult(result));
+
+  console.log(`[searchBusinessesByName] Found ${results.length} results for "${name}"`);
+  return results.slice(0, 8); // Limit to 8 results
 }
 
 // Job Scraping Functions

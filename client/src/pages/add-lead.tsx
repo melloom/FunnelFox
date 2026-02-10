@@ -237,10 +237,21 @@ export default function AddLeadPage() {
     setShowNameResults(false);
     setNameSearchResults([]);
 
+    // Provide better feedback based on source
+    const sourceMessages = {
+      facebook: "Selected Facebook page — scraping for details...",
+      instagram: "Selected Instagram page — scraping for details...", 
+      yelp: "Selected Yelp listing — scraping for details...",
+      official: "Selected official website — scraping for details...",
+      web: "Selected business — searching for details..."
+    };
+
+    const message = sourceMessages[result.source as keyof typeof sourceMessages] || "Selected business — searching for details...";
+    toast({ title: `${result.name} — ${message}` });
+
     if (result.url) {
       setUrlLookupLoading(true);
       setUrlLookupResult(null);
-      toast({ title: `Selected: ${result.name} — scraping for details...` });
       try {
         const res = await apiRequest("POST", "/api/lookup-url", { url: result.url });
         const data: UrlLookupResult = await res.json();
@@ -271,7 +282,7 @@ export default function AddLeadPage() {
       }
       setUrlLookupLoading(false);
     } else {
-      toast({ title: `Selected: ${result.name}` });
+      toast({ title: `Selected: ${result.name} (no URL to scrape)` });
     }
   }, [form, toast]);
 
@@ -448,6 +459,9 @@ export default function AddLeadPage() {
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{result.name}</p>
                             <div className="flex items-center gap-3 flex-wrap mt-0.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                                {result.source}
+                              </span>
                               {result.url && (
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 truncate max-w-[180px]">
                                   <Globe className="w-2.5 h-2.5 shrink-0" />
