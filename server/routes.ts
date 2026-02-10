@@ -775,5 +775,137 @@ export async function registerRoutes(
     }
   });
 
+  // Job scraping routes
+  app.get("/api/jobs", isAuthenticated, async (req, res) => {
+    try {
+      const { search, source, type, experience, tech } = req.query;
+      
+      // For now, return mock data - in production this would query a database
+      const mockJobs: any[] = [
+        {
+          id: "1",
+          title: "Senior Frontend Developer",
+          company: "Tech Corp",
+          location: "San Francisco, CA",
+          salary: "$120,000 - $160,000",
+          type: "full-time",
+          experience: "senior",
+          description: "We are looking for an experienced frontend developer to join our team...",
+          requirements: ["5+ years React experience", "TypeScript proficiency", "Strong CSS skills"],
+          postedDate: "2 days ago",
+          source: "LinkedIn",
+          url: "https://linkedin.com/jobs/123",
+          technologies: ["React", "TypeScript", "Node.js"],
+          remote: true
+        },
+        {
+          id: "2",
+          title: "Full Stack Web Developer",
+          company: "StartupXYZ",
+          location: "New York, NY",
+          salary: "$80,000 - $120,000",
+          type: "full-time",
+          experience: "mid",
+          description: "Join our fast-growing startup as a full stack developer...",
+          requirements: ["3+ years experience", "React and Node.js", "Database knowledge"],
+          postedDate: "1 week ago",
+          source: "Indeed",
+          url: "https://indeed.com/jobs/456",
+          technologies: ["React", "Node.js", "MongoDB"],
+          remote: false
+        }
+      ];
+      
+      // Apply filters (basic implementation)
+      let filteredJobs = mockJobs;
+      
+      if (search) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.title.toLowerCase().includes(String(search).toLowerCase()) ||
+          job.company.toLowerCase().includes(String(search).toLowerCase())
+        );
+      }
+      
+      if (source && source !== "all") {
+        filteredJobs = filteredJobs.filter(job => job.source === source);
+      }
+      
+      if (type && type !== "all") {
+        filteredJobs = filteredJobs.filter(job => job.type === type);
+      }
+      
+      if (experience && experience !== "all") {
+        filteredJobs = filteredJobs.filter(job => job.experience === experience);
+      }
+      
+      if (tech) {
+        const techArray = String(tech).split(",").filter(Boolean);
+        filteredJobs = filteredJobs.filter(job => 
+          techArray.some(t => job.technologies.includes(t))
+        );
+      }
+      
+      res.json(filteredJobs);
+    } catch (err) {
+      console.error("Jobs fetch error:", err);
+      res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+  });
+
+  app.post("/api/jobs/scrape", isAuthenticated, async (req, res) => {
+    try {
+      const { sources, keywords } = req.body;
+      
+      // Mock scraping implementation
+      // In production, this would scrape actual job sites
+      const mockScrapedJobs = [
+        {
+          id: "scraped-1",
+          title: "React Developer",
+          company: "Web Agency",
+          location: "Remote",
+          salary: "$70,000 - $90,000",
+          type: "full-time",
+          experience: "mid",
+          description: "Looking for a React developer to work on exciting projects...",
+          requirements: ["React experience", "JavaScript proficiency", "CSS skills"],
+          postedDate: "Just posted",
+          source: "RemoteOK",
+          url: "https://remoteok.io/789",
+          technologies: ["React", "JavaScript", "CSS"],
+          remote: true
+        },
+        {
+          id: "scraped-2",
+          title: "Backend Developer",
+          company: "DataTech",
+          location: "Austin, TX",
+          salary: "$100,000 - $140,000",
+          type: "full-time",
+          experience: "senior",
+          description: "Senior backend developer needed for our data platform...",
+          requirements: ["Node.js expertise", "Database design", "API development"],
+          postedDate: "3 days ago",
+          source: "Stack Overflow",
+          url: "https://stackoverflow.com/jobs/101",
+          technologies: ["Node.js", "Python", "PostgreSQL"],
+          remote: false
+        }
+      ];
+      
+      // Simulate scraping delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      res.json({
+        jobsFound: mockScrapedJobs.length,
+        sourcesScraped: sources?.length || 4,
+        jobs: mockScrapedJobs
+      });
+    } catch (err) {
+      console.error("Job scraping error:", err);
+      res.status(500).json({ error: "Failed to scrape jobs" });
+    }
+  });
+
   return httpServer;
 }

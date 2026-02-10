@@ -18,6 +18,7 @@ import LeadsPage from "@/pages/leads";
 import AddLeadPage from "@/pages/add-lead";
 import DiscoverPage from "@/pages/discover";
 import PipelinePage from "@/pages/pipeline";
+import FindWorkPage from "@/pages/find-work";
 import HelpPage from "@/pages/help";
 import PricingPage from "@/pages/pricing";
 import LandingPage from "@/pages/landing";
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/discover" component={DiscoverPage} />
       <Route path="/leads" component={LeadsPage} />
       <Route path="/add" component={AddLeadPage} />
+      <Route path="/find-work" component={FindWorkPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/subscription" component={SubscriptionPage} />
       <Route path="/help" component={HelpPage} />
