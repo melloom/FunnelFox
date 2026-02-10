@@ -499,8 +499,8 @@ export default function AddLeadPage() {
                     <FormLabel>Location</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="City, State"
-                        autoComplete="address-level2"
+                        placeholder="Full Address: 123 Main St, City, State 12345"
+                        autoComplete="street-address"
                         {...field}
                         value={field.value || ""}
                         data-testid="input-location"
