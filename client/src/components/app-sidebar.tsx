@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, Crown, Settings, Briefcase, FolderOpen, TrendingUp, Filter, RefreshCw, Target } from "lucide-react";
+import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, Crown, Settings, Briefcase, FolderOpen, TrendingUp, Filter, RefreshCw, Target, Bookmark, ListChecks } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -28,8 +28,9 @@ const leadGenerationNavItems = [
 
 const findWorkNavItems = [
   { title: "Find Work", url: "/find-work", icon: Briefcase },
-  { title: "Back to Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "All Leads", url: "/leads", icon: Users },
+  { title: "Scraped Jobs", url: "/scraped-jobs", icon: ListChecks },
+  { title: "Saved Jobs", url: "/saved-jobs", icon: Bookmark },
+  { title: "Back to CRM", url: "/", icon: LayoutDashboard },
 ];
 
 const bottomNavItems = [
@@ -56,11 +57,11 @@ export function AppSidebar() {
     }
   };
 
-  // Determine which navigation to show based on current location
-  const isFindWorkPage = location === "/find-work";
-  const currentNavItems = isFindWorkPage ? findWorkNavItems : leadGenerationNavItems;
-  const currentGroupLabel = isFindWorkPage ? "Job Search" : "Navigation";
-  const currentSubtitle = isFindWorkPage ? "Find your next opportunity" : "Find your next client";
+  const findWorkPaths = ["/find-work", "/scraped-jobs", "/saved-jobs"];
+  const isFindWorkSection = findWorkPaths.includes(location);
+  const currentNavItems = isFindWorkSection ? findWorkNavItems : leadGenerationNavItems;
+  const currentGroupLabel = isFindWorkSection ? "Job Search" : "Navigation";
+  const currentSubtitle = isFindWorkSection ? "Find your next opportunity" : "Find your next client";
 
   return (
     <Sidebar>

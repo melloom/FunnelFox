@@ -28,6 +28,8 @@ import PrivacyPage from "@/pages/privacy";
 import AccountPage from "@/pages/account";
 import SubscriptionPage from "@/pages/subscription";
 import ProjectsPage from "@/pages/projects";
+import SavedJobsPage from "@/pages/saved-jobs";
+import ScrapedJobsPage from "@/pages/scraped-jobs";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import VerifyEmailPage from "@/pages/verify-email";
@@ -42,6 +44,8 @@ function Router() {
       <Route path="/add" component={AddLeadPage} />
       <Route path="/projects" component={ProjectsPage} />
       <Route path="/find-work" component={FindWorkPage} />
+      <Route path="/scraped-jobs" component={ScrapedJobsPage} />
+      <Route path="/saved-jobs" component={SavedJobsPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/subscription" component={SubscriptionPage} />
       <Route path="/help" component={HelpPage} />
