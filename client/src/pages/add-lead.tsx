@@ -47,7 +47,7 @@ const formSchema = z.object({
   companyName: z.string().optional(),
   websiteUrl: z.string().optional().default(""),
   contactName: z.string().optional(),
-  contactEmail: z.string().email().or(z.literal("")).optional().nullable(),
+  contactEmail: z.string().email().or(z.literal("")).optional(),
   contactPhone: z.string().optional().nullable(),
   industry: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
@@ -393,8 +393,8 @@ export default function AddLeadPage() {
                           type="button"
                           variant="outline"
                           size="icon"
-                          onClick={() => handleNameSearch(form.getValues("companyName"))}
-                          disabled={nameSearchLoading || !form.getValues("companyName")?.trim()}
+                          onClick={() => handleNameSearch(watchedName || "")}
+                          disabled={nameSearchLoading || !watchedName?.trim()}
                           data-testid="button-search-name"
                         >
                           {nameSearchLoading ? (
