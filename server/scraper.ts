@@ -3237,6 +3237,8 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
   socialMedia?: string[];
   description?: string;
 }> {
+  console.log(`[scrapeUrlForBusinessInfo] Processing URL: ${inputUrl}`);
+  
   let fullUrl = inputUrl.trim();
   if (!fullUrl.startsWith("http")) {
     fullUrl = `https://${fullUrl}`;
@@ -3289,8 +3291,14 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
       name = name
         .replace(/\s*[-|]\s*(Facebook|Instagram|Twitter|X|LinkedIn|TikTok|YouTube|Pinterest).*$/i, "")
         .replace(/\s*on\s+(Facebook|Instagram|Twitter|X|LinkedIn)$/i, "")
+        .replace(/\s*\|\s*.*$/i, "") // Remove anything after pipe
         .trim();
-      if (name && name.length > 1 && name.length < 80) {
+      
+      // Additional validation for extracted names
+      const genericNames = ["business", "page", "profile", "account", "home", "login", "sign up", "create page"];
+      const isGeneric = genericNames.some(generic => name.toLowerCase().includes(generic));
+      
+      if (name && name.length > 1 && name.length < 80 && !isGeneric) {
         result.companyName = name;
       }
 
@@ -3300,16 +3308,67 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
       const bodyText = $("body").text();
       const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
       const emailMatches = bodyText.match(emailRegex) || [];
-      for (const email of emailMatches) {
+      
+      // Filter out likely platform/generic emails
+      const filteredEmails = emailMatches.filter(email => {
         const lo = email.toLowerCase();
-        if (lo.endsWith(".png") || lo.endsWith(".jpg") || lo.includes("example.com") || lo.includes("facebook.com")) continue;
+        // Exclude image files and examples
+        if (lo.endsWith(".png") || lo.endsWith(".jpg") || lo.includes("example.com")) return false;
+        // Exclude platform domains
+        if (lo.includes("@facebook.com") || lo.includes("@instagram.com") || lo.includes("@meta.com") || 
+            lo.includes("@support.") || lo.includes("@help.") || lo.includes("@noreply.")) return false;
+        // Exclude obviously fake emails
+        if (lo.startsWith("test@") || lo.startsWith("fake@") || lo.startsWith("demo@")) return false;
+        return true;
+      });
+      
+      for (const email of filteredEmails) {
         result.contactEmail = email;
         break;
       }
 
       const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
       const phoneMatches = bodyText.match(phoneRegex) || [];
-      if (phoneMatches.length > 0) result.contactPhone = phoneMatches[0];
+      
+      // Filter and prioritize phone numbers by context relevance
+      const filteredPhones = phoneMatches.filter(phone => {
+        const cleanPhone = phone.replace(/[^0-9]/g, "");
+        // Exclude obviously fake/generic numbers
+        if (cleanPhone === "0000000000" || cleanPhone === "1111111111" || cleanPhone === "1234567890") return false;
+        // Exclude very short numbers after cleaning
+        if (cleanPhone.length < 10) return false;
+        // Exclude Meta's known customer service numbers
+        const metaNumbers = ["6505434800", "6503087300", "6505434800"]; // Meta/Facebook corporate numbers
+        if (metaNumbers.includes(cleanPhone)) return false;
+        return true;
+      });
+      
+      // If we have multiple phones, try to find the most business-relevant one
+      if (filteredPhones.length > 0) {
+        let bestPhone = filteredPhones[0];
+        
+        // Look for phones in business context sections
+        const businessContextSelectors = [
+          '.contact', '.about', '.info', '.description', '[data-testid*="contact"]',
+          '[aria-label*="contact"]', '[aria-label*="phone"]', '.business', '.page'
+        ];
+        
+        for (const selector of businessContextSelectors) {
+          const contextElement = $(selector).first();
+          if (contextElement.length > 0) {
+            const contextText = contextElement.text();
+            const contextPhones = contextText.match(phoneRegex) || [];
+            for (const contextPhone of contextPhones) {
+              if (filteredPhones.includes(contextPhone)) {
+                bestPhone = contextPhone;
+                break;
+              }
+            }
+          }
+        }
+        
+        result.contactPhone = bestPhone;
+      }
 
       const websiteLink = $('a[href]').filter((_i, el) => {
         const href = $(el).attr("href") || "";
@@ -3429,6 +3488,19 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
   } catch (err) {
     console.error("[scrapeUrlForBusinessInfo] Error:", err);
   }
+
+  console.log(`[scrapeUrlForBusinessInfo] Extracted from ${inputUrl}:`, {
+    companyName: result.companyName,
+    contactEmail: result.contactEmail,
+    contactPhone: result.contactPhone,
+    websiteUrl: result.websiteUrl,
+    socialMedia: result.socialMedia,
+    description: result.description?.substring(0, 100) + "..."
+  });
+
+  // Add URL fingerprint to help identify if results are actually different
+  const urlFingerprint = new URL(fullUrl).hostname + new URL(fullUrl).pathname;
+  console.log(`[scrapeUrlForBusinessInfo] URL fingerprint: ${urlFingerprint}`);
 
   return result;
 }
