@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, FolderOpen, Calendar, DollarSign, User, Clock, CheckCircle, AlertCircle, PlayCircle, PauseCircle, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Plus, FolderOpen, Calendar, DollarSign, User, Clock, CheckCircle, AlertCircle, PlayCircle, PauseCircle, MoreHorizontal, Edit, Trash2, Link } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Project } from "@shared/schema";
+import type { Project, Lead } from "@shared/schema";
 
 const STATUS_CONFIG = {
   planning: { label: 'Planning', icon: Clock, color: 'bg-blue-500', textColor: 'text-blue-600' },
@@ -80,7 +80,7 @@ function ProjectCard({ project, onEdit, onDelete }: { project: Project; onEdit: 
           </div>
         )}
 
-        {project.technologies.length > 0 && (
+        {project.technologies && project.technologies.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {project.technologies.slice(0, 3).map((tech) => (
               <Badge key={tech} variant="secondary" className="text-[10px]">
@@ -92,6 +92,13 @@ function ProjectCard({ project, onEdit, onDelete }: { project: Project; onEdit: 
                 +{project.technologies.length - 3}
               </Badge>
             )}
+          </div>
+        )}
+
+        {project.leadId && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Link className="w-3 h-3" />
+            <span>Connected to lead #{project.leadId}</span>
           </div>
         )}
 
@@ -139,11 +146,13 @@ function AddProjectDialog() {
       description: formData.description,
       status: formData.status,
       priority: formData.priority,
-      budget: formData.budget ? parseFloat(formData.budget) : undefined,
-      startDate: formData.startDate || undefined,
-      endDate: formData.endDate || undefined,
+      budget: formData.budget ? parseFloat(formData.budget) : null,
+      startDate: formData.startDate ? new Date(formData.startDate) : null,
+      endDate: formData.endDate ? new Date(formData.endDate) : null,
       technologies: formData.technologies.split(',').map(t => t.trim()).filter(t => t),
-      notes: formData.notes || undefined,
+      notes: formData.notes || null,
+      leadId: null,
+      userId: 'current-user', // This would come from auth context
     };
 
     // In a real app, this would make an API call
@@ -310,38 +319,48 @@ export default function ProjectsPage() {
   // Mock data - in a real app, this would come from an API
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
-    queryFn: () => Promise.resolve([
-      {
-        id: '1',
-        name: 'E-commerce Website',
-        client: 'Acme Store',
-        description: 'Full-stack e-commerce platform with payment integration and inventory management',
-        status: 'in_progress',
-        priority: 'high',
-        budget: 15000,
-        startDate: '2024-01-15',
-        endDate: '2024-03-30',
-        technologies: ['React', 'Node.js', 'MongoDB', 'Stripe'],
-        notes: 'Client wants custom design with mobile-first approach',
-        createdAt: '2024-01-10T00:00:00Z',
-        updatedAt: '2024-01-20T00:00:00Z',
-      },
-      {
-        id: '2',
-        name: 'Portfolio Website',
-        client: 'John Doe Photography',
-        description: 'Responsive portfolio website with gallery and booking system',
-        status: 'planning',
-        priority: 'medium',
-        budget: 3500,
-        technologies: ['Next.js', 'Tailwind CSS', 'Cloudinary'],
-        createdAt: '2024-01-18T00:00:00Z',
-        updatedAt: '2024-01-18T00:00:00Z',
-      },
-    ]),
+    queryFn: async (): Promise<Project[]> => {
+      // Mock data matching the new schema with leadId and userId
+      return [
+        {
+          id: 1,
+          name: 'E-commerce Website',
+          client: 'Acme Store',
+          description: 'Full-stack e-commerce platform with payment integration and inventory management',
+          status: 'in_progress' as const,
+          priority: 'high' as const,
+          budget: 15000,
+          startDate: new Date('2024-01-15'),
+          endDate: new Date('2024-03-30'),
+          technologies: ['React', 'Node.js', 'MongoDB', 'Stripe'],
+          notes: 'Client wants custom design with mobile-first approach',
+          leadId: 1,
+          userId: 'current-user',
+          createdAt: new Date('2024-01-10T00:00:00Z'),
+          updatedAt: new Date('2024-01-20T00:00:00Z'),
+        },
+        {
+          id: 2,
+          name: 'Portfolio Website',
+          client: 'John Doe Photography',
+          description: 'Responsive portfolio website with gallery and booking system',
+          status: 'planning' as const,
+          priority: 'medium' as const,
+          budget: 3500,
+          startDate: null,
+          endDate: null,
+          technologies: ['Next.js', 'Tailwind CSS', 'Cloudinary'],
+          notes: null,
+          leadId: null,
+          userId: 'current-user',
+          createdAt: new Date('2024-01-18T00:00:00Z'),
+          updatedAt: new Date('2024-01-18T00:00:00Z'),
+        },
+      ];
+    },
   });
 
-  const filteredProjects = projects.filter(project => {
+  const filteredProjects = projects.filter((project: Project) => {
     const matchesSearch = project.name.toLowerCase().includes(search.toLowerCase()) ||
                          project.client.toLowerCase().includes(search.toLowerCase()) ||
                          project.description.toLowerCase().includes(search.toLowerCase());
@@ -353,9 +372,19 @@ export default function ProjectsPage() {
 
   const stats = {
     total: projects.length,
-    planning: projects.filter(p => p.status === 'planning').length,
-    inProgress: projects.filter(p => p.status === 'in_progress').length,
-    completed: projects.filter(p => p.status === 'completed').length,
+    planning: projects.filter((p: Project) => p.status === 'planning').length,
+    inProgress: projects.filter((p: Project) => p.status === 'in_progress').length,
+    completed: projects.filter((p: Project) => p.status === 'completed').length,
+  };
+
+  const handleEdit = (project: Project) => {
+    // TODO: Implement edit functionality
+    console.log('Edit project:', project);
+  };
+
+  const handleDelete = (project: Project) => {
+    // TODO: Implement delete functionality
+    console.log('Delete project:', project);
   };
 
   if (isLoading) {
@@ -476,8 +505,13 @@ export default function ProjectsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+          {filteredProjects.map((project: Project) => (
+            <ProjectCard 
+              key={project.id} 
+              project={project} 
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
           ))}
         </div>
       )}

@@ -1,7 +1,7 @@
 import {
   HelpCircle, Search, Kanban, Users, Plus, LayoutDashboard, Mail, Star,
   Globe, Shield, Zap, BarChart3, Smartphone, ChevronDown, CreditCard,
-  Download, CheckSquare, Settings, FileText, Target, Crown
+  Download, CheckSquare, Settings, FileText, Target, Crown, Briefcase
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +59,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: "What's included in the Pro plan?",
-    answer: "The Pro plan ($30/month) includes up to 300 leads per month, unlimited saved leads, full website analysis and scoring, all data sources (BBB, Google, Yelp), Gmail integration for direct outreach, bulk actions and export, and technology detection for 50+ platforms.",
+    answer: "The Pro plan ($30/month) includes up to 300 leads per month, unlimited saved leads, full website analysis and scoring, all data sources (BBB, Google, Yelp), Gmail integration for direct outreach, bulk actions and export, technology detection for 50+ platforms, and the Find Work feature for job discovery and freelance projects from multiple sources.",
   },
   {
     question: "How do I cancel or change my subscription?",
@@ -72,6 +72,18 @@ const faqs: FAQItem[] = [
   {
     question: "Can I add leads manually?",
     answer: "Yes! Use the Add Lead page to enter a business website URL. FunnelFox will automatically analyze the website, check quality, extract contact information (emails, phone numbers), detect technologies, capture a screenshot, and calculate a website score. You can also fill in details manually.",
+  },
+  {
+    question: "What is Find Work and how does it work?",
+    answer: "Find Work is a premium feature that scrapes real job opportunities and freelance projects from multiple sources. It searches job boards like Indeed, LinkedIn, RemoteOK for traditional jobs, and freelance platforms like Upwork, Fiverr, Reddit, and Facebook Groups for project-based work. You can filter by technology stack, experience level, job type, location, and salary. Available with the $30/month subscription.",
+  },
+  {
+    question: "What job sources does Find Work scrape?",
+    answer: "Find Work scrapes from multiple sources: Traditional job boards (Indeed, LinkedIn, Stack Overflow Jobs, RemoteOK) for full-time and part-time positions, and freelance platforms (Upwork, Fiverr, Reddit subreddits like r/freelance and r/webdev, Facebook Groups for developers) for project-based work. All sources are scraped in real-time with proper rate limiting.",
+  },
+  {
+    question: "How often does Find Work scrape new jobs?",
+    answer: "You can trigger fresh scraping anytime with the 'Scrape New Jobs' button. The system scrapes the most recent postings from each source (typically from the last 7 days for Indeed, 24 hours for Reddit, etc.). Jobs are cached in your database so you can search and filter them instantly without re-scraping.",
   },
 ];
 
@@ -124,6 +136,11 @@ const sections = [
     icon: Mail,
     title: "Email Outreach",
     description: "When you're ready to reach out, click 'Email Lead' on any lead with a contact email. Choose from 6 pre-built templates (Introduction, Free Audit, Follow Up, No Website Pitch, Proposal, Social to Website) that auto-fill with the lead's info. Connect Gmail to send directly with a professional HTML template, or copy the email to your clipboard.",
+  },
+  {
+    icon: Briefcase,
+    title: "Find Work",
+    description: "Discover job opportunities and freelance projects from multiple sources. Scrape real job listings from Indeed, LinkedIn, RemoteOK, and freelance projects from Upwork, Fiverr, Reddit, and Facebook Groups. Filter by technology, experience level, job type, and location. Available with the $30/month subscription.",
   },
   {
     icon: CreditCard,

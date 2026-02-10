@@ -70,6 +70,7 @@ import {
   FileJson,
   Sheet,
   MoreVertical,
+  FolderOpen,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -1509,6 +1510,24 @@ ${dataRows}
                             <DropdownMenuItem onClick={() => toggleSelect(lead.id)}>
                               <Checkbox checked={isSelected} className="mr-2" />
                               {isSelected ? "Deselect" : "Select"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                // Navigate to projects page with pre-filled data
+                                const projectData = {
+                                  name: `${lead.companyName} Project`,
+                                  client: lead.companyName,
+                                  description: `Project for ${lead.companyName}${lead.industry ? ` in ${lead.industry}` : ''}`,
+                                  leadId: lead.id,
+                                };
+                                // Store in sessionStorage for pre-filling
+                                sessionStorage.setItem('convertLeadToProject', JSON.stringify(projectData));
+                                // Navigate to projects page
+                                window.location.href = '/projects';
+                              }}
+                            >
+                              <FolderOpen className="w-4 h-4 mr-2" />
+                              Convert to Project
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
