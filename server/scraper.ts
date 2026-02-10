@@ -2824,16 +2824,75 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
     );
 
     if (isSocialMedia) {
+      // Enhanced company name extraction with multiple fallbacks
+      let companyName = "";
+      
+      // Strategy 1: Open Graph title
       const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
       const twitterTitle = $('meta[name="twitter:title"]').attr("content")?.trim();
       const pageTitle = $("title").text().trim();
-      let name = ogTitle || twitterTitle || pageTitle || "";
-      name = name
+      
+      // Strategy 2: Try to extract from meta tags first
+      companyName = ogTitle || twitterTitle || pageTitle || "";
+      
+      // Strategy 3: Clean up common patterns
+      companyName = companyName
         .replace(/\s*[-|]\s*(Facebook|Instagram|Twitter|X|LinkedIn|TikTok|YouTube|Pinterest).*$/i, "")
         .replace(/\s*on\s+(Facebook|Instagram|Twitter|X|LinkedIn)$/i, "")
+        .replace(/\s*[-|]\s*Home[\s\|\-]*$/i, "")
+        .replace(/\s*[-|]\s*Page[\s\|\-]*$/i, "")
+        .replace(/\s*[-|]\s*Official Site[\s\|\-]*$/i, "")
+        .replace(/\s*[-|]\s*.{0,30}$/i, "") // Remove trailing descriptors
         .trim();
-      if (name && name.length > 1 && name.length < 80) {
-        result.companyName = name;
+      
+      // Strategy 4: If still no good name, try alternative methods
+      if (!companyName || companyName.length < 2 || companyName.length > 80) {
+        // Try h1 tags
+        const h1Text = $('h1').first().text().trim();
+        if (h1Text && h1Text.length > 1 && h1Text.length < 80) {
+          companyName = h1Text.replace(/\s*[-|].{0,50}$/, "").trim();
+        }
+        
+        // Try logo alt text
+        if (!companyName) {
+          const logoAlt = $('img[alt*="logo" i], img[src*="logo" i]').first().attr('alt')?.trim();
+          if (logoAlt && logoAlt.length > 1 && logoAlt.length < 80) {
+            companyName = logoAlt.replace(/logo\s*/i, "").trim();
+          }
+        }
+        
+        // Try business name from structured data
+        if (!companyName) {
+          const schemas = $('script[type="application/ld+json"]').toArray();
+          for (const s of schemas) {
+            try {
+              const j = JSON.parse($(s).text());
+              const name = j.name || j?.["@graph"]?.[0]?.name || j?.brand?.name;
+              if (name && typeof name === 'string' && name.length > 1 && name.length < 80) {
+                companyName = name.trim();
+                break;
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+        
+        // Try domain name as last resort
+        if (!companyName) {
+          const domainParts = host.split('.');
+          if (domainParts.length >= 2) {
+            companyName = domainParts[0]
+              .replace(/[^a-zA-Z0-9\s]/g, ' ')
+              .replace(/\b\w/g, l => l.toUpperCase())
+              .trim();
+          }
+        }
+      }
+      
+      // Final validation
+      if (companyName && companyName.length > 1 && companyName.length < 80) {
+        result.companyName = companyName;
       }
 
       const ogDesc = $('meta[property="og:description"]').attr("content")?.trim();
@@ -2930,12 +2989,81 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
         } catch {}
       }
     } else {
+      // Enhanced company name extraction for regular websites
+      let companyName = "";
+      
+      // Strategy 1: Open Graph and meta titles
       const title = $("title").text().trim();
       const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
-      let name = ogTitle || title || "";
-      name = name.replace(/\s*[-|].{0,50}$/, "").trim();
-      if (name && name.length > 1 && name.length < 80) {
-        result.companyName = name;
+      const twitterTitle = $('meta[name="twitter:title"]').attr("content")?.trim();
+      
+      companyName = ogTitle || twitterTitle || title || "";
+      
+      // Strategy 2: Clean up common patterns
+      companyName = companyName
+        .replace(/\s*[-|]\s*Home[\s\|\-]*$/i, "")
+        .replace(/\s*[-|]\s*Page[\s\|\-]*$/i, "")
+        .replace(/\s*[-|]\s*Official Site[\s\|\-]*$/i, "")
+        .replace(/\s*[-|]\s*Welcome[\s\|\-]*$/i, "")
+        .replace(/\s*[-|]\s*.{0,40}$/i, "") // Remove trailing descriptors
+        .trim();
+      
+      // Strategy 3: If still no good name, try alternative methods
+      if (!companyName || companyName.length < 2 || companyName.length > 80) {
+        // Try h1 tags
+        const h1Text = $('h1').first().text().trim();
+        if (h1Text && h1Text.length > 1 && h1Text.length < 80) {
+          companyName = h1Text.replace(/\s*[-|].{0,50}$/, "").trim();
+        }
+        
+        // Try navigation brand/logo
+        if (!companyName) {
+          const brandText = $('.brand, .logo, .navbar-brand, .site-title').first().text().trim();
+          if (brandText && brandText.length > 1 && brandText.length < 80) {
+            companyName = brandText;
+          }
+        }
+        
+        // Try logo alt text
+        if (!companyName) {
+          const logoAlt = $('img[alt*="logo" i], img[src*="logo" i], img[alt*="brand" i]').first().attr('alt')?.trim();
+          if (logoAlt && logoAlt.length > 1 && logoAlt.length < 80) {
+            companyName = logoAlt.replace(/logo\s*/i, "").replace(/brand\s*/i, "").trim();
+          }
+        }
+        
+        // Try business name from structured data
+        if (!companyName) {
+          const schemas = $('script[type="application/ld+json"]').toArray();
+          for (const s of schemas) {
+            try {
+              const j = JSON.parse($(s).text());
+              const name = j.name || j?.["@graph"]?.[0]?.name || j?.brand?.name || j?.organization?.name;
+              if (name && typeof name === 'string' && name.length > 1 && name.length < 80) {
+                companyName = name.trim();
+                break;
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+        
+        // Try domain name as last resort
+        if (!companyName) {
+          const domainParts = host.split('.');
+          if (domainParts.length >= 2) {
+            companyName = domainParts[0]
+              .replace(/[^a-zA-Z0-9\s]/g, ' ')
+              .replace(/\b\w/g, l => l.toUpperCase())
+              .trim();
+          }
+        }
+      }
+      
+      // Final validation
+      if (companyName && companyName.length > 1 && companyName.length < 80) {
+        result.companyName = companyName;
       }
       result.websiteUrl = parsedUrl.origin;
 
