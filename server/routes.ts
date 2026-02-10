@@ -44,7 +44,7 @@ export async function registerRoutes(
 
   app.get("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const lead = await storage.getLead(id);
       if (!lead) return res.status(404).json({ error: "Lead not found" });
@@ -82,7 +82,7 @@ export async function registerRoutes(
 
   app.patch("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const existing = await storage.getLead(id);
       if (!existing) return res.status(404).json({ error: "Lead not found" });
@@ -137,7 +137,7 @@ export async function registerRoutes(
 
   app.delete("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const deleted = await storage.deleteLead(id);
       if (!deleted) return res.status(404).json({ error: "Lead not found" });
@@ -192,7 +192,7 @@ export async function registerRoutes(
 
   app.get("/api/leads/:id/activities", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const activities = await storage.getActivities(id);
       res.json(activities);
@@ -260,7 +260,7 @@ export async function registerRoutes(
 
   app.post("/api/leads/:id/enrich", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const lead = await storage.getLead(id);
       if (!lead) return res.status(404).json({ error: "Lead not found" });

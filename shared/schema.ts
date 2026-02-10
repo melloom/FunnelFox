@@ -69,9 +69,29 @@ export const leads = pgTable("leads", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertLeadSchema = createInsertSchema(leads).omit({
-  id: true,
-  createdAt: true,
+export const insertLeadSchema = z.object({
+  companyName: z.string().min(1).max(200),
+  websiteUrl: z.string().url().min(1),
+  contactName: z.string().optional(),
+  contactEmail: z.string().email().optional(),
+  contactPhone: z.string().optional(),
+  industry: z.string().optional(),
+  location: z.string().optional(),
+  status: z.enum(["new", "contacted", "interested", "demo_scheduled", "proposal_sent", "negotiation", "converted", "lost"]).default("new"),
+  websiteScore: z.number().optional(),
+  websiteIssues: z.array(z.string()).optional(),
+  notes: z.string().optional(),
+  source: z.string().default("manual"),
+  socialMedia: z.array(z.string()).optional(),
+  detectedTechnologies: z.array(z.string()).optional(),
+  screenshotUrl: z.string().optional(),
+  bbbRating: z.string().optional(),
+  bbbAccredited: z.boolean().optional(),
+  googleRating: z.number().optional(),
+  googleReviewCount: z.number().optional(),
+  hasSitemap: z.boolean().optional(),
+  hasRobotsTxt: z.boolean().optional(),
+  sitemapIssues: z.array(z.string()).optional(),
 });
 
 export type InsertLead = z.infer<typeof insertLeadSchema>;
