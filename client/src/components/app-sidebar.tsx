@@ -64,7 +64,7 @@ export function AppSidebar() {
   const currentSubtitle = isFindWorkSection ? "Find your next opportunity" : "Find your next client";
 
   return (
-    <Sidebar className="safe-area-top">
+    <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <img
