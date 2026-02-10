@@ -325,9 +325,25 @@ function PipelineLeadDetailDialog({
   });
 
   const updateLeadMutation = useMutation({
-    mutationFn: async (data: { id: number; location?: string; socialMedia?: string[] }) => {
+    mutationFn: async (data: { 
+      id: number; 
+      companyName?: string; 
+      websiteUrl?: string; 
+      contactName?: string; 
+      contactEmail?: string; 
+      contactPhone?: string; 
+      location?: string; 
+      industry?: string; 
+      socialMedia?: string[] 
+    }) => {
       await apiRequest("PATCH", `/api/leads/${data.id}`, {
+        companyName: data.companyName,
+        websiteUrl: data.websiteUrl,
+        contactName: data.contactName,
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone,
         location: data.location,
+        industry: data.industry,
         socialMedia: data.socialMedia,
       });
     },
@@ -343,14 +359,26 @@ function PipelineLeadDetailDialog({
   const [notesValue, setNotesValue] = useState("");
   const [editingLead, setEditingLead] = useState(false);
   const [editForm, setEditForm] = useState({
+    companyName: "",
+    websiteUrl: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
     location: "",
+    industry: "",
     socialMedia: [] as string[],
   });
 
   useEffect(() => {
     if (lead) {
       setEditForm({
+        companyName: lead.companyName || "",
+        websiteUrl: lead.websiteUrl || "",
+        contactName: lead.contactName || "",
+        contactEmail: lead.contactEmail || "",
+        contactPhone: lead.contactPhone || "",
         location: lead.location || "",
+        industry: lead.industry || "",
         socialMedia: lead.socialMedia || [],
       });
     }
@@ -785,10 +813,65 @@ function PipelineLeadDetailDialog({
         <DialogHeader>
           <DialogTitle>Edit Lead Information</DialogTitle>
           <DialogDescription>
-            Update the lead's address and social media profiles
+            Update all lead information including contact details and business info
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div>
+            <label className="text-sm font-medium">Company Name</label>
+            <Input
+              value={editForm.companyName}
+              onChange={(e) => setEditForm(prev => ({ ...prev, companyName: e.target.value }))}
+              placeholder="Enter company name"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Website URL</label>
+            <Input
+              value={editForm.websiteUrl}
+              onChange={(e) => setEditForm(prev => ({ ...prev, websiteUrl: e.target.value }))}
+              placeholder="Enter website URL"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Contact Name</label>
+            <Input
+              value={editForm.contactName}
+              onChange={(e) => setEditForm(prev => ({ ...prev, contactName: e.target.value }))}
+              placeholder="Enter contact name"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Contact Email</label>
+            <Input
+              value={editForm.contactEmail}
+              onChange={(e) => setEditForm(prev => ({ ...prev, contactEmail: e.target.value }))}
+              placeholder="Enter contact email"
+              type="email"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Contact Phone</label>
+            <Input
+              value={editForm.contactPhone}
+              onChange={(e) => setEditForm(prev => ({ ...prev, contactPhone: e.target.value }))}
+              placeholder="Enter contact phone"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Industry</label>
+            <Input
+              value={editForm.industry}
+              onChange={(e) => setEditForm(prev => ({ ...prev, industry: e.target.value }))}
+              placeholder="Enter industry"
+            />
+          </div>
+
           <div>
             <label className="text-sm font-medium">Address/Location</label>
             <Input
@@ -841,7 +924,13 @@ function PipelineLeadDetailDialog({
             <Button
               onClick={() => updateLeadMutation.mutate({
                 id: lead.id,
+                companyName: editForm.companyName || undefined,
+                websiteUrl: editForm.websiteUrl || undefined,
+                contactName: editForm.contactName || undefined,
+                contactEmail: editForm.contactEmail || undefined,
+                contactPhone: editForm.contactPhone || undefined,
                 location: editForm.location || undefined,
+                industry: editForm.industry || undefined,
                 socialMedia: editForm.socialMedia.filter(s => s.trim())
               })}
               disabled={updateLeadMutation.isPending}
