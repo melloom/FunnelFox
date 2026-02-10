@@ -121,7 +121,7 @@ export const jobs = pgTable("jobs", {
   technologies: text("technologies").array(),
   remote: boolean("remote").notNull().default(false),
   scrapedAt: timestamp("scraped_at").notNull().defaultNow(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
 });
 
 export const projects = pgTable("projects", {
@@ -151,8 +151,8 @@ export const insertActivitySchema = z.object({
 export const insertJobSchema = z.object({
   title: z.string().min(1).max(200),
   company: z.string().min(1).max(100),
-  location: z.string().min(1).max(200),
-  salary: z.string().optional().nullable(),
+  location: z.string().min(1).max(100),
+  salary: z.string().optional(),
   type: z.string().default("full-time"),
   experience: z.string().default("mid"),
   description: z.string().min(1).max(2000),
@@ -162,7 +162,7 @@ export const insertJobSchema = z.object({
   url: z.string().url(),
   technologies: z.array(z.string()).optional(),
   remote: z.boolean().default(false),
-  userId: z.number(),
+  userId: z.string(),
 });
 
 export const insertProjectSchema = z.object({
@@ -183,6 +183,7 @@ export const insertProjectSchema = z.object({
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activityLog.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;
+export type Job = typeof jobs.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 

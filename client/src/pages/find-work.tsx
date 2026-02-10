@@ -6,7 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, MapPin, DollarSign, Clock, Building, Search, RefreshCw, Filter, Briefcase, Crown, Lock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { ExternalLink, MapPin, DollarSign, Clock, Building, Search, RefreshCw, Filter, Briefcase, Crown, Lock, CheckCircle2, Settings, Save, History, Star, TrendingUp, Zap, Target, Globe2, Users } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -70,7 +74,31 @@ export default function FindWorkPage() {
   const [selectedExperience, setSelectedExperience] = useState("all");
   const [selectedTech, setSelectedTech] = useState<string[]>([]);
   const [isScraping, setIsScraping] = useState(false);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [autoScraping, setAutoScraping] = useState(false);
+  const [scrapeInterval, setScrapeInterval] = useState(24); // hours
+  const [maxJobs, setMaxJobs] = useState(100);
+  const [showSavedJobs, setShowSavedJobs] = useState(false);
   const { toast } = useToast();
+
+  // Get user subscription status
+  const { data: subscription } = useQuery({
+    queryKey: ["/api/subscription"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/subscription");
+      if (!res.ok) {
+        if (res.status === 401) {
+          // User not authenticated
+          return null;
+        }
+        throw new Error("Failed to fetch subscription");
+      }
+      return res.json();
+    },
+  });
+
+  const isSubscribed = subscription?.planStatus === "active" || subscription?.planStatus === "pro";
 
   const { data: jobs = [], isLoading, error, refetch } = useQuery<JobListing[]>({
     queryKey: ["/api/jobs", searchTerm, selectedSource, selectedType, selectedExperience, selectedTech],
@@ -103,6 +131,11 @@ export default function FindWorkPage() {
   });
 
   const handleScrapeJobs = async () => {
+    if (!isSubscribed) {
+      setShowSubscriptionDialog(true);
+      return;
+    }
+
     setIsScraping(true);
     try {
       const res = await apiRequest("POST", "/api/jobs/scrape", {
@@ -131,6 +164,11 @@ export default function FindWorkPage() {
   };
 
   const handleScrapeFreelanceProjects = async () => {
+    if (!isSubscribed) {
+      setShowSubscriptionDialog(true);
+      return;
+    }
+
     setIsScraping(true);
     try {
       const res = await apiRequest("POST", "/api/jobs/scrape", {
@@ -183,31 +221,37 @@ export default function FindWorkPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30">
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         {/* Header Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 lg:p-8">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl border-0 p-6 lg:p-8 text-white">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-2">
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-blue-600" />
+                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                  <Briefcase className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-slate-900">Find Work</h1>
-                  <p className="text-slate-600 mt-1">
+                  <h1 className="text-3xl lg:text-4xl font-bold">Find Work</h1>
+                  <p className="text-blue-100 text-sm lg:text-base">
                     Discover web development opportunities from top job boards
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>Real-time job listings tailored to your skills</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full backdrop-blur-sm">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium">Real-time job listings</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full backdrop-blur-sm">
+                  <Star className="w-4 h-4 text-yellow-300" />
+                  <span className="text-sm font-medium">Premium Features</span>
+                </div>
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex flex-wrap gap-3 items-center">
               <Button 
                 onClick={handleScrapeJobs} 
                 disabled={isScraping}
-                className="gap-2 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/25 transition-all duration-200 hover:scale-105"
+                className="gap-2 bg-white text-blue-600 hover:bg-white/90 hover:text-blue-700 shadow-lg shadow-white/25 transition-all duration-200 hover:scale-105 border-2 border-white/30"
                 size="lg"
               >
                 <RefreshCw className={`w-4 h-4 ${isScraping ? 'animate-spin' : ''}`} />
@@ -217,7 +261,7 @@ export default function FindWorkPage() {
               <Button 
                 variant="outline" 
                 onClick={() => refetch()} 
-                className="gap-2 border-slate-200 hover:bg-slate-50 transition-all duration-200"
+                className="gap-2 border-white/30 hover:bg-white/20 text-white transition-all duration-200"
                 size="lg"
               >
                 <Search className="w-4 h-4" />
@@ -228,25 +272,96 @@ export default function FindWorkPage() {
                 variant="outline" 
                 onClick={handleScrapeFreelanceProjects} 
                 disabled={isScraping}
-                className="gap-2 border-purple-200 hover:bg-purple-50 transition-all duration-200"
+                className="gap-2 border-white/30 hover:bg-white/20 text-white transition-all duration-200"
                 size="lg"
               >
                 <Briefcase className={`w-4 h-4 ${isScraping ? 'animate-spin' : ''}`} />
                 {isScraping ? "Scraping Freelance..." : "Scrape Freelance Projects"}
               </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setShowSettingsDialog(true)}
+                className="gap-2 border-white/30 hover:bg-white/20 text-white transition-all duration-200"
+                size="lg"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </Button>
             </div>
           </div>
         </div>
 
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-600 text-sm font-medium">Total Jobs</p>
+                  <p className="text-2xl font-bold text-blue-900">{filteredJobs.length}</p>
+                </div>
+                <Briefcase className="w-8 h-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-600 text-sm font-medium">New Today</p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {filteredJobs.filter(job => {
+                      const today = new Date().toDateString();
+                      const jobDate = new Date(job.postedDate).toDateString();
+                      return jobDate === today;
+                    }).length}
+                  </p>
+                </div>
+                <Zap className="w-8 h-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-600 text-sm font-medium">Remote Jobs</p>
+                  <p className="text-2xl font-bold text-purple-900">
+                    {filteredJobs.filter(job => job.remote).length}
+                  </p>
+                </div>
+                <Globe2 className="w-8 h-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-600 text-sm font-medium">Top Companies</p>
+                  <p className="text-2xl font-bold text-orange-900">
+                    {new Set(filteredJobs.map(job => job.company)).size}
+                  </p>
+                </div>
+                <Building className="w-8 h-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Filters Section */}
-        <Card className="border-slate-200/60 shadow-sm">
+        <Card className="border-slate-200/60 shadow-sm bg-white/80 backdrop-blur-sm">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-900">
               <Filter className="w-5 h-5 text-blue-600" />
               <span>Smart Filters</span>
             </CardTitle>
             <CardDescription className="text-slate-600">
-              Customize your job search with these filters
+              Customize your job search with these powerful filters
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -543,6 +658,223 @@ export default function FindWorkPage() {
           )}
         </div>
       </div>
+
+      {/* Subscription Dialog */}
+      <Dialog open={showSubscriptionDialog} onOpenChange={setShowSubscriptionDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-purple-100 to-blue-100 rounded-xl">
+                <Crown className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Premium Feature</DialogTitle>
+                <DialogDescription>
+                  Get access to powerful job scraping and project management tools
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+              <h4 className="font-semibold text-purple-900 mb-2">Find Work Premium includes:</h4>
+              <ul className="space-y-2 text-sm text-purple-800">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  Real-time job scraping from Indeed, LinkedIn, and more
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  Freelance projects from Upwork, Fiverr, and Reddit
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  Advanced filtering and technology matching
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  Budget and salary information extraction
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  Project management and lead-to-project conversion
+                </li>
+              </ul>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div>
+                <p className="font-semibold text-green-900">Only $30/month</p>
+                <p className="text-sm text-green-700">Cancel anytime</p>
+              </div>
+              <div className="text-2xl font-bold text-green-600">$30</div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+                <Link href="/subscription">
+                  <Crown className="w-4 h-4 mr-2" />
+                  Upgrade to Premium
+                </Link>
+              </Button>
+              <Button variant="outline" asChild className="flex-1">
+                <Link href="/subscription">
+                  View Pricing
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
+                <Settings className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Job Search Settings</DialogTitle>
+                <DialogDescription>
+                  Configure your job scraping and filtering preferences
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Auto-Scraping Settings */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                Auto-Scraping
+              </h4>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="auto-scraping" className="text-sm font-medium">Enable Auto-Scraping</Label>
+                  <p className="text-xs text-slate-500">Automatically scrape new jobs at intervals</p>
+                </div>
+                <Switch
+                  id="auto-scraping"
+                  checked={autoScraping}
+                  onCheckedChange={setAutoScraping}
+                />
+              </div>
+              
+              {autoScraping && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Scraping Interval (hours)</Label>
+                  <div className="flex items-center gap-3">
+                    <Slider
+                      value={[scrapeInterval]}
+                      onValueChange={(value) => setScrapeInterval(value[0])}
+                      max={168}
+                      min={1}
+                      step={1}
+                      className="flex-1"
+                    />
+                    <span className="text-sm font-medium w-12 text-right">{scrapeInterval}h</span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Jobs will be scraped every {scrapeInterval} hour{scrapeInterval > 1 ? 's' : ''}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Job Limits */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                Job Limits
+              </h4>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Maximum Jobs to Store</Label>
+                <div className="flex items-center gap-3">
+                  <Slider
+                    value={[maxJobs]}
+                    onValueChange={(value) => setMaxJobs(value[0])}
+                    max={1000}
+                    min={10}
+                    step={10}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-medium w-12 text-right">{maxJobs}</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Oldest jobs will be removed when limit is reached
+                </p>
+              </div>
+            </div>
+
+            {/* Saved Searches */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                <History className="w-4 h-4" />
+                Saved Searches
+              </h4>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">React Developer Jobs</p>
+                    <p className="text-xs text-slate-500">React, Node.js, Remote</p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Load
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">Full Stack Developer</p>
+                    <p className="text-xs text-slate-500">JavaScript, Python, Senior Level</p>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Load
+                  </Button>
+                </div>
+              </div>
+              
+              <Button variant="outline" className="w-full gap-2">
+                <Save className="w-4 h-4" />
+                Save Current Search
+              </Button>
+            </div>
+
+            {/* Notification Settings */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Notifications
+              </h4>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="new-jobs" className="text-sm font-medium">New Job Alerts</Label>
+                    <p className="text-xs text-slate-500">Get notified when new jobs match your criteria</p>
+                  </div>
+                  <Switch id="new-jobs" />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="daily-digest" className="text-sm font-medium">Daily Digest</Label>
+                    <p className="text-xs text-slate-500">Receive daily summary of new jobs</p>
+                  </div>
+                  <Switch id="daily-digest" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

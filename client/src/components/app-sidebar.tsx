@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, Crown, Settings, Briefcase, FolderOpen } from "lucide-react";
+import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, Crown, Settings, Briefcase, FolderOpen, TrendingUp, Filter, RefreshCw, Target } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const mainNavItems = [
+const leadGenerationNavItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Pipeline", url: "/pipeline", icon: Kanban },
   { title: "Discover Leads", url: "/discover", icon: Search },
@@ -24,6 +24,15 @@ const mainNavItems = [
   { title: "Add Lead", url: "/add", icon: Plus },
   { title: "Ongoing Projects", url: "/projects", icon: FolderOpen },
   { title: "Find Work", url: "/find-work", icon: Briefcase },
+];
+
+const findWorkNavItems = [
+  { title: "Find Work", url: "/find-work", icon: Briefcase },
+  { title: "Job Dashboard", url: "/find-work", icon: TrendingUp },
+  { title: "Scrape Jobs", url: "/find-work", icon: RefreshCw },
+  { title: "Advanced Filters", url: "/find-work", icon: Filter },
+  { title: "Job Sources", url: "/find-work", icon: Target },
+  { title: "Back to Leads", url: "/leads", icon: Users },
 ];
 
 const bottomNavItems = [
@@ -50,6 +59,12 @@ export function AppSidebar() {
     }
   };
 
+  // Determine which navigation to show based on current location
+  const isFindWorkPage = location === "/find-work";
+  const currentNavItems = isFindWorkPage ? findWorkNavItems : leadGenerationNavItems;
+  const currentGroupLabel = isFindWorkPage ? "Job Search" : "Navigation";
+  const currentSubtitle = isFindWorkPage ? "Find your next opportunity" : "Find your next client";
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
@@ -62,16 +77,16 @@ export function AppSidebar() {
           />
           <div>
             <h2 className="text-sm font-semibold" data-testid="text-app-title">FunnelFox</h2>
-            <p className="text-xs text-muted-foreground">Find your next client</p>
+            <p className="text-xs text-muted-foreground">{currentSubtitle}</p>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>{currentGroupLabel}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
+              {currentNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

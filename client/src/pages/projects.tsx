@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, FolderOpen, Calendar, DollarSign, User, Clock, CheckCircle, AlertCircle, PlayCircle, PauseCircle, MoreHorizontal, Edit, Trash2, Link } from "lucide-react";
+import { Plus, FolderOpen, Calendar, DollarSign, User, Clock, CheckCircle, AlertCircle, PlayCircle, PauseCircle, MoreHorizontal, Edit, Trash2, Link, X, Globe2, Building, MapPin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, Lead } from "@shared/schema";
 
@@ -133,9 +133,22 @@ function AddProjectDialog() {
     endDate: '',
     technologies: '',
     notes: '',
+    leadId: null as number | null,
   });
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [showLeadSelector, setShowLeadSelector] = useState(false);
 
   const queryClient = useQueryClient();
+
+  // Fetch leads for selection
+  const { data: leads = [] } = useQuery<Lead[]>({
+    queryKey: ["/api/leads"],
+    queryFn: async () => {
+      const response = await fetch('/api/leads');
+      if (!response.ok) throw new Error('Failed to fetch leads');
+      return response.json();
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -149,6 +162,8 @@ function AddProjectDialog() {
           endDate: data.endDate ? new Date(data.endDate) : null,
           technologies: data.technologies.split(',').map(t => t.trim()).filter(t => t),
           notes: data.notes || null,
+          leadId: data.leadId,
+          userId: 'current-user', // This would come from auth context
         }),
       });
       
@@ -172,9 +187,34 @@ function AddProjectDialog() {
         endDate: '',
         technologies: '',
         notes: '',
+        leadId: null,
       });
+      setSelectedLead(null);
     },
   });
+
+  const handleLeadSelect = (lead: Lead) => {
+    setSelectedLead(lead);
+    setFormData(prev => ({
+      ...prev,
+      leadId: lead.id,
+      // Auto-fill from lead data
+      client: lead.companyName || prev.client,
+      description: prev.description || `Project for ${lead.companyName}${lead.industry ? ` in ${lead.industry}` : ''}${lead.websiteUrl && lead.websiteUrl !== 'none' ? ` - Website: ${lead.websiteUrl}` : ''}`,
+      technologies: prev.technologies || (lead.detectedTechnologies ? lead.detectedTechnologies.join(', ') : ''),
+      notes: prev.notes || `Converted from lead #${lead.id}. ${lead.notes || ''}`,
+    }));
+    setShowLeadSelector(false);
+  };
+
+  const handleRemoveLead = () => {
+    setSelectedLead(null);
+    setFormData(prev => ({
+      ...prev,
+      leadId: null,
+      // Keep the auto-filled data but allow editing
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,7 +234,7 @@ function AddProjectDialog() {
           <DialogTitle>Add New Project</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Project Name</Label>
               <Input
@@ -215,6 +255,81 @@ function AddProjectDialog() {
             </div>
           </div>
 
+          {/* Lead Selection Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Link to Lead (Optional)</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLeadSelector(true)}
+                className="gap-2"
+              >
+                <Link className="w-4 h-4" />
+                {selectedLead ? 'Change Lead' : 'Select Lead'}
+              </Button>
+            </div>
+            
+            {selectedLead ? (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="font-medium text-blue-900">{selectedLead.companyName}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        Lead #{selectedLead.id}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      {selectedLead.websiteUrl && selectedLead.websiteUrl !== 'none' && (
+                        <div className="flex items-center gap-1">
+                          <Globe2 className="w-3 h-3" />
+                          <span>{selectedLead.websiteUrl}</span>
+                        </div>
+                      )}
+                      {selectedLead.industry && (
+                        <div className="flex items-center gap-1">
+                          <Building className="w-3 h-3" />
+                          <span>{selectedLead.industry}</span>
+                        </div>
+                      )}
+                      {selectedLead.location && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          <span>{selectedLead.location}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveLead}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+                <p className="text-xs text-blue-600 mt-2">
+                  ✓ Lead info auto-filled. You can still edit any field before saving.
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                <Link className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">
+                  Select a lead to auto-fill project information
+                </p>
+                <p className="text-xs text-gray-500">
+                  Or create a standalone project
+                </p>
+              </div>
+            )}
+          </div>
+
           <div>
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -225,7 +340,7 @@ function AddProjectDialog() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
@@ -248,17 +363,15 @@ function AddProjectDialog() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PRIORITY_CONFIG).map(([value, config]) => (
-                    <SelectItem key={value} value={value}>
-                      {config.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="budget">Budget ($)</Label>
               <Input
@@ -266,6 +379,7 @@ function AddProjectDialog() {
                 type="number"
                 value={formData.budget}
                 onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                placeholder="0"
               />
             </div>
             <div>
@@ -277,6 +391,9 @@ function AddProjectDialog() {
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="endDate">End Date</Label>
               <Input
@@ -286,16 +403,15 @@ function AddProjectDialog() {
                 onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
               />
             </div>
-          </div>
-
-          <div>
-            <Label htmlFor="technologies">Technologies (comma-separated)</Label>
-            <Input
-              id="technologies"
-              placeholder="React, Node.js, TypeScript"
-              value={formData.technologies}
-              onChange={(e) => setFormData({ ...formData, technologies: e.target.value })}
-            />
+            <div>
+              <Label htmlFor="technologies">Technologies (comma-separated)</Label>
+              <Input
+                id="technologies"
+                placeholder="React, Node.js, TypeScript"
+                value={formData.technologies}
+                onChange={(e) => setFormData({ ...formData, technologies: e.target.value })}
+              />
+            </div>
           </div>
 
           <div>
@@ -304,6 +420,7 @@ function AddProjectDialog() {
               id="notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Additional project notes..."
             />
           </div>
 
@@ -317,55 +434,40 @@ function AddProjectDialog() {
           </div>
         </form>
       </DialogContent>
-    </Dialog>
-  );
-}
 
-export default function ProjectsPage() {
-  const [filter, setFilter] = useState<string>('all');
-  const [search, setSearch] = useState('');
-
-  // Real API call to fetch projects
-  const { data: projects = [], isLoading } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
-    queryFn: async () => {
-      const response = await fetch('/api/projects');
-      if (!response.ok) {
-        throw new Error('Failed to fetch projects');
-      }
-      return response.json();
-    },
-  });
-
-  const queryClient = useQueryClient();
-
-  const deleteMutation = useMutation({
-    mutationFn: async (projectId: number) => {
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete project');
-      }
-      
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
-    },
-  });
-
-  const filteredProjects = projects.filter((project: Project) => {
-    const matchesSearch = project.name.toLowerCase().includes(search.toLowerCase()) ||
-                         project.client.toLowerCase().includes(search.toLowerCase()) ||
-                         project.description.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesFilter = filter === 'all' || project.status === filter;
-    
-    return matchesSearch && matchesFilter;
-  });
-
+      {/* Lead Selection Dialog */}
+      <Dialog open={showLeadSelector} onOpenChange={setShowLeadSelector}>
+        <DialogContent className="max-w-2xl max-h-[60vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Lead</DialogTitle>
+            <DialogDescription>
+              Choose a lead to auto-fill project information
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {leads.map((lead) => (
+              <div
+                key={lead.id}
+                className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                onClick={() => handleLeadSelect(lead)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <Building className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium">{lead.companyName}</div>
+                    <div className="text-sm text-gray-500">{lead.websiteUrl}</div>
+                    {lead.industry && (
+                      <Badge variant="secondary" className="text-xs mt-1">
+                        {lead.industry}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
   const stats = {
     total: projects.length,
     planning: projects.filter((p: Project) => p.status === 'planning').length,
@@ -379,104 +481,99 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = (project: Project) => {
-    if (window.confirm(`Are you sure you want to delete "${project.name}"?`)) {
-      deleteMutation.mutate(project.id);
-    }
+    deleteMutation.mutate(project.id);
   };
+
+  const filteredProjects = projects.filter((project: Project) => {
+    const matchesSearch = !search || 
+      project.name.toLowerCase().includes(search.toLowerCase()) ||
+      project.client.toLowerCase().includes(search.toLowerCase()) ||
+      project.description.toLowerCase().includes(search.toLowerCase());
+    
+    const matchesFilter = filter === 'all' || project.status === filter;
+    
+    return matchesSearch && matchesFilter;
+  });
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
-        <div>
-          <div className="h-8 w-48 bg-muted rounded mb-2" />
-          <div className="h-4 w-72 bg-muted rounded" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-muted rounded" />
-          ))}
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-            <FolderOpen className="w-6 h-6" />
-            Ongoing Projects
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Track and manage your client projects
-          </p>
+          <h1 className="text-3xl font-bold">Projects</h1>
+          <p className="text-muted-foreground">Manage your client projects</p>
         </div>
         <AddProjectDialog />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-              <FolderOpen className="w-4 h-4 text-muted-foreground" />
-            </div>
+          <CardContent className="p-6">
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-sm text-muted-foreground">Total Projects</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Planning</p>
-                <p className="text-2xl font-bold">{stats.planning}</p>
-              </div>
-              <Clock className="w-4 h-4 text-blue-500" />
-            </div>
+          <CardContent className="p-6">
+            <div className="text-2xl font-bold">{stats.planning}</div>
+            <p className="text-sm text-muted-foreground">Planning</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">In Progress</p>
-                <p className="text-2xl font-bold">{stats.inProgress}</p>
-              </div>
-              <PlayCircle className="w-4 h-4 text-green-500" />
-            </div>
+          <CardContent className="p-6">
+            <div className="text-2xl font-bold">{stats.inProgress}</div>
+            <p className="text-sm text-muted-foreground">In Progress</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">{stats.completed}</p>
-              </div>
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-            </div>
+          <CardContent className="p-6">
+            <div className="text-2xl font-bold">{stats.completed}</div>
+            <p className="text-sm text-muted-foreground">Completed</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-2 flex-1 max-w-md">
-          <Input
-            placeholder="Search projects..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1"
+      {/* Filters */}
+      <div className="flex items-center gap-4">
+        <Input
+          placeholder="Search projects..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="planning">Planning</SelectItem>
+            <SelectItem value="in_progress">In Progress</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="on_hold">On Hold</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProjects.map((project: Project) => (
+          <ProjectCard
+            key={project.id}
+            project={project}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
           />
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+        ))}
                 <SelectItem key={value} value={value}>
                   {config.label}
                 </SelectItem>

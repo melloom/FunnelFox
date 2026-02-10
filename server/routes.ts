@@ -789,49 +789,17 @@ export async function registerRoutes(
       
       const { search, source, type, experience, tech } = req.query;
       
-      // For now, return mock data - in production this would query a database
-      const mockJobs: any[] = [
-        {
-          id: "1",
-          title: "Senior Frontend Developer",
-          company: "Tech Corp",
-          location: "San Francisco, CA",
-          salary: "$120,000 - $160,000",
-          type: "full-time",
-          experience: "senior",
-          description: "We are looking for an experienced frontend developer to join our team...",
-          requirements: ["5+ years React experience", "TypeScript proficiency", "Strong CSS skills"],
-          postedDate: "2 days ago",
-          source: "LinkedIn",
-          url: "https://linkedin.com/jobs/123",
-          technologies: ["React", "TypeScript", "Node.js"],
-          remote: true
-        },
-        {
-          id: "2",
-          title: "Full Stack Web Developer",
-          company: "StartupXYZ",
-          location: "New York, NY",
-          salary: "$80,000 - $120,000",
-          type: "full-time",
-          experience: "mid",
-          description: "Join our fast-growing startup as a full stack developer...",
-          requirements: ["3+ years experience", "React and Node.js", "Database knowledge"],
-          postedDate: "1 week ago",
-          source: "Indeed",
-          url: "https://indeed.com/jobs/456",
-          technologies: ["React", "Node.js", "MongoDB"],
-          remote: false
-        }
-      ];
+      // Get user's jobs from database
+      const userJobs = await storage.getJobs(req.session.userId!);
       
-      // Apply filters (basic implementation)
-      let filteredJobs = mockJobs;
+      // Apply filters
+      let filteredJobs = userJobs;
       
       if (search) {
         filteredJobs = filteredJobs.filter(job => 
           job.title.toLowerCase().includes(String(search).toLowerCase()) ||
-          job.company.toLowerCase().includes(String(search).toLowerCase())
+          job.company.toLowerCase().includes(String(search).toLowerCase()) ||
+          job.description.toLowerCase().includes(String(search).toLowerCase())
         );
       }
       
@@ -850,7 +818,7 @@ export async function registerRoutes(
       if (tech) {
         const techArray = String(tech).split(",").filter(Boolean);
         filteredJobs = filteredJobs.filter(job => 
-          techArray.some(t => job.technologies.includes(t))
+          techArray.some(t => job.technologies?.includes(t))
         );
       }
       
@@ -916,7 +884,7 @@ export async function registerRoutes(
               url: item.url,
               technologies: item.technologies || [],
               remote: item.remote,
-              userId,
+              userId: userId,
             };
           } else {
           // It's a freelance project
@@ -934,11 +902,11 @@ export async function registerRoutes(
               url: item.url,
               technologies: item.skills || [],
               remote: item.remote,
-              userId,
+              userId: userId,
             };
           }
           
-          const saved = await db.insert(jobsTable).values(data).returning();
+          const saved = await storage.createJob(data);
           savedResults.push(saved);
         } catch (error) {
           console.error(`Failed to save item: ${item.title}`, error);

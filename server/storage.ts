@@ -1,23 +1,25 @@
 import {
   leads,
-  users,
   activityLog,
   jobs,
+  projects,
   type Lead,
   type InsertLead,
-  type User,
-  type InsertUser,
   type Activity,
   type InsertActivity,
   type InsertJob,
+  type Job,
+  type InsertProject,
+  type Project,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, inArray, sql } from "drizzle-orm";
+import { eq, desc, inArray, sql, and } from "drizzle-orm";
+import { users as usersTable, type User, type UpsertUser } from "@shared/models/auth";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: UpsertUser): Promise<User>;
   getLeads(): Promise<Lead[]>;
   getLead(id: number): Promise<Lead | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
@@ -29,21 +31,27 @@ export interface IStorage {
   createActivity(activity: InsertActivity): Promise<Activity>;
   getActivitiesForLeads(leadIds: number[]): Promise<Activity[]>;
   getLeadCount(): Promise<number>;
+  // Job storage methods
+  getJobs(userId: string): Promise<Job[]>;
+  createJob(job: InsertJob): Promise<Job>;
+  deleteJob(id: number, userId: string): Promise<boolean>;
+  deleteJobs(ids: number[], userId: string): Promise<number>;
+  getJobCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
     return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, username));
     return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+  async createUser(insertUser: UpsertUser): Promise<User> {
+    const [user] = await db.insert(usersTable).values(insertUser).returning();
     return user;
   }
 
@@ -103,6 +111,32 @@ export class DatabaseStorage implements IStorage {
 
   async getLeadCount(): Promise<number> {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(leads);
+    return Number(result?.count || 0);
+  }
+
+  // Job storage methods
+  async getJobs(userId: string): Promise<Job[]> {
+    return db.select().from(jobs).where(eq(jobs.userId, userId)).orderBy(desc(jobs.scrapedAt));
+  }
+
+  async createJob(job: InsertJob): Promise<Job> {
+    const [created] = await db.insert(jobs).values(job).returning();
+    return created;
+  }
+
+  async deleteJob(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(jobs).where(and(eq(jobs.id, id), eq(jobs.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async deleteJobs(ids: number[], userId: string): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await db.delete(jobs).where(and(inArray(jobs.id, ids), eq(jobs.userId, userId)));
+    return result.rowCount || 0;
+  }
+
+  async getJobCount(userId: string): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(jobs).where(eq(jobs.userId, userId));
     return Number(result?.count || 0);
   }
 }
