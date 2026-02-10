@@ -3277,6 +3277,31 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
     const html = await response.text();
     const $ = cheerio.load(html);
 
+    // Check if page requires login or is blocked
+    const bodyText = $("body").text().toLowerCase();
+    const titleText = $("title").text().toLowerCase();
+    
+    // Indicators of login-required or blocked pages
+    const loginIndicators = [
+      "log in", "sign in", "login", "sign up", "create account",
+      "you must be logged in", "please log in", "authentication required",
+      "this content is only available to", "private account", "follow to see",
+      "access denied", "unauthorized", "login required"
+    ];
+    
+    const isLoginRequired = loginIndicators.some(indicator => 
+      bodyText.includes(indicator) || titleText.includes(indicator)
+    );
+    
+    // Check for meta tags that indicate private/login required content
+    const robotsMeta = $('meta[name="robots"]').attr("content")?.toLowerCase() || "";
+    const isNoIndex = robotsMeta.includes("noindex") || robotsMeta.includes("none");
+    
+    if (isLoginRequired) {
+      console.log(`[scrapeUrlForBusinessInfo] Login required for ${inputUrl}, attempting public data extraction`);
+      // Still try to extract public meta data even if login is required
+    }
+
     const parsedUrl = new URL(fullUrl);
     const host = parsedUrl.hostname.replace(/^www\./, "").replace(/^m\./, "");
     const isSocialMedia = Object.keys(SOCIAL_MEDIA_DOMAINS).some(
@@ -3284,109 +3309,127 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
     );
 
     if (isSocialMedia) {
+      // Prioritize public meta data which is usually available even on login-required pages
       const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
       const twitterTitle = $('meta[name="twitter:title"]').attr("content")?.trim();
       const pageTitle = $("title").text().trim();
       let name = ogTitle || twitterTitle || pageTitle || "";
+      
+      // More aggressive cleaning for social media titles
       name = name
-        .replace(/\s*[-|]\s*(Facebook|Instagram|Twitter|X|LinkedIn|TikTok|YouTube|Pinterest).*$/i, "")
+        .replace(/\s*[-|]\s*(Facebook|Instagram|Twitter|X|LinkedIn|TikTok|YouTube|Pinterest|Meta).*$/i, "")
         .replace(/\s*on\s+(Facebook|Instagram|Twitter|X|LinkedIn)$/i, "")
-        .replace(/\s*\|\s*.*$/i, "") // Remove anything after pipe
+        .replace(/\s*\|\s*.*$/i, "")
+        .replace(/\s*\(\s*@.*\)\s*$/i, "") // Remove @username in parentheses
+        .replace(/@\s*[a-zA-Z0-9_.]+$/, "") // Remove @username at end
         .trim();
       
       // Additional validation for extracted names
-      const genericNames = ["business", "page", "profile", "account", "home", "login", "sign up", "create page"];
+      const genericNames = ["business", "page", "profile", "account", "home", "login", "sign up", "create page", "meta"];
       const isGeneric = genericNames.some(generic => name.toLowerCase().includes(generic));
       
       if (name && name.length > 1 && name.length < 80 && !isGeneric) {
         result.companyName = name;
       }
 
+      // Meta descriptions are usually public even on private accounts
       const ogDesc = $('meta[property="og:description"]').attr("content")?.trim();
-      if (ogDesc) result.description = ogDesc.slice(0, 300);
-
-      const bodyText = $("body").text();
-      const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
-      const emailMatches = bodyText.match(emailRegex) || [];
-      
-      // Filter out likely platform/generic emails
-      const filteredEmails = emailMatches.filter(email => {
-        const lo = email.toLowerCase();
-        // Exclude image files and examples
-        if (lo.endsWith(".png") || lo.endsWith(".jpg") || lo.includes("example.com")) return false;
-        // Exclude platform domains
-        if (lo.includes("@facebook.com") || lo.includes("@instagram.com") || lo.includes("@meta.com") || 
-            lo.includes("@support.") || lo.includes("@help.") || lo.includes("@noreply.")) return false;
-        // Exclude obviously fake emails
-        if (lo.startsWith("test@") || lo.startsWith("fake@") || lo.startsWith("demo@")) return false;
-        return true;
-      });
-      
-      for (const email of filteredEmails) {
-        result.contactEmail = email;
-        break;
+      if (ogDesc && !ogDesc.toLowerCase().includes("log in") && !ogDesc.toLowerCase().includes("sign up")) {
+        result.description = ogDesc.slice(0, 300);
       }
 
-      const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
-      const phoneMatches = bodyText.match(phoneRegex) || [];
-      
-      // Filter and prioritize phone numbers by context relevance
-      const filteredPhones = phoneMatches.filter(phone => {
-        const cleanPhone = phone.replace(/[^0-9]/g, "");
-        // Exclude obviously fake/generic numbers
-        if (cleanPhone === "0000000000" || cleanPhone === "1111111111" || cleanPhone === "1234567890") return false;
-        // Exclude very short numbers after cleaning
-        if (cleanPhone.length < 10) return false;
-        // Exclude Meta's known customer service numbers
-        const metaNumbers = ["6505434800", "6503087300", "6505434800"]; // Meta/Facebook corporate numbers
-        if (metaNumbers.includes(cleanPhone)) return false;
-        return true;
-      });
-      
-      // If we have multiple phones, try to find the most business-relevant one
-      if (filteredPhones.length > 0) {
-        let bestPhone = filteredPhones[0];
+      // Only attempt body text extraction if page doesn't require login
+      if (!isLoginRequired) {
+        const bodyText = $("body").text();
+        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+        const emailMatches = bodyText.match(emailRegex) || [];
         
-        // Look for phones in business context sections
-        const businessContextSelectors = [
-          '.contact', '.about', '.info', '.description', '[data-testid*="contact"]',
-          '[aria-label*="contact"]', '[aria-label*="phone"]', '.business', '.page'
-        ];
+        // Filter out likely platform/generic emails
+        const filteredEmails = emailMatches.filter(email => {
+          const lo = email.toLowerCase();
+          // Exclude image files and examples
+          if (lo.endsWith(".png") || lo.endsWith(".jpg") || lo.includes("example.com")) return false;
+          // Exclude platform domains
+          if (lo.includes("@facebook.com") || lo.includes("@instagram.com") || lo.includes("@meta.com") || 
+              lo.includes("@support.") || lo.includes("@help.") || lo.includes("@noreply.")) return false;
+          // Exclude obviously fake emails
+          if (lo.startsWith("test@") || lo.startsWith("fake@") || lo.startsWith("demo@")) return false;
+          return true;
+        });
         
-        for (const selector of businessContextSelectors) {
-          const contextElement = $(selector).first();
-          if (contextElement.length > 0) {
-            const contextText = contextElement.text();
-            const contextPhones = contextText.match(phoneRegex) || [];
-            for (const contextPhone of contextPhones) {
-              if (filteredPhones.includes(contextPhone)) {
-                bestPhone = contextPhone;
-                break;
+        for (const email of filteredEmails) {
+          result.contactEmail = email;
+          break;
+        }
+
+        const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+        const phoneMatches = bodyText.match(phoneRegex) || [];
+        
+        // Filter and prioritize phone numbers by context relevance
+        const filteredPhones = phoneMatches.filter(phone => {
+          const cleanPhone = phone.replace(/[^0-9]/g, "");
+          // Exclude obviously fake/generic numbers
+          if (cleanPhone === "0000000000" || cleanPhone === "1111111111" || cleanPhone === "1234567890") return false;
+          // Exclude very short numbers after cleaning
+          if (cleanPhone.length < 10) return false;
+          // Exclude Meta's known customer service numbers
+          const metaNumbers = ["6505434800", "6503087300", "6505434800"]; // Meta/Facebook corporate numbers
+          if (metaNumbers.includes(cleanPhone)) return false;
+          return true;
+        });
+        
+        // If we have multiple phones, try to find the most business-relevant one
+        if (filteredPhones.length > 0) {
+          let bestPhone = filteredPhones[0];
+          
+          // Look for phones in business context sections
+          const businessContextSelectors = [
+            '.contact', '.about', '.info', '.description', '[data-testid*="contact"]',
+            '[aria-label*="contact"]', '[aria-label*="phone"]', '.business', '.page'
+          ];
+          
+          for (const selector of businessContextSelectors) {
+            const contextElement = $(selector).first();
+            if (contextElement.length > 0) {
+              const contextText = contextElement.text();
+              const contextPhones = contextText.match(phoneRegex) || [];
+              for (const contextPhone of contextPhones) {
+                if (filteredPhones.includes(contextPhone)) {
+                  bestPhone = contextPhone;
+                  break;
+                }
               }
             }
           }
+          
+          result.contactPhone = bestPhone;
         }
-        
-        result.contactPhone = bestPhone;
       }
 
+      // Extract website links - this often works even on login-required pages
       const websiteLink = $('a[href]').filter((_i, el) => {
         const href = $(el).attr("href") || "";
         const text = $(el).text().toLowerCase();
-        return (text.includes("website") || text.includes("visit") || text.includes("site")) &&
+        return (text.includes("website") || text.includes("visit") || text.includes("site") || text.includes("link")) &&
           href.startsWith("http") && !detectSocialMediaUrl(href);
       }).first().attr("href");
       if (websiteLink) result.websiteUrl = websiteLink;
 
-      const locationPatterns = [
-        /(?:located|based)\s+(?:in|at)\s+([^.!?<]+)/i,
-        /(\d+\s+[A-Z][a-z]+\s+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl)\b[^,]*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?,?\s*[A-Z]{2}\s*\d{5})/,
-      ];
-      for (const pattern of locationPatterns) {
-        const match = bodyText.match(pattern);
-        if (match && match[1]) {
-          result.location = match[1].trim().slice(0, 100);
-          break;
+      // Location extraction - only if not login required
+      if (!isLoginRequired) {
+        const locationPatterns = [
+          /(?:located|based)\s+(?:in|at)\s+([^.!?<]+)/i,
+          /(\d+\s+[A-Z][a-z]+\s+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl)\b[^,]*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?,?\s*[A-Z]{2}\s*\d{5})/,
+        ];
+        
+        // Use the already defined bodyText or get it again if needed
+        const locationBodyText = bodyText || $("body").text();
+        for (const pattern of locationPatterns) {
+          const match = locationBodyText.match(pattern);
+          if (match && match[1]) {
+            result.location = match[1].trim().slice(0, 100);
+            break;
+          }
         }
       }
 
@@ -3402,8 +3445,9 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
         }
       }
 
-      if (result.websiteUrl) {
+      if (result.websiteUrl && result.websiteUrl !== fullUrl) {
         try {
+          console.log(`[scrapeUrlForBusinessInfo] Following website link: ${result.websiteUrl}`);
           const ctrl2 = new AbortController();
           const t2 = setTimeout(() => ctrl2.abort(), 10000);
           const resp2 = await fetch(result.websiteUrl, {
@@ -3415,36 +3459,52 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
           if (resp2.ok) {
             const html2 = await resp2.text();
             const $2 = cheerio.load(html2);
-            if (!result.companyName) {
-              const t = $2('meta[property="og:title"]').attr("content")?.trim() || $2("title").text().trim();
-              const clean = t?.replace(/\s*[-|].{0,50}$/, "").trim();
-              if (clean && clean.length > 1 && clean.length < 80) result.companyName = clean;
-            }
-            const ci = extractContactInfo(html2, $2, result.websiteUrl);
-            if (!result.contactEmail && ci.emails?.length) result.contactEmail = ci.emails[0];
-            if (!result.contactPhone && ci.phones?.length) result.contactPhone = ci.phones[0];
-            if (!result.description) {
-              const d = $2('meta[property="og:description"]').attr("content")?.trim() || $2('meta[name="description"]').attr("content")?.trim();
-              if (d) result.description = d.slice(0, 300);
-            }
-            if (!result.location) {
-              const schemas = $2('script[type="application/ld+json"]').toArray();
-              for (const s of schemas) {
-                try {
-                  const j = JSON.parse($2(s).text());
-                  const addr = j.address || j?.["@graph"]?.[0]?.address;
-                  if (addr) {
-                    const parts = [addr.streetAddress, addr.addressLocality, addr.addressRegion, addr.postalCode].filter(Boolean);
-                    if (parts.length > 0) { result.location = parts.join(", ").slice(0, 100); break; }
-                  }
-                } catch {}
+            
+            // Check if the external website also requires login or is blocked
+            const bodyText2 = $2("body").text().toLowerCase();
+            const titleText2 = $2("title").text().toLowerCase();
+            const isLoginRequired2 = loginIndicators.some(indicator => 
+              bodyText2.includes(indicator) || titleText2.includes(indicator)
+            );
+            
+            if (!isLoginRequired2) {
+              if (!result.companyName) {
+                const t = $2('meta[property="og:title"]').attr("content")?.trim() || $2("title").text().trim();
+                const clean = t?.replace(/\s*[-|].{0,50}$/, "").trim();
+                if (clean && clean.length > 1 && clean.length < 80) result.companyName = clean;
               }
+              const ci = extractContactInfo(html2, $2, result.websiteUrl);
+              if (!result.contactEmail && ci.emails?.length) result.contactEmail = ci.emails[0];
+              if (!result.contactPhone && ci.phones?.length) result.contactPhone = ci.phones[0];
+              if (!result.description) {
+                const d = $2('meta[property="og:description"]').attr("content")?.trim() || $2('meta[name="description"]').attr("content")?.trim();
+                if (d) result.description = d.slice(0, 300);
+              }
+              if (!result.location) {
+                const schemas = $2('script[type="application/ld+json"]').toArray();
+                for (const s of schemas) {
+                  try {
+                    const j = JSON.parse($2(s).text());
+                    const addr = j.address || j?.["@graph"]?.[0]?.address;
+                    if (addr) {
+                      const parts = [addr.streetAddress, addr.addressLocality, addr.addressRegion, addr.postalCode].filter(Boolean);
+                      if (parts.length > 0) { result.location = parts.join(", ").slice(0, 100); break; }
+                    }
+                  } catch {}
+                }
+              }
+              const ws = extractSocialLinksFromHtml(html2, $2);
+              const ex = new Set(result.socialMedia || []);
+              for (const s of ws) { if (!ex.has(s)) { if (!result.socialMedia) result.socialMedia = []; result.socialMedia.push(s); ex.add(s); } }
+            } else {
+              console.log(`[scrapeUrlForBusinessInfo] External website ${result.websiteUrl} also requires login`);
             }
-            const ws = extractSocialLinksFromHtml(html2, $2);
-            const ex = new Set(result.socialMedia || []);
-            for (const s of ws) { if (!ex.has(s)) { if (!result.socialMedia) result.socialMedia = []; result.socialMedia.push(s); ex.add(s); } }
+          } else {
+            console.log(`[scrapeUrlForBusinessInfo] Failed to fetch external website: ${resp2.status}`);
           }
-        } catch {}
+        } catch (err) {
+          console.log(`[scrapeUrlForBusinessInfo] Error fetching external website:`, err);
+        }
       }
     } else {
       const title = $("title").text().trim();
