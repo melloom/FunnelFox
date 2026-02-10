@@ -296,13 +296,14 @@ function LeadDetailDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead?.id] });
       toast({ title: "Notes updated" });
     },
   });
 
   const updateLeadField = async (field: string, value: string) => {
     try {
+      if (!lead) return;
       await apiRequest("PATCH", `/api/leads/${lead.id}`, { [field]: value });
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });

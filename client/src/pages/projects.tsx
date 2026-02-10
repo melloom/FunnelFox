@@ -137,39 +137,48 @@ function AddProjectDialog() {
 
   const queryClient = useQueryClient();
 
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          budget: data.budget ? parseFloat(data.budget) : null,
+          startDate: data.startDate ? new Date(data.startDate) : null,
+          endDate: data.endDate ? new Date(data.endDate) : null,
+          technologies: data.technologies.split(',').map(t => t.trim()).filter(t => t),
+          notes: data.notes || null,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create project');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setOpen(false);
+      setFormData({
+        name: '',
+        client: '',
+        description: '',
+        status: 'planning',
+        priority: 'medium',
+        budget: '',
+        startDate: '',
+        endDate: '',
+        technologies: '',
+        notes: '',
+      });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const newProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> = {
-      name: formData.name,
-      client: formData.client,
-      description: formData.description,
-      status: formData.status,
-      priority: formData.priority,
-      budget: formData.budget ? parseFloat(formData.budget) : null,
-      startDate: formData.startDate ? new Date(formData.startDate) : null,
-      endDate: formData.endDate ? new Date(formData.endDate) : null,
-      technologies: formData.technologies.split(',').map(t => t.trim()).filter(t => t),
-      notes: formData.notes || null,
-      leadId: null,
-      userId: 'current-user', // This would come from auth context
-    };
-
-    // In a real app, this would make an API call
-    console.log('New project:', newProject);
-    setOpen(false);
-    setFormData({
-      name: '',
-      client: '',
-      description: '',
-      status: 'planning',
-      priority: 'medium',
-      budget: '',
-      startDate: '',
-      endDate: '',
-      technologies: '',
-      notes: '',
-    });
+    createMutation.mutate(formData);
   };
 
   return (
@@ -302,8 +311,8 @@ function AddProjectDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">
-              Add Project
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Adding...' : 'Add Project'}
             </Button>
           </div>
         </form>
@@ -316,47 +325,34 @@ export default function ProjectsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
-  // Mock data - in a real app, this would come from an API
+  // Real API call to fetch projects
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
-    queryFn: async (): Promise<Project[]> => {
-      // Mock data matching the new schema with leadId and userId
-      return [
-        {
-          id: 1,
-          name: 'E-commerce Website',
-          client: 'Acme Store',
-          description: 'Full-stack e-commerce platform with payment integration and inventory management',
-          status: 'in_progress' as const,
-          priority: 'high' as const,
-          budget: 15000,
-          startDate: new Date('2024-01-15'),
-          endDate: new Date('2024-03-30'),
-          technologies: ['React', 'Node.js', 'MongoDB', 'Stripe'],
-          notes: 'Client wants custom design with mobile-first approach',
-          leadId: 1,
-          userId: 'current-user',
-          createdAt: new Date('2024-01-10T00:00:00Z'),
-          updatedAt: new Date('2024-01-20T00:00:00Z'),
-        },
-        {
-          id: 2,
-          name: 'Portfolio Website',
-          client: 'John Doe Photography',
-          description: 'Responsive portfolio website with gallery and booking system',
-          status: 'planning' as const,
-          priority: 'medium' as const,
-          budget: 3500,
-          startDate: null,
-          endDate: null,
-          technologies: ['Next.js', 'Tailwind CSS', 'Cloudinary'],
-          notes: null,
-          leadId: null,
-          userId: 'current-user',
-          createdAt: new Date('2024-01-18T00:00:00Z'),
-          updatedAt: new Date('2024-01-18T00:00:00Z'),
-        },
-      ];
+    queryFn: async () => {
+      const response = await fetch('/api/projects');
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+      return response.json();
+    },
+  });
+
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (projectId: number) => {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete project');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
     },
   });
 
@@ -383,8 +379,9 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = (project: Project) => {
-    // TODO: Implement delete functionality
-    console.log('Delete project:', project);
+    if (window.confirm(`Are you sure you want to delete "${project.name}"?`)) {
+      deleteMutation.mutate(project.id);
+    }
   };
 
   if (isLoading) {
