@@ -351,17 +351,19 @@ function PipelineLeadDetailDialog({
 
   // Initialize edit form when lead is available
   useEffect(() => {
-    setEditForm({
-      location: lead.location || "",
-      socialMedia: lead.socialMedia || [],
-    });
+    if (lead) {
+      setEditForm({
+        location: lead.location || "",
+        socialMedia: lead.socialMedia || [],
+      });
+    }
   }, [lead]);
 
   const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
   const currentStageIndex = PIPELINE_STAGES.findIndex((s) => s.value === lead.status);
   const currentStage = PIPELINE_STAGES[currentStageIndex];
 
-  const screenshotUrl = lead.screenshotUrl || (!noWebsite ? `https://image.thum.io/get/width/1280/crop/800/noanimate/${lead.websiteUrl!.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}` : null);
+  const screenshotUrl = lead.screenshotUrl || (!noWebsite && lead.websiteUrl ? `https://image.thum.io/get/width/1280/crop/800/noanimate/${lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}` : null);
 
   return (
     <>
@@ -687,7 +689,9 @@ function PipelineLeadDetailDialog({
                 variant="ghost"
                 onClick={() => {
                   setEditingNotes(!editingNotes);
-                  setNotesValue(lead.notes || "");
+                  if (lead) {
+                    setNotesValue(lead.notes || "");
+                  }
                 }}
                 data-testid="button-pipeline-edit-notes"
               >
