@@ -347,10 +347,61 @@ function PipelineLeadDetailDialog({
         socialMedia: data.socialMedia,
       });
     },
+    onMutate: async (data) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/leads"] });
+      
+      // Snapshot the previous value
+      const previousLeads = queryClient.getQueryData<Lead[]>(["/api/leads"]);
+      
+      // Optimistically update to the new value
+      if (previousLeads) {
+        queryClient.setQueryData<Lead[]>(["/api/leads"], 
+          previousLeads.map(lead => 
+            lead.id === data.id 
+              ? { 
+                  ...lead, 
+                  ...(data.companyName && { companyName: data.companyName }),
+                  ...(data.websiteUrl && { websiteUrl: data.websiteUrl }),
+                  ...(data.contactName && { contactName: data.contactName }),
+                  ...(data.contactEmail && { contactEmail: data.contactEmail }),
+                  ...(data.contactPhone && { contactPhone: data.contactPhone }),
+                  ...(data.location && { location: data.location }),
+                  ...(data.industry && { industry: data.industry }),
+                  ...(data.socialMedia && { socialMedia: data.socialMedia }),
+                }
+              : lead
+          )
+        );
+      }
+      
+      return { previousLeads };
+    },
     onSuccess: () => {
+      // Invalidate queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({ title: "Lead updated successfully" });
+      
+      // Show success toast
+      toast({ 
+        title: "Lead updated successfully",
+        description: "All changes have been saved"
+      });
+      
+      // Close edit dialog
       setEditingLead(false);
+    },
+    onError: (error, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousLeads) {
+        queryClient.setQueryData(["/api/leads"], context.previousLeads);
+      }
+      
+      console.error("Failed to update lead:", error);
+      toast({ 
+        title: "Failed to update lead", 
+        description: "Please try again",
+        variant: "destructive"
+      });
     },
   });
 
