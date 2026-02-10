@@ -72,7 +72,20 @@ export const leads = pgTable("leads", {
 
 export const insertLeadSchema = z.object({
   companyName: z.string().min(1).max(200),
-  websiteUrl: z.string().url().min(1),
+  websiteUrl: z.string().min(1).max(500).refine((url) => {
+    // Allow "none" as a special value
+    if (url === "none") return true;
+    // Allow common URL formats including partial domains
+    const urlPatterns = [
+      /^https?:\/\/.+/i,           // Full URLs
+      /^www\..+/i,                 // www. domains
+      /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}.*/i, // domain.tld format
+      /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/i,  // simple domain.tld
+    ];
+    return urlPatterns.some(pattern => pattern.test(url));
+  }, {
+    message: "Please enter a valid URL (e.g., facebook.com/joes-pizza, www.joespizza.com, or https://joespizza.com)"
+  }),
   contactName: z.string().optional(),
   contactEmail: z.string().email().or(z.literal("")).optional().nullable(),
   contactPhone: z.string().optional(),

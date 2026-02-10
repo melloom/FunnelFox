@@ -45,7 +45,23 @@ import { useState, useMemo, useCallback, useRef } from "react";
 
 const formSchema = z.object({
   companyName: z.string().optional(),
-  websiteUrl: z.string().optional().default(""),
+  websiteUrl: z.string().optional().default("").refine((url) => {
+    // Allow empty string
+    if (!url || url.trim() === "") return true;
+    // Allow "none"
+    if (url.trim() === "none") return true;
+    // Allow common URL formats
+    const trimmedUrl = url.trim();
+    const urlPatterns = [
+      /^https?:\/\/.+/i,           // Full URLs
+      /^www\..+/i,                 // www. domains
+      /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}.*/i, // domain.tld format
+      /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/i,  // simple domain.tld
+    ];
+    return urlPatterns.some(pattern => pattern.test(trimmedUrl));
+  }, {
+    message: "Enter a valid URL (facebook.com/joes-pizza, www.joespizza.com, or https://joespizza.com)"
+  }),
   contactName: z.string().optional(),
   contactEmail: z.string().email().or(z.literal("")).optional(),
   contactPhone: z.string().optional().nullable(),
@@ -346,7 +362,7 @@ export default function AddLeadPage() {
                       </Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Works with Facebook pages, Yelp listings, any business URL — we'll scrape it for info
+                      Works with Facebook pages, Instagram, Yelp listings, any business URL or domain name
                     </p>
                     <FormMessage />
                   </FormItem>
