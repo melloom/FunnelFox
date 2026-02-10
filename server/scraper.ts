@@ -3628,10 +3628,31 @@ export async function searchBusinessesByName(
         $(".result").each((_i, el) => {
           if (queryResults.length >= 5) return; // Limit per query
           const title = $(el).find(".result__title").text().trim();
-          const href = $(el).find(".result__url").text().trim();
+          let href = $(el).find(".result__url").text().trim();
           const snippet = $(el).find(".result__snippet").text().trim();
           
           if (!title) return;
+
+          // Extract and normalize URL from DuckDuckGo results
+          if (href) {
+            // Handle DuckDuckGo redirect URLs
+            if (href.includes("uddg=")) {
+              try {
+                const urlParam = new URL(href, "https://duckduckgo.com").searchParams.get("uddg");
+                if (urlParam) href = urlParam;
+              } catch {}
+            }
+            
+            // Normalize URL format
+            if (!href.startsWith("http")) {
+              href = "https://" + href;
+            }
+            
+            // Remove tracking parameters for social media
+            if (href.includes("instagram.com") || href.includes("facebook.com")) {
+              href = href.split('?')[0].split('#')[0];
+            }
+          }
 
           // Enhanced phone extraction with multiple patterns
           const phonePatterns = [
@@ -3679,6 +3700,11 @@ export async function searchBusinessesByName(
             address: addressMatch || undefined,
             source: source,
           });
+          
+          // Debug logging for URL extraction
+          if (href) {
+            console.log(`[searchBusinessesByName] Extracted URL: ${href} for "${cleanName}" (source: ${source})`);
+          }
         });
         
         return queryResults;

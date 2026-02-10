@@ -98,6 +98,38 @@ function normalizeForCompare(str: string): string {
     .trim();
 }
 
+function normalizeUrl(url: string): string {
+  if (!url) return url;
+  
+  let normalized = url.trim();
+  
+  // Remove DuckDuckGo redirect parameters if present
+  if (normalized.includes("uddg=")) {
+    try {
+      const urlParam = new URL(normalized, "https://duckduckgo.com").searchParams.get("uddg");
+      if (urlParam) normalized = urlParam;
+    } catch {}
+  }
+  
+  // Ensure proper format for social media URLs
+  if (normalized.includes("instagram.com") || normalized.includes("facebook.com")) {
+    // Remove tracking parameters
+    normalized = normalized.split('?')[0].split('#')[0];
+    
+    // Ensure it starts with https://
+    if (!normalized.startsWith("http")) {
+      normalized = "https://" + normalized;
+    }
+  }
+  
+  // For other URLs, ensure https:// if no protocol
+  else if (!normalized.startsWith("http")) {
+    normalized = "https://" + normalized;
+  }
+  
+  return normalized;
+}
+
 function findDuplicates(name: string, website: string, leads: Lead[]): Lead[] {
   if (!name && !website) return [];
   const normalizedName = normalizeForCompare(name);
@@ -231,7 +263,14 @@ export default function AddLeadPage() {
 
   const selectSearchResult = useCallback(async (result: BusinessSearchResult) => {
     form.setValue("companyName", result.name);
-    if (result.url) form.setValue("websiteUrl", result.url);
+    
+    // Normalize and set the URL
+    if (result.url) {
+      const normalizedUrl = normalizeUrl(result.url);
+      form.setValue("websiteUrl", normalizedUrl);
+      console.log(`[selectSearchResult] Set normalized URL: ${normalizedUrl} (from: ${result.url})`);
+    }
+    
     if (result.phone && !form.getValues("contactPhone")) form.setValue("contactPhone", result.phone);
     if (result.address && !form.getValues("location")) form.setValue("location", result.address);
     setShowNameResults(false);
@@ -253,7 +292,9 @@ export default function AddLeadPage() {
       setUrlLookupLoading(true);
       setUrlLookupResult(null);
       try {
-        const res = await apiRequest("POST", "/api/lookup-url", { url: result.url });
+        // Use the normalized URL for scraping
+        const normalizedUrl = normalizeUrl(result.url);
+        const res = await apiRequest("POST", "/api/lookup-url", { url: normalizedUrl });
         const data: UrlLookupResult = await res.json();
         setUrlLookupResult(data);
 
