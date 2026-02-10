@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { ExternalLink, MapPin, DollarSign, Clock, Building, Search, RefreshCw, Filter, Briefcase, Crown, Lock, CheckCircle2, Settings, Save, History, Star, TrendingUp, Zap, Target, Globe2, Users } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { ExternalLink, MapPin, DollarSign, Clock, Building, Search, RefreshCw, Filter, Briefcase, Crown, Lock, CheckCircle2, Settings, Save, History, Star, TrendingUp, Zap, Target, Globe2, Users, Bookmark, BookmarkCheck } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
@@ -99,6 +99,41 @@ export default function FindWorkPage() {
   });
 
   const isSubscribed = subscription?.planStatus === "pro" || subscription?.isAdmin === true;
+
+  const { data: savedJobIds = [] } = useQuery<number[]>({
+    queryKey: ["/api/saved-jobs/ids"],
+    enabled: isSubscribed,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      await apiRequest("POST", `/api/saved-jobs/${jobId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-jobs/ids"] });
+      toast({ title: "Job saved" });
+    },
+  });
+
+  const unsaveMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      await apiRequest("DELETE", `/api/saved-jobs/${jobId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-jobs/ids"] });
+      toast({ title: "Job removed from saved list" });
+    },
+  });
+
+  const toggleSave = (jobId: string) => {
+    if (savedJobIds.includes(Number(jobId))) {
+      unsaveMutation.mutate(jobId);
+    } else {
+      saveMutation.mutate(jobId);
+    }
+  };
 
   const { data: jobs = [], isLoading, error, refetch } = useQuery<JobListing[]>({
     queryKey: ["/api/jobs", searchTerm, selectedSource, selectedType, selectedExperience, selectedTech],
@@ -669,6 +704,27 @@ export default function FindWorkPage() {
                               <ExternalLink className="w-3 h-3" />
                               Apply Now
                             </a>
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant={savedJobIds.includes(Number(job.id)) ? "default" : "outline"}
+                            onClick={() => toggleSave(job.id)}
+                            disabled={saveMutation.isPending || unsaveMutation.isPending}
+                            className="gap-1.5"
+                            data-testid={`button-save-${job.id}`}
+                          >
+                            {savedJobIds.includes(Number(job.id)) ? (
+                              <>
+                                <BookmarkCheck className="w-3 h-3" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Bookmark className="w-3 h-3" />
+                                Save
+                              </>
+                            )}
                           </Button>
                           
                           <Badge variant="outline" className="text-xs border-slate-200">
