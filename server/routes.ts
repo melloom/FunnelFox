@@ -778,9 +778,9 @@ export async function registerRoutes(
   // Job scraping routes
   app.get("/api/jobs", isAuthenticated, async (req, res) => {
     try {
-      // Check if user has paid subscription
+      // Check if user has paid subscription or is admin
       const user = await storage.getUser(req.session.userId!);
-      if (!user || user.planStatus !== 'active') {
+      if (!user || (user.planStatus !== 'active' && !user.isAdmin)) {
         return res.status(403).json({ 
           error: "Premium subscription required",
           message: "Find Work is available with the $30/month subscription"
@@ -831,9 +831,9 @@ export async function registerRoutes(
 
   app.post("/api/jobs/scrape", isAuthenticated, async (req, res) => {
     try {
-      // Check if user has paid subscription
+      // Check if user has paid subscription or is admin
       const user = await storage.getUser(req.session.userId!);
-      if (!user || user.planStatus !== 'active') {
+      if (!user || (user.planStatus !== 'active' && !user.isAdmin)) {
         return res.status(403).json({ 
           error: "Premium subscription required",
           message: "Job scraping is available with the $30/month subscription"
