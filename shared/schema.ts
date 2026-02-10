@@ -74,7 +74,7 @@ export const insertLeadSchema = z.object({
   companyName: z.string().min(1).max(200),
   websiteUrl: z.string().url().min(1),
   contactName: z.string().optional(),
-  contactEmail: z.string().email().optional(),
+  contactEmail: z.string().email().or(z.literal("")).optional().nullable(),
   contactPhone: z.string().optional(),
   industry: z.string().optional(),
   location: z.string().optional(),
