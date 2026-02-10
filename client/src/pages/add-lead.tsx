@@ -46,7 +46,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 const formSchema = z.object({
   companyName: z.string().optional(),
   websiteUrl: z.string().optional().default("").refine((url) => {
-    // Allow empty string
+    // Allow empty string (no website)
     if (!url || url.trim() === "") return true;
     // Allow "none"
     if (url.trim() === "none") return true;
@@ -60,7 +60,7 @@ const formSchema = z.object({
     ];
     return urlPatterns.some(pattern => pattern.test(trimmedUrl));
   }, {
-    message: "Enter a valid URL (facebook.com/joes-pizza, www.joespizza.com, or https://joespizza.com)"
+    message: "Enter a valid URL or leave empty (facebook.com/joes-pizza, www.joespizza.com, or https://joespizza.com)"
   }),
   contactName: z.string().optional(),
   contactEmail: z.string().email().or(z.literal("")).optional(),
@@ -339,7 +339,7 @@ export default function AddLeadPage() {
                     <div className="flex gap-2">
                       <FormControl>
                         <Input
-                          placeholder="facebook.com/joes-pizza or www.joespizza.com"
+                          placeholder="Optional: facebook.com/joes-pizza or www.joespizza.com"
                           autoComplete="url"
                           inputMode="url"
                           {...field}
@@ -362,7 +362,7 @@ export default function AddLeadPage() {
                       </Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Works with Facebook pages, Instagram, Yelp listings, any business URL or domain name
+                      Optional: Works with Facebook pages, Instagram, Yelp listings, any business URL or domain name
                     </p>
                     <FormMessage />
                   </FormItem>
