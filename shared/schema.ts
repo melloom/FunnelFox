@@ -196,6 +196,22 @@ export const insertSavedJobSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const savedScrapes = pgTable("saved_scrapes", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  category: text("category").notNull(),
+  location: text("location").notNull(),
+  maxResults: integer("max_results").notNull().default(20),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSavedScrapeSchema = z.object({
+  category: z.string().min(1),
+  location: z.string().min(1),
+  maxResults: z.number().optional(),
+  userId: z.string(),
+});
+
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activityLog.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;
@@ -204,5 +220,7 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 export type InsertSavedJob = z.infer<typeof insertSavedJobSchema>;
 export type SavedJob = typeof savedJobs.$inferSelect;
+export type InsertSavedScrape = z.infer<typeof insertSavedScrapeSchema>;
+export type SavedScrape = typeof savedScrapes.$inferSelect;
 
 export * from "./models/auth";
