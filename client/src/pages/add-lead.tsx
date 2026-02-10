@@ -47,7 +47,7 @@ const formSchema = z.object({
   companyName: z.string().optional(),
   websiteUrl: z.string().optional().default(""),
   contactName: z.string().optional(),
-  contactEmail: z.string().email().optional().nullable(),
+  contactEmail: z.string().email().or(z.literal("")).optional().nullable(),
   contactPhone: z.string().optional().nullable(),
   industry: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
