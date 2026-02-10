@@ -43,7 +43,7 @@ input, textarea {
 }
 
 .safe-area-top {
-  padding-top: max(1.5rem, env(safe-area-inset-top));
+  padding-top: max(1rem, env(safe-area-inset-top));
 }
 
 .safe-area-bottom {
