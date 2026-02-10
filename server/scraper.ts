@@ -121,8 +121,8 @@ interface CacheEntry {
 }
 
 const searchCache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 3 * 60 * 60 * 1000;
-const MAX_CACHE_ENTRIES = 200;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // Increased to 24 hours to save scraping costs
+const MAX_CACHE_ENTRIES = 500; // Increased capacity for growing user base
 
 function getCacheKey(category: string, location: string, maxResults: number, page: number = 1): string {
   return `${category.toLowerCase().trim()}|${location.toLowerCase().trim()}|${maxResults}|p${page}`;
