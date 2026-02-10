@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLeadSchema, PIPELINE_STAGES, leads as leadsTable, activityLog, insertProjectSchema, projects as projectsTable } from "@shared/schema";
+import { insertLeadSchema, PIPELINE_STAGES, leads as leadsTable, activityLog, insertProjectSchema, projects as projectsTable, jobs as jobsTable } from "@shared/schema";
 import { users as usersTable } from "@shared/models/auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -104,7 +104,7 @@ export async function registerRoutes(
         await storage.createActivity({
           leadId: id,
           action: "notes_updated",
-          details: parsed.notes ? "Notes updated" : "Notes cleared",
+          details: parsed.notes ? "Notes added/updated" : "Notes removed",
         });
       }
 
@@ -203,7 +203,7 @@ export async function registerRoutes(
 
   app.post("/api/leads/:id/activities", isAuthenticated, async (req, res) => {
     try {
-      const leadId = parseInt(req.params.id);
+      const leadId = parseInt(req.params.id as string);
       if (isNaN(leadId)) return res.status(400).json({ error: "Invalid ID" });
       const { action, details } = req.body;
       if (!action) return res.status(400).json({ error: "action is required" });
@@ -355,7 +355,7 @@ export async function registerRoutes(
         }
       }
 
-      function isDuplicate(name: string, url: string | undefined, phone: string | undefined): boolean {
+      const isDuplicate = (name: string, url: string | undefined, phone: string | undefined): boolean => {
         const nameKey = name
           .toLowerCase()
           .replace(/[^a-z0-9\s]/g, "")
@@ -365,7 +365,7 @@ export async function registerRoutes(
 
         if (existingNames.has(nameKey)) return true;
 
-        for (const existing of existingNames) {
+        for (const existing of Array.from(existingNames)) {
           if (nameKey.length >= 5 && existing.length >= 5) {
             if (existing.includes(nameKey) || nameKey.includes(existing)) {
               const shorter = Math.min(nameKey.length, existing.length);
@@ -441,14 +441,14 @@ export async function registerRoutes(
               status: "new",
               websiteScore: 0,
               websiteIssues: issues,
-              notes: notesParts.join(" | ") || null,
+              notes: notesParts.join(" | ") || undefined,
               source: "auto-discover",
-              contactName: null,
-              contactEmail: bizEmail,
-              contactPhone: bizPhone,
-              socialMedia: biz.socialMedia || null,
-              detectedTechnologies: null,
-              screenshotUrl: null,
+              contactName: undefined,
+              contactEmail: bizEmail || undefined,
+              contactPhone: bizPhone || undefined,
+              socialMedia: biz.socialMedia || undefined,
+              detectedTechnologies: undefined,
+              screenshotUrl: undefined,
             });
           })
         );
@@ -471,7 +471,7 @@ export async function registerRoutes(
             if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
 
             const allSocials = [...(biz.socialMedia || []), ...(analysis.socialMedia || [])];
-            const uniqueSocials = allSocials.length ? [...new Map(allSocials.map(s => [s.split(":")[0], s])).values()] : null;
+            const uniqueSocials = allSocials.length ? Array.from(new Map(allSocials.map(s => [s.split(":")[0], s])).values()) : null;
 
             const contactEmail = analysis.contactInfo?.emails?.[0] || null;
             const contactPhone = biz.phone || analysis.contactInfo?.phones?.[0] || null;
@@ -494,21 +494,21 @@ export async function registerRoutes(
               status: "new",
               websiteScore: analysis.score,
               websiteIssues: analysis.issues,
-              notes: notesParts.join(" | ") || null,
+              notes: notesParts.join(" | ") || undefined,
               source: "auto-discover",
-              contactName: null,
-              contactEmail,
-              contactPhone,
-              socialMedia: uniqueSocials,
-              detectedTechnologies: analysis.technologies || null,
-              screenshotUrl: analysis.screenshotUrl || null,
-              bbbRating: biz.bbbRating || null,
-              bbbAccredited: biz.bbbAccredited || null,
-              googleRating: analysis.googleRating || null,
-              googleReviewCount: analysis.googleReviewCount || null,
-              hasSitemap: analysis.hasSitemap || null,
-              hasRobotsTxt: analysis.hasRobotsTxt || null,
-              sitemapIssues: analysis.sitemapIssues || null,
+              contactName: undefined,
+              contactEmail: contactEmail || undefined,
+              contactPhone: contactPhone || undefined,
+              socialMedia: uniqueSocials || undefined,
+              detectedTechnologies: analysis.technologies || undefined,
+              screenshotUrl: analysis.screenshotUrl || undefined,
+              bbbRating: biz.bbbRating || undefined,
+              bbbAccredited: biz.bbbAccredited || undefined,
+              googleRating: analysis.googleRating || undefined,
+              googleReviewCount: analysis.googleReviewCount || undefined,
+              hasSitemap: analysis.hasSitemap || undefined,
+              hasRobotsTxt: analysis.hasRobotsTxt || undefined,
+              sitemapIssues: analysis.sitemapIssues || undefined,
             });
           })
         );
@@ -779,7 +779,7 @@ export async function registerRoutes(
   app.get("/api/jobs", isAuthenticated, async (req, res) => {
     try {
       // Check if user has paid subscription
-      const user = await storage.getUser(req.session.userId);
+      const user = await storage.getUser(req.session.userId!);
       if (!user || user.planStatus !== 'active') {
         return res.status(403).json({ 
           error: "Premium subscription required",
@@ -864,7 +864,7 @@ export async function registerRoutes(
   app.post("/api/jobs/scrape", isAuthenticated, async (req, res) => {
     try {
       // Check if user has paid subscription
-      const user = await storage.getUser(req.session.userId);
+      const user = await storage.getUser(req.session.userId!);
       if (!user || user.planStatus !== 'active') {
         return res.status(403).json({ 
           error: "Premium subscription required",
@@ -938,7 +938,7 @@ export async function registerRoutes(
             };
           }
           
-          const saved = await storage.createJob(data);
+          const saved = await db.insert(jobsTable).values(data).returning();
           savedResults.push(saved);
         } catch (error) {
           console.error(`Failed to save item: ${item.title}`, error);
