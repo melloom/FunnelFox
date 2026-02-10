@@ -98,7 +98,7 @@ export default function FindWorkPage() {
     },
   });
 
-  const isSubscribed = subscription?.planStatus === "active" || subscription?.planStatus === "pro";
+  const isSubscribed = subscription?.planStatus === "active" || subscription?.planStatus === "pro" || subscription?.isAdmin;
 
   const { data: jobs = [], isLoading, error, refetch } = useQuery<JobListing[]>({
     queryKey: ["/api/jobs", searchTerm, selectedSource, selectedType, selectedExperience, selectedTech],
