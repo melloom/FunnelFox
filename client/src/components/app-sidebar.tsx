@@ -28,11 +28,8 @@ const leadGenerationNavItems = [
 
 const findWorkNavItems = [
   { title: "Find Work", url: "/find-work", icon: Briefcase },
-  { title: "Job Dashboard", url: "/find-work", icon: TrendingUp },
-  { title: "Scrape Jobs", url: "/find-work", icon: RefreshCw },
-  { title: "Advanced Filters", url: "/find-work", icon: Filter },
-  { title: "Job Sources", url: "/find-work", icon: Target },
-  { title: "Back to Leads", url: "/leads", icon: Users },
+  { title: "Back to Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "All Leads", url: "/leads", icon: Users },
 ];
 
 const bottomNavItems = [
