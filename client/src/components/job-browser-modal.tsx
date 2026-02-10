@@ -5,15 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Briefcase,
-  MapPin,
-  Clock,
-  DollarSign,
   Search,
   Globe,
-  Building,
-  Calendar,
   Users,
-  Star,
   TrendingUp,
   ArrowRight,
   Zap,
@@ -23,7 +17,6 @@ import {
   RefreshCw,
   CheckCircle2,
   Sparkles,
-  Filter,
 } from "lucide-react";
 
 const scraperFeatures = [
@@ -51,126 +44,6 @@ const scraperFeatures = [
     description: "Continuous monitoring with intelligent rate limiting, proxy rotation, and spam filtering ensures reliable, up-to-date job listings",
     frequency: "Every 15-30 minutes with smart caching"
   }
-];
-
-const sampleJobs = [
-  {
-    id: 1,
-    title: "Senior Full Stack Developer",
-    company: "TechCorp Solutions",
-    location: "Remote",
-    type: "Full-time",
-    salary: "$120k - $160k",
-    posted: "2 hours ago",
-    skills: ["React", "Node.js", "TypeScript", "PostgreSQL"],
-    platform: "LinkedIn",
-    rating: 4.8,
-    scraped: true,
-  },
-  {
-    id: 2,
-    title: "Frontend Developer - React Specialist",
-    company: "Digital Agency",
-    location: "San Francisco, CA",
-    type: "Full-time",
-    salary: "$90k - $120k",
-    posted: "1 hour ago",
-    skills: ["React", "TypeScript", "Redux", "Tailwind"],
-    platform: "Glassdoor",
-    rating: 4.7,
-    scraped: true,
-  },
-  {
-    id: 3,
-    title: "Full Stack Developer - Startup",
-    company: "Tech Startup",
-    location: "Remote",
-    type: "Full-time",
-    salary: "$80k - $110k + equity",
-    posted: "30 minutes ago",
-    skills: ["Vue.js", "Node.js", "PostgreSQL", "Docker"],
-    platform: "AngelList",
-    rating: 4.6,
-    scraped: true,
-  },
-  {
-    id: 4,
-    title: "E-commerce Website Development",
-    company: "Retail Startup",
-    location: "New York, NY",
-    type: "Contract",
-    salary: "$5,000 - $8,000",
-    posted: "3 hours ago",
-    skills: ["React", "Node.js", "MongoDB", "Stripe API"],
-    platform: "Upwork",
-    rating: 4.5,
-    scraped: true,
-  },
-  {
-    id: 5,
-    title: "WordPress Website Redesign",
-    company: "Local Business",
-    location: "Los Angeles, CA",
-    type: "Project",
-    salary: "$2,000 - $3,500",
-    posted: "4 hours ago",
-    skills: ["WordPress", "PHP", "CSS", "JavaScript"],
-    platform: "Freelancer.com",
-    rating: 4.2,
-    scraped: true,
-  },
-  {
-    id: 6,
-    title: "Remote Node.js Developer",
-    company: "SaaS Company",
-    location: "Remote",
-    type: "Part-time",
-    salary: "$60 - $80/hr",
-    posted: "5 hours ago",
-    skills: ["Node.js", "Express", "MongoDB", "AWS"],
-    platform: "PeoplePerHour",
-    rating: 4.4,
-    scraped: true,
-  },
-  {
-    id: 7,
-    title: "Full Stack Web Application",
-    company: "Tech Company",
-    location: "Austin, TX",
-    type: "Full-time",
-    salary: "$100k - $130k",
-    posted: "6 hours ago",
-    skills: ["Angular", "Node.js", "PostgreSQL", "Docker"],
-    platform: "Indeed",
-    rating: 4.5,
-    scraped: true,
-  },
-  {
-    id: 8,
-    title: "Frontend Developer - React",
-    company: "Startup",
-    location: "Remote",
-    type: "Contract",
-    salary: "$70 - $90/hr",
-    posted: "8 hours ago",
-    skills: ["React", "JavaScript", "CSS", "HTML"],
-    platform: "Stack Overflow",
-    rating: 4.3,
-    scraped: true,
-  },
-  {
-    id: 9,
-    title: "Full Stack Developer",
-    company: "Open Source Project",
-    location: "Remote",
-    type: "Volunteer",
-    salary: "Open Source",
-    posted: "12 hours ago",
-    skills: ["Python", "Django", "PostgreSQL", "Docker"],
-    platform: "GitHub",
-    rating: 4.1,
-    scraped: true,
-  },
 ];
 
 interface JobBrowserModalProps {
@@ -229,77 +102,6 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
     </Card>
   );
 
-  const JobCard = ({ job }: { job: typeof sampleJobs[0] }) => (
-    <Card className="border-border/50 hover:shadow-lg transition-all duration-200 relative overflow-hidden">
-      {job.scraped && (
-        <div className="absolute top-2 right-2 z-10">
-          <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-xs font-medium">
-            <Sparkles className="w-3 h-3 mr-1" />
-            Scraped
-          </Badge>
-        </div>
-      )}
-      <CardHeader className="pb-3">
-        <div className="space-y-2">
-          <CardTitle className="text-base font-semibold line-clamp-1 pr-16">{job.title}</CardTitle>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Building className="w-3 h-3" />
-            <span className="truncate">{job.company}</span>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-1">
-          {job.skills.slice(0, 3).map((skill) => (
-            <Badge key={skill} variant="outline" className="text-xs">
-              {skill}
-            </Badge>
-          ))}
-          {job.skills.length > 3 && (
-            <Badge variant="outline" className="text-xs">
-              +{job.skills.length - 3}
-            </Badge>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="flex items-center gap-1">
-            <MapPin className="w-3 h-3 text-muted-foreground" />
-            <span className="truncate">{job.location}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <DollarSign className="w-3 h-3 text-muted-foreground" />
-            <span className="truncate">{job.salary}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-muted-foreground" />
-            <span className="truncate">{job.type}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="w-3 h-3 text-muted-foreground" />
-            <span className="truncate">{job.posted}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-2 border-t">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-              <span>{job.rating}</span>
-            </div>
-            <Badge variant="secondary" className="text-xs">
-              {job.platform}
-            </Badge>
-          </div>
-          <Button size="sm" className="text-xs px-2 py-1 h-7">
-            View
-            <ArrowRight className="w-3 h-3 ml-1" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
@@ -315,7 +117,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
 
         <div className="space-y-6">
           {/* Tab Navigation */}
-          <div className="flex flex-col sm:flex-row gap-2 border-b">
+          <div className="flex border-b">
             <button
               onClick={() => setActiveTab("scraper")}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -326,17 +128,6 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
             >
               <Database className="w-4 h-4 inline mr-2" />
               Scraper Features
-            </button>
-            <button
-              onClick={() => setActiveTab("jobs")}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "jobs"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Briefcase className="w-4 h-4 inline mr-2" />
-              Sample Jobs
             </button>
           </div>
 
@@ -375,38 +166,6 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
                   </div>
                 </CardContent>
               </Card>
-            </div>
-          )}
-
-          {/* Sample Jobs Tab */}
-          {activeTab === "jobs" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  <Sparkles className="w-4 h-4 inline mr-2 text-green-500" />
-                  Recently scraped jobs (updated hourly)
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Last update: 15 mins ago</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                {sampleJobs.map((job) => (
-                  <JobCard key={job.id} job={job} />
-                ))}
-              </div>
-
-              <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Showing 3 of 1000+ available jobs
-                </p>
-                <Button variant="outline" size="sm">
-                  Load More Jobs
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
             </div>
           )}
 
