@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -343,11 +343,19 @@ function PipelineLeadDetailDialog({
   const [notesValue, setNotesValue] = useState("");
   const [editingLead, setEditingLead] = useState(false);
   const [editForm, setEditForm] = useState({
-    location: lead.location || "",
-    socialMedia: lead.socialMedia || [],
+    location: "",
+    socialMedia: [] as string[],
   });
 
   if (!lead) return null;
+
+  // Initialize edit form when lead is available
+  useEffect(() => {
+    setEditForm({
+      location: lead.location || "",
+      socialMedia: lead.socialMedia || [],
+    });
+  }, [lead]);
 
   const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
   const currentStageIndex = PIPELINE_STAGES.findIndex((s) => s.value === lead.status);
