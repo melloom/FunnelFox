@@ -49,56 +49,56 @@ const staggerContainer = {
 const features = [
   {
     icon: Search,
-    title: "Smart Discovery",
-    description: "Search across 6+ data sources to instantly find businesses in any niche and city that need a website or a better one.",
+    title: "AI-Powered Smart Discovery",
+    description: "Search across 13+ data sources to instantly find businesses in any niche and city that need a website or a better one.",
     badge: "AI-Powered"
   },
   {
     icon: Globe,
-    title: "Website Scoring",
+    title: "Technical Website Analysis",
     description: "Every prospect's site gets graded on speed, SEO, mobile, and security — so you can show them exactly what's wrong.",
     badge: "Technical Analysis"
   },
   {
     icon: Kanban,
-    title: "Sales Pipeline",
+    title: "Visual Sales Pipeline",
     description: "Drag-and-drop Kanban board moves prospects from first contact to signed contract across 8 customizable stages.",
     badge: "Visual CRM"
   },
   {
     icon: Briefcase,
-    title: "Job Scraper",
-    description: "Find web development jobs from multiple platforms - Upwork, Freelancer, and more - all in one place.",
+    title: "Multi-Platform Job Scraper",
+    description: "Find web development jobs from 13+ platforms including LinkedIn, Glassdoor, AngelList, Upwork, Freelancer, and more - all in one place.",
     badge: "NEW"
   },
   {
     icon: Code,
-    title: "Project Management",
+    title: "Project Management System",
     description: "Track all your client projects in one place with timelines, budgets, and lead-to-project connections.",
     badge: "NEW"
   },
   {
     icon: Mail,
-    title: "Built-In Outreach",
+    title: "Built-In Email Outreach",
     description: "Send personalized pitch emails straight from FunnelFox with Gmail — no copy-pasting into another tool.",
     badge: "Email Integration"
   },
   {
     icon: BarChart3,
-    title: "Priority Scoring",
-    description: "Leads are auto-ranked Hot, Warm, Cool, or Cold so you spend time on the prospects most likely to convert.",
-    badge: "Smart Scoring"
+    title: "Analytics & Insights",
+    description: "Track your lead generation performance, conversion rates, and ROI with comprehensive analytics dashboard.",
+    badge: "Analytics"
   },
   {
     icon: Shield,
-    title: "Deep Business Intel",
-    description: "Phone numbers, emails, Google ratings, BBB scores, social links, and tech stack — all pulled automatically.",
-    badge: "Data Mining"
+    title: "Data Security",
+    description: "Your data is encrypted and secure with enterprise-grade security and regular backups.",
+    badge: "Secure"
   },
 ];
 
 const stats = [
-  { value: "6+", label: "Data Sources" },
+  { value: "13+", label: "Data Sources" },
   { value: "8", label: "Pipeline Stages" },
   { value: "100%", label: "Automated" },
 ];
@@ -430,7 +430,7 @@ export default function LandingPage() {
                   </h2>
                 </div>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  25 free leads per month, job scraping, and project management. 
+                  25 free leads per month, multi-platform job scraping, and project management. 
                   No credit card needed. Start landing clients today.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
