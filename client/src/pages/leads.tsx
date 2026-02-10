@@ -295,10 +295,25 @@ function LeadDetailDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "activities"] });
-      toast({ title: "Notes saved" });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
+      toast({ title: "Notes updated" });
     },
   });
+
+  const updateLeadField = async (field: string, value: string) => {
+    try {
+      await apiRequest("PATCH", `/api/leads/${lead.id}`, { [field]: value });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
+      toast({ title: `${field} updated` });
+    } catch (error) {
+      toast({ 
+        title: "Update failed", 
+        description: "Unable to update field. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -315,6 +330,18 @@ function LeadDetailDialog({
   const [notesValue, setNotesValue] = useState("");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  
+  // Editable field states
+  const [editingContactName, setEditingContactName] = useState(false);
+  const [contactNameValue, setContactNameValue] = useState("");
+  const [editingContactEmail, setEditingContactEmail] = useState(false);
+  const [contactEmailValue, setContactEmailValue] = useState("");
+  const [editingContactPhone, setEditingContactPhone] = useState(false);
+  const [contactPhoneValue, setContactPhoneValue] = useState("");
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationValue, setLocationValue] = useState("");
+  const [editingCompanyName, setEditingCompanyName] = useState(false);
+  const [companyNameValue, setCompanyNameValue] = useState("");
 
   if (!lead) return null;
 
@@ -341,7 +368,34 @@ function LeadDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Building2 className="w-5 h-5 text-primary shrink-0" />
-            <span className="break-words min-w-0">{lead.companyName}</span>
+            {editingCompanyName ? (
+              <Input
+                value={companyNameValue}
+                onChange={(e) => setCompanyNameValue(e.target.value)}
+                onBlur={() => updateLeadField('companyName', companyNameValue)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    updateLeadField('companyName', companyNameValue);
+                    setEditingCompanyName(false);
+                  }
+                }}
+                placeholder="Company name"
+                className="text-lg font-semibold h-8"
+                data-testid="input-company-name"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => {
+                  setCompanyNameValue(lead.companyName || '');
+                  setEditingCompanyName(true);
+                }}
+                className="break-words min-w-0 text-left bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-2 py-1 transition-colors"
+                data-testid="button-edit-company-name"
+              >
+                {lead.companyName}
+              </button>
+            )}
           </DialogTitle>
           <DialogDescription className="max-sm:text-xs">Lead details and contact information</DialogDescription>
         </DialogHeader>
@@ -393,44 +447,158 @@ function LeadDetailDialog({
 
             <div className="flex items-center gap-2 text-sm">
               <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span data-testid="text-contact-name">{lead.contactName || <span className="text-muted-foreground italic">Not found</span>}</span>
+              {editingContactName ? (
+                <Input
+                  value={contactNameValue}
+                  onChange={(e) => setContactNameValue(e.target.value)}
+                  onBlur={() => updateLeadField('contactName', contactNameValue)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateLeadField('contactName', contactNameValue);
+                      setEditingContactName(false);
+                    }
+                  }}
+                  placeholder="Contact name"
+                  className="text-sm h-7"
+                  data-testid="input-contact-name"
+                  autoFocus
+                />
+              ) : (
+                <button
+                  onClick={() => {
+                    setContactNameValue(lead.contactName || '');
+                    setEditingContactName(true);
+                  }}
+                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+                  data-testid="button-edit-contact-name"
+                >
+                  {lead.contactName || <span className="text-muted-foreground italic">Click to add contact name</span>}
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2 text-sm">
               <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-              {lead.contactEmail ? (
+              {editingContactEmail ? (
+                <Input
+                  value={contactEmailValue}
+                  onChange={(e) => setContactEmailValue(e.target.value)}
+                  onBlur={() => updateLeadField('contactEmail', contactEmailValue)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateLeadField('contactEmail', contactEmailValue);
+                      setEditingContactEmail(false);
+                    }
+                  }}
+                  placeholder="Email address"
+                  className="text-sm h-7"
+                  data-testid="input-contact-email"
+                  autoFocus
+                />
+              ) : lead.contactEmail ? (
                 <>
                   <button
-                    onClick={() => setEmailDialogOpen(true)}
-                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate"
-                    data-testid="link-contact-email"
+                    onClick={() => {
+                      setContactEmailValue(lead.contactEmail || '');
+                      setEditingContactEmail(true);
+                    }}
+                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+                    data-testid="button-edit-contact-email"
                   >
                     {lead.contactEmail}
                   </button>
                   <CopyButton value={lead.contactEmail} label="Email" />
                 </>
               ) : (
-                <span className="text-muted-foreground italic" data-testid="text-no-email">Not found</span>
+                <button
+                  onClick={() => {
+                    setContactEmailValue('');
+                    setEditingContactEmail(true);
+                  }}
+                  className="text-muted-foreground italic bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+                  data-testid="button-add-contact-email"
+                >
+                  Click to add email
+                </button>
               )}
             </div>
 
             <div className="flex items-center gap-2 text-sm">
               <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-              {lead.contactPhone ? (
+              {editingContactPhone ? (
+                <Input
+                  value={contactPhoneValue}
+                  onChange={(e) => setContactPhoneValue(e.target.value)}
+                  onBlur={() => updateLeadField('contactPhone', contactPhoneValue)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateLeadField('contactPhone', contactPhoneValue);
+                      setEditingContactPhone(false);
+                    }
+                  }}
+                  placeholder="Phone number"
+                  className="text-sm h-7"
+                  data-testid="input-contact-phone"
+                  autoFocus
+                />
+              ) : lead.contactPhone ? (
                 <>
-                  <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2 flex-1" data-testid="link-contact-phone">
+                  <button
+                    onClick={() => {
+                      setContactPhoneValue(lead.contactPhone || '');
+                      setEditingContactPhone(true);
+                    }}
+                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+                    data-testid="button-edit-contact-phone"
+                  >
                     {lead.contactPhone}
-                  </a>
+                  </button>
                   <CopyButton value={lead.contactPhone} label="Phone" />
                 </>
               ) : (
-                <span className="text-muted-foreground italic" data-testid="text-no-phone">Not found</span>
+                <button
+                  onClick={() => {
+                    setContactPhoneValue('');
+                    setEditingContactPhone(true);
+                  }}
+                  className="text-muted-foreground italic bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+                  data-testid="button-add-contact-phone"
+                >
+                  Click to add phone
+                </button>
               )}
             </div>
 
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span data-testid="text-lead-location">{lead.location || <span className="text-muted-foreground italic">Not found</span>}</span>
+              {editingLocation ? (
+                <Input
+                  value={locationValue}
+                  onChange={(e) => setLocationValue(e.target.value)}
+                  onBlur={() => updateLeadField('location', locationValue)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateLeadField('location', locationValue);
+                      setEditingLocation(false);
+                    }
+                  }}
+                  placeholder="Location"
+                  className="text-sm h-7"
+                  data-testid="input-location"
+                  autoFocus
+                />
+              ) : (
+                <button
+                  onClick={() => {
+                    setLocationValue(lead.location || '');
+                    setEditingLocation(true);
+                  }}
+                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+                  data-testid="button-edit-location"
+                >
+                  {lead.location || <span className="text-muted-foreground italic">Click to add location</span>}
+                </button>
+              )}
             </div>
           </div>
 
