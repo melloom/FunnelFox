@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLeadSchema, PIPELINE_STAGES, leads as leadsTable, activityLog } from "@shared/schema";
+import { insertLeadSchema, PIPELINE_STAGES, leads as leadsTable, activityLog, insertProjectSchema, projects as projectsTable } from "@shared/schema";
 import { users as usersTable } from "@shared/models/auth";
 import { z } from "zod";
 import { db } from "./db";
@@ -778,6 +778,15 @@ export async function registerRoutes(
   // Job scraping routes
   app.get("/api/jobs", isAuthenticated, async (req, res) => {
     try {
+      // Check if user has paid subscription
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.planStatus !== 'active') {
+        return res.status(403).json({ 
+          error: "Premium subscription required",
+          message: "Find Work is available with the $30/month subscription"
+        });
+      }
+      
       const { search, source, type, experience, tech } = req.query;
       
       // For now, return mock data - in production this would query a database
@@ -854,6 +863,15 @@ export async function registerRoutes(
 
   app.post("/api/jobs/scrape", isAuthenticated, async (req, res) => {
     try {
+      // Check if user has paid subscription
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.planStatus !== 'active') {
+        return res.status(403).json({ 
+          error: "Premium subscription required",
+          message: "Job scraping is available with the $30/month subscription"
+        });
+      }
+      
       const { sources, keywords, includeFreelance } = req.body;
       const userId = req.session.userId;
       
@@ -938,6 +956,133 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Job scraping error:", err);
       res.status(500).json({ error: "Failed to scrape jobs" });
+    }
+  });
+
+  // Project Routes
+  app.get("/api/projects", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const projects = await db.select()
+        .from(projectsTable)
+        .where(eq(projectsTable.userId, userId))
+        .orderBy(projectsTable.updatedAt);
+      res.json(projects);
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+      res.status(500).json({ error: "Failed to fetch projects" });
+    }
+  });
+
+  app.post("/api/projects", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const validatedData = insertProjectSchema.parse({ ...req.body, userId });
+      
+      const project = await db.insert(projectsTable)
+        .values({
+          ...validatedData,
+          startDate: validatedData.startDate ? new Date(validatedData.startDate) : null,
+          endDate: validatedData.endDate ? new Date(validatedData.endDate) : null,
+        })
+        .returning();
+      
+      res.json(project[0]);
+    } catch (err) {
+      console.error("Failed to create project:", err);
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: err.errors });
+      }
+      res.status(500).json({ error: "Failed to create project" });
+    }
+  });
+
+  app.put("/api/projects/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const projectId = parseInt(req.params.id as string);
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+
+      const validatedData = insertProjectSchema.partial().parse(req.body);
+      
+      const existingProject = await db.select()
+        .from(projectsTable)
+        .where(eq(projectsTable.id, projectId))
+        .limit(1);
+
+      if (existingProject.length === 0) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      if (existingProject[0].userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updatedProject = await db.update(projectsTable)
+        .set({
+          ...validatedData,
+          startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
+          endDate: validatedData.endDate ? new Date(validatedData.endDate) : undefined,
+          updatedAt: new Date(),
+        })
+        .where(eq(projectsTable.id, projectId))
+        .returning();
+
+      res.json(updatedProject[0]);
+    } catch (err) {
+      console.error("Failed to update project:", err);
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: err.errors });
+      }
+      res.status(500).json({ error: "Failed to update project" });
+    }
+  });
+
+  app.delete("/api/projects/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const projectId = parseInt(req.params.id as string);
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: "Invalid project ID" });
+      }
+
+      const existingProject = await db.select()
+        .from(projectsTable)
+        .where(eq(projectsTable.id, projectId))
+        .limit(1);
+
+      if (existingProject.length === 0) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      if (existingProject[0].userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await db.delete(projectsTable)
+        .where(eq(projectsTable.id, projectId));
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      res.status(500).json({ error: "Failed to delete project" });
     }
   });
 

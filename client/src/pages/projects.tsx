@@ -7,24 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, FolderOpen, Calendar, DollarSign, User, Clock, CheckCircle, AlertCircle, PlayCircle, PauseCircle } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, FolderOpen, Calendar, DollarSign, User, Clock, CheckCircle, AlertCircle, PlayCircle, PauseCircle, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-interface Project {
-  id: string;
-  name: string;
-  client: string;
-  description: string;
-  status: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high';
-  budget?: number;
-  startDate?: string;
-  endDate?: string;
-  technologies: string[];
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Project } from "@shared/schema";
 
 const STATUS_CONFIG = {
   planning: { label: 'Planning', icon: Clock, color: 'bg-blue-500', textColor: 'text-blue-600' },
@@ -40,7 +26,7 @@ const PRIORITY_CONFIG = {
   high: { label: 'High', color: 'bg-red-100 text-red-700' },
 };
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, onEdit, onDelete }: { project: Project; onEdit: (project: Project) => void; onDelete: (project: Project) => void }) {
   const statusConfig = STATUS_CONFIG[project.status];
   const priorityConfig = PRIORITY_CONFIG[project.priority];
   const StatusIcon = statusConfig.icon;
@@ -59,9 +45,28 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground line-clamp-2">
-          {project.description}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {project.description}
+          </p>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(project)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete(project)} className="text-red-600">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         
         <div className="flex items-center gap-2">
           <StatusIcon className={`w-4 h-4 ${statusConfig.textColor}`} />
@@ -94,6 +99,13 @@ function ProjectCard({ project }: { project: Project }) {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Calendar className="w-3 h-3" />
             Started: {new Date(project.startDate).toLocaleDateString()}
+          </div>
+        )}
+        
+        {project.endDate && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Calendar className="w-3 h-3" />
+            Due: {new Date(project.endDate).toLocaleDateString()}
           </div>
         )}
       </CardContent>

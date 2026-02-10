@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, MapPin, DollarSign, Clock, Building, Search, RefreshCw, Filter, Briefcase } from "lucide-react";
+import { ExternalLink, MapPin, DollarSign, Clock, Building, Search, RefreshCw, Filter, Briefcase, Crown, Lock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 interface JobListing {
   id: string;
@@ -71,7 +72,7 @@ export default function FindWorkPage() {
   const [isScraping, setIsScraping] = useState(false);
   const { toast } = useToast();
 
-  const { data: jobs = [], isLoading, refetch } = useQuery<JobListing[]>({
+  const { data: jobs = [], isLoading, error, refetch } = useQuery<JobListing[]>({
     queryKey: ["/api/jobs", searchTerm, selectedSource, selectedType, selectedExperience, selectedTech],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -83,8 +84,21 @@ export default function FindWorkPage() {
       });
       
       const res = await apiRequest("GET", `/api/jobs?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch jobs");
+      if (!res.ok) {
+        if (res.status === 403) {
+          const error = await res.json();
+          throw new Error(error.message || "Premium subscription required");
+        }
+        throw new Error("Failed to fetch jobs");
+      }
       return res.json();
+    },
+    retry: (failureCount, error) => {
+      // Don't retry on subscription errors
+      if (error.message?.includes("subscription")) {
+        return false;
+      }
+      return failureCount < 3;
     },
   });
 
@@ -355,6 +369,52 @@ export default function FindWorkPage() {
               <p className="mt-4 text-slate-600 font-medium">Loading amazing jobs...</p>
               <p className="text-sm text-slate-500">Finding the perfect opportunities for you</p>
             </div>
+          ) : error?.message?.includes("subscription") ? (
+            <Card className="border-slate-200/60">
+              <CardContent className="text-center py-16">
+                <div className="flex flex-col items-center space-y-4 max-w-md mx-auto">
+                  <div className="p-4 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl">
+                    <Crown className="w-8 h-8 text-purple-600" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold text-slate-900">Premium Feature</h3>
+                    <p className="text-slate-600">
+                      Find Work is available with the $30/month subscription. Get access to:
+                    </p>
+                    <ul className="text-sm text-slate-600 space-y-1 text-left">
+                      <li className="flex items-center gap-2">
+                        <Lock className="w-3 h-3" />
+                        Real-time job scraping from Indeed, LinkedIn, and more
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Lock className="w-3 h-3" />
+                        Freelance projects from Upwork, Fiverr, and Reddit
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Lock className="w-3 h-3" />
+                        Advanced filtering and technology matching
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Lock className="w-3 h-3" />
+                        Budget and salary information extraction
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button asChild className="bg-purple-600 hover:bg-purple-700">
+                      <Link href="/subscription">
+                        Upgrade to Premium
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/subscription">
+                        View Pricing
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ) : filteredJobs.length === 0 ? (
             <Card className="border-slate-200/60">
               <CardContent className="text-center py-16">

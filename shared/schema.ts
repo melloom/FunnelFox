@@ -15,6 +15,20 @@ export const leadStatusEnum = pgEnum("lead_status", [
   "lost",
 ]);
 
+export const projectStatusEnum = pgEnum("project_status", [
+  "planning",
+  "in_progress",
+  "on_hold",
+  "completed",
+  "cancelled",
+]);
+
+export const projectPriorityEnum = pgEnum("project_priority", [
+  "low",
+  "medium",
+  "high",
+]);
+
 export const PIPELINE_STAGES = [
   { value: "new", label: "New Lead", color: "chart-1" },
   { value: "contacted", label: "Contacted", color: "chart-4" },
@@ -90,6 +104,23 @@ export const jobs = pgTable("jobs", {
   userId: integer("user_id").notNull(),
 });
 
+export const projects = pgTable("projects", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull(),
+  client: text("client").notNull(),
+  description: text("description").notNull(),
+  status: projectStatusEnum("status").notNull().default("planning"),
+  priority: projectPriorityEnum("priority").notNull().default("medium"),
+  budget: integer("budget"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  technologies: text("technologies").array(),
+  notes: text("notes"),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const insertActivitySchema = z.object({
   leadId: z.number(),
   action: z.string(),
@@ -113,8 +144,24 @@ export const insertJobSchema = z.object({
   userId: z.number(),
 });
 
+export const insertProjectSchema = z.object({
+  name: z.string().min(1).max(200),
+  client: z.string().min(1).max(100),
+  description: z.string().min(1).max(2000),
+  status: z.enum(["planning", "in_progress", "on_hold", "completed", "cancelled"]).default("planning"),
+  priority: z.enum(["low", "medium", "high"]).default("medium"),
+  budget: z.number().optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  technologies: z.array(z.string()).optional(),
+  notes: z.string().optional().nullable(),
+  userId: z.string(),
+});
+
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activityLog.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Project = typeof projects.$inferSelect;
 
 export * from "./models/auth";
