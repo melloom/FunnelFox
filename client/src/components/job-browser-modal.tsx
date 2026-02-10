@@ -105,7 +105,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 z-[9999]">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 z-[9999]">
         <DialogHeader className="mb-6">
           <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl">
             <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
@@ -116,7 +116,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
           </p>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Tab Navigation */}
           <div className="flex border-b">
             <button
@@ -134,7 +134,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
 
           {/* Scraper Features Tab */}
           {activeTab === "scraper" && (
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {scraperFeatures.map((feature) => (
                   <ScraperFeatureCard key={feature.title} feature={feature} />
@@ -143,7 +143,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
 
               {/* Stats Section */}
               <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-                <CardContent className="p-6">
+                <CardContent className="p-8">
                   <div className="text-center space-y-4">
                     <h3 className="text-lg font-semibold">Our Scraper Power</h3>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -172,7 +172,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
 
           {/* CTA Section */}
           <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-            <CardContent className="p-6">
+            <CardContent className="p-8">
               <div className="text-center space-y-4">
                 <h3 className="text-lg font-semibold">Get Access to Our Job Scraper</h3>
                 <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
