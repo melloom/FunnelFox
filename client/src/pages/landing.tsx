@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { JobBrowserModal } from "@/components/job-browser-modal";
@@ -49,51 +48,43 @@ const staggerContainer = {
 const features = [
   {
     icon: Search,
-    title: "AI-Powered Smart Discovery",
+    title: "Smart Discovery",
     description: "Search across 13+ data sources to instantly find businesses in any niche and city that need a website or a better one.",
-    badge: "AI-Powered"
   },
   {
     icon: Globe,
-    title: "Technical Website Analysis",
+    title: "Website Analysis",
     description: "Every prospect's site gets graded on speed, SEO, mobile, and security — so you can show them exactly what's wrong.",
-    badge: "Technical Analysis"
   },
   {
     icon: Kanban,
-    title: "Visual Sales Pipeline",
+    title: "Sales Pipeline",
     description: "Drag-and-drop Kanban board moves prospects from first contact to signed contract across 8 customizable stages.",
-    badge: "Visual CRM"
   },
   {
     icon: Briefcase,
     title: "Multi-Platform Job Scraper",
     description: "Find web development jobs from 13+ platforms including LinkedIn, Glassdoor, AngelList, Upwork, Freelancer, and more - all in one place.",
-    badge: "NEW"
   },
   {
     icon: Code,
-    title: "Project Management System",
+    title: "Project Management",
     description: "Track all your client projects in one place with timelines, budgets, and lead-to-project connections.",
-    badge: "NEW"
   },
   {
     icon: Mail,
-    title: "Built-In Email Outreach",
+    title: "Email Outreach",
     description: "Send personalized pitch emails straight from FunnelFox with Gmail — no copy-pasting into another tool.",
-    badge: "Email Integration"
   },
   {
     icon: BarChart3,
     title: "Analytics & Insights",
     description: "Track your lead generation performance, conversion rates, and ROI with comprehensive analytics dashboard.",
-    badge: "Analytics"
   },
   {
     icon: Shield,
     title: "Data Security",
     description: "Your data is encrypted and secure with enterprise-grade security and regular backups.",
-    badge: "Secure"
   },
 ];
 
@@ -107,23 +98,16 @@ function FeatureCard({
   icon: Icon,
   title,
   description,
-  badge,
   index,
 }: {
   icon: typeof Search;
   title: string;
   description: string;
-  badge?: string;
   index?: number;
 }) {
   return (
     <motion.div variants={fadeUp} custom={index}>
-      <Card className="hover-elevate h-full relative overflow-hidden">
-        {badge && (
-          <Badge className="absolute top-3 right-3 z-10 bg-primary text-primary-foreground text-xs font-medium px-2 py-1">
-            {badge}
-          </Badge>
-        )}
+      <Card className="hover-elevate h-full">
         <CardContent className="pt-5 pb-5 space-y-3">
           <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
             <Icon className="w-5 h-5 text-primary" />

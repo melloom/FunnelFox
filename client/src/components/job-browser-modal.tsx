@@ -105,7 +105,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 z-[9999]">
         <DialogHeader className="mb-6">
           <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl">
             <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
