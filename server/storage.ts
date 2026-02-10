@@ -2,12 +2,14 @@ import {
   leads,
   users,
   activityLog,
+  jobs,
   type Lead,
   type InsertLead,
   type User,
   type InsertUser,
   type Activity,
   type InsertActivity,
+  type InsertJob,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, inArray, sql } from "drizzle-orm";

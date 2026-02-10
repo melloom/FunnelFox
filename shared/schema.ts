@@ -71,12 +71,50 @@ export const activityLog = pgTable("activity_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertActivitySchema = createInsertSchema(activityLog).omit({
-  id: true,
-  createdAt: true,
+export const jobs = pgTable("jobs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+  company: text("company").notNull(),
+  location: text("location").notNull(),
+  salary: text("salary"),
+  type: text("type").notNull().default("full-time"),
+  experience: text("experience").notNull().default("mid"),
+  description: text("description").notNull(),
+  requirements: text("requirements").array(),
+  postedDate: text("posted_date").notNull(),
+  source: text("source").notNull(),
+  url: text("url").notNull(),
+  technologies: text("technologies").array(),
+  remote: boolean("remote").notNull().default(false),
+  scrapedAt: timestamp("scraped_at").notNull().defaultNow(),
+  userId: integer("user_id").notNull(),
+});
+
+export const insertActivitySchema = z.object({
+  leadId: z.number(),
+  action: z.string(),
+  details: z.string().optional().nullable(),
+});
+
+export const insertJobSchema = z.object({
+  title: z.string().min(1).max(200),
+  company: z.string().min(1).max(100),
+  location: z.string().min(1).max(200),
+  salary: z.string().optional().nullable(),
+  type: z.string().default("full-time"),
+  experience: z.string().default("mid"),
+  description: z.string().min(1).max(2000),
+  requirements: z.array(z.string()).optional(),
+  postedDate: z.string(),
+  source: z.string(),
+  url: z.string().url(),
+  technologies: z.array(z.string()).optional(),
+  remote: z.boolean().default(false),
+  userId: z.number(),
 });
 
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activityLog.$inferSelect;
+export type InsertJob = z.infer<typeof insertJobSchema>;
 
 export * from "./models/auth";

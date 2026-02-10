@@ -855,51 +855,50 @@ export async function registerRoutes(
   app.post("/api/jobs/scrape", isAuthenticated, async (req, res) => {
     try {
       const { sources, keywords } = req.body;
+      const userId = req.session.userId;
       
-      // Mock scraping implementation
-      // In production, this would scrape actual job sites
-      const mockScrapedJobs = [
-        {
-          id: "scraped-1",
-          title: "React Developer",
-          company: "Web Agency",
-          location: "Remote",
-          salary: "$70,000 - $90,000",
-          type: "full-time",
-          experience: "mid",
-          description: "Looking for a React developer to work on exciting projects...",
-          requirements: ["React experience", "JavaScript proficiency", "CSS skills"],
-          postedDate: "Just posted",
-          source: "RemoteOK",
-          url: "https://remoteok.io/789",
-          technologies: ["React", "JavaScript", "CSS"],
-          remote: true
-        },
-        {
-          id: "scraped-2",
-          title: "Backend Developer",
-          company: "DataTech",
-          location: "Austin, TX",
-          salary: "$100,000 - $140,000",
-          type: "full-time",
-          experience: "senior",
-          description: "Senior backend developer needed for our data platform...",
-          requirements: ["Node.js expertise", "Database design", "API development"],
-          postedDate: "3 days ago",
-          source: "Stack Overflow",
-          url: "https://stackoverflow.com/jobs/101",
-          technologies: ["Node.js", "Python", "PostgreSQL"],
-          remote: false
+      // Import the job scraper
+      const { scrapeJobsFromMultipleSources } = await import('./scraper');
+      
+      // Use real scraping with the provided keywords
+      const scrapedJobs = await scrapeJobsFromMultipleSources(
+        keywords || ["web developer", "frontend", "backend", "full stack", "react", "node.js"]
+      );
+      
+      // Save jobs to database
+      const savedJobs = [];
+      for (const job of scrapedJobs) {
+        try {
+          const jobData = {
+            title: job.title,
+            company: job.company,
+            location: job.location,
+            salary: job.salary || null,
+            type: job.type,
+            experience: job.experience,
+            description: job.description,
+            requirements: job.requirements || [],
+            postedDate: job.postedDate,
+            source: job.source,
+            url: job.url,
+            technologies: job.technologies || [],
+            remote: job.remote,
+            userId,
+          };
+          
+          const savedJob = await storage.createJob(jobData);
+          savedJobs.push(savedJob);
+        } catch (error) {
+          console.error(`Failed to save job: ${job.title}`, error);
         }
-      ];
+      }
       
-      // Simulate scraping delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log(`[jobScrape] Successfully scraped and saved ${savedJobs.length} jobs`);
       
       res.json({
-        jobsFound: mockScrapedJobs.length,
-        sourcesScraped: sources?.length || 4,
-        jobs: mockScrapedJobs
+        jobsFound: savedJobs.length,
+        sourcesScraped: sources?.length || 2,
+        jobs: savedJobs
       });
     } catch (err) {
       console.error("Job scraping error:", err);

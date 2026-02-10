@@ -14,6 +14,23 @@ interface ScrapedBusiness {
   bbbAccredited?: boolean;
 }
 
+interface ScrapedJob {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  type: string;
+  experience: string;
+  description: string;
+  requirements: string[];
+  postedDate: string;
+  source: string;
+  url: string;
+  technologies: string[];
+  remote: boolean;
+}
+
 interface WebsiteAnalysis {
   score: number;
   issues: string[];
@@ -3047,4 +3064,210 @@ export async function searchBusinessesByName(
   }
 
   return results;
+}
+
+// Job Scraping Functions
+export async function scrapeJobsFromMultipleSources(keywords: string[]): Promise<ScrapedJob[]> {
+  const allJobs: ScrapedJob[] = [];
+  
+  try {
+    // Scrape from different job sources
+    const [indeedJobs, remoteOkJobs] = await Promise.allSettled([
+      scrapeIndeedJobs(keywords),
+      scrapeRemoteOkJobs(keywords)
+    ]);
+    
+    // Collect successful results
+    if (indeedJobs.status === 'fulfilled') {
+      allJobs.push(...indeedJobs.value);
+    }
+    if (remoteOkJobs.status === 'fulfilled') {
+      allJobs.push(...remoteOkJobs.value);
+    }
+    
+    console.log(`[scrapeJobsFromMultipleSources] Total jobs scraped: ${allJobs.length}`);
+    return allJobs;
+  } catch (error) {
+    console.error('[scrapeJobsFromMultipleSources] Error:', error);
+    return [];
+  }
+}
+
+async function scrapeIndeedJobs(keywords: string[]): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web developer`);
+      const url = `https://www.indeed.com/jobs?q=${searchQuery}&l=Remote&fromage=7`;
+      
+      console.log(`[scrapeIndeedJobs] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeIndeedJobs] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.job_seen_beacon').each((index, element) => {
+        if (jobs.length >= 10) return false;
+        
+        const $job = $(element);
+        const title = $job.find('.jobTitle').text().trim();
+        const company = $job.find('.companyName').text().trim();
+        const location = $job.find('.companyLocation').text().trim();
+        const salary = $job.find('.salary-snippet-container').text().trim() || 'Competitive';
+        const snippet = $job.find('.job-snippet').text().trim();
+        const jobUrl = $job.find('.jcs-JobTitle').attr('href') || '';
+        const postedDate = $job.find('.date').text().trim() || 'Recently';
+        
+        if (!title || !company) return;
+        
+        const techKeywords = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'JavaScript', 'TypeScript'];
+        const technologies = techKeywords.filter(tech => 
+          title.toLowerCase().includes(tech.toLowerCase()) || 
+          snippet.toLowerCase().includes(tech.toLowerCase())
+        );
+        
+        let experience = 'mid';
+        if (title.toLowerCase().includes('senior') || title.toLowerCase().includes('sr.')) {
+          experience = 'senior';
+        } else if (title.toLowerCase().includes('junior') || title.toLowerCase().includes('jr.')) {
+          experience = 'entry';
+        }
+        
+        const isRemote = location.toLowerCase().includes('remote');
+        
+        jobs.push({
+          id: `indeed-${Date.now()}-${index}`,
+          title,
+          company,
+          location: location || 'Remote',
+          salary,
+          type: 'full-time',
+          experience,
+          description: snippet,
+          requirements: extractRequirements(snippet),
+          postedDate,
+          source: 'Indeed',
+          url: jobUrl.startsWith('http') ? jobUrl : `https://www.indeed.com${jobUrl}`,
+          technologies,
+          remote: isRemote
+        });
+      });
+      
+      await delay(1000 + Math.random() * 2000);
+    }
+  } catch (error) {
+    console.error('[scrapeIndeedJobs] Error:', error);
+  }
+  
+  return jobs;
+}
+
+async function scrapeRemoteOkJobs(keywords: string[]): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  
+  try {
+    const url = 'https://remoteok.io/remote-dev-jobs';
+    
+    console.log(`[scrapeRemoteOkJobs] Scraping: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': getRandomUA(),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    
+    if (!response.ok) {
+      console.log(`[scrapeRemoteOkJobs] Failed to fetch: ${response.status}`);
+      return jobs;
+    }
+    
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    
+    $('.job').each((index, element) => {
+      if (jobs.length >= 12) return false;
+      
+      const $job = $(element);
+      const title = $job.find('h2 a, .title').text().trim();
+      const company = $job.find('.company a, .company').text().trim();
+      const location = $job.find('.location').text().trim() || 'Remote';
+      const salary = $job.find('.salary').text().trim() || 'Competitive';
+      const tags = $job.find('.tag').map((_, el) => $(el).text().trim()).get();
+      const postedDate = $job.find('.time').text().trim() || 'Recently';
+      const jobUrl = $job.find('h2 a, a').attr('href') || '';
+      
+      if (!title) return;
+      
+      const devKeywords = ['developer', 'engineer', 'programmer', 'frontend', 'backend'];
+      const isDevJob = devKeywords.some(keyword => 
+        title.toLowerCase().includes(keyword) || 
+        tags.some(tag => tag.toLowerCase().includes(keyword))
+      );
+      
+      if (!isDevJob) return;
+      
+      const techKeywords = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'JavaScript', 'TypeScript'];
+      const technologies = tags.filter(tag => 
+        techKeywords.some(tech => tag.toLowerCase().includes(tech.toLowerCase()))
+      );
+      
+      jobs.push({
+        id: `remoteok-${Date.now()}-${index}`,
+        title,
+        company: company || 'Remote Company',
+        location: 'Remote',
+        salary,
+        type: 'full-time',
+        experience: 'mid',
+        description: `Remote opportunity for a ${title}`,
+        requirements: ['Remote work experience', 'Self-motivated'],
+        postedDate,
+        source: 'RemoteOK',
+        url: jobUrl.startsWith('http') ? jobUrl : `https://remoteok.io${jobUrl}`,
+        technologies,
+        remote: true
+      });
+    });
+    
+  } catch (error) {
+    console.error('[scrapeRemoteOkJobs] Error:', error);
+  }
+  
+  return jobs;
+}
+
+function extractRequirements(text: string): string[] {
+  const requirements: string[] = [];
+  
+  const patterns = [
+    /\d+\+? years? (?:of )?(?:experience|exp)/gi,
+    /bachelor'?s? degree/i,
+    /react|vue|angular|node\.?js|python|javascript|typescript/gi,
+    /communication skills?/gi,
+    /problem solving/gi,
+    /remote work/gi
+  ];
+  
+  patterns.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      requirements.push(...matches.map(m => m.charAt(0).toUpperCase() + m.slice(1)));
+    }
+  });
+  
+  return [...new Set(requirements)].slice(0, 5);
 }
