@@ -42,6 +42,7 @@
     "@radix-ui/react-tooltip": "^1.2.0",
     "@tanstack/react-query": "^5.60.5",
     "@types/bcryptjs": "^2.4.6",
+    "@types/cheerio": "^0.22.35",
     "@types/memoizee": "^0.4.12",
     "@types/nodemailer": "^7.0.9",
     "bcryptjs": "^3.0.3",

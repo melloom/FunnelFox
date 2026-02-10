@@ -3288,7 +3288,7 @@ function extractRequirements(text: string): string[] {
     }
   });
   
-  return [...new Set(requirements)].slice(0, 5);
+  return Array.from(new Set(requirements)).slice(0, 5);
 }
 
 // Freelance Platform Scraping Functions
@@ -3361,10 +3361,10 @@ async function scrapeUpworkProjects(keywords: string[]): Promise<ScrapedFreelanc
         const budget = $project.find('.budget').text().trim();
         const duration = $project.find('.duration').text().trim();
         const skills = $project.find('.skill-name').map((_, el) => $(el).text().trim()).get();
-        const postedBy = $project('.client-info').text().trim();
-        const postedDate = $project('.posted-on').text().trim() || 'Recently';
+        const postedBy = $project.find('.client-info').text().trim();
+        const postedDate = $project.find('.posted-on').text().trim() || 'Recently';
         const projectUrl = $project.find('.job-tile-title').attr('href') || '';
-        const applicantsText = $project('.talent-number').text().trim();
+        const applicantsText = $project.find('.talent-number').text().trim();
         const applicants = parseInt(applicantsText.match(/\d+/)?.[0] || '0');
         
         if (!title) return;

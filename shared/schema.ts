@@ -116,6 +116,7 @@ export const projects = pgTable("projects", {
   endDate: timestamp("end_date"),
   technologies: text("technologies").array(),
   notes: text("notes"),
+  leadId: integer("lead_id"),
   userId: varchar("user_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -155,6 +156,7 @@ export const insertProjectSchema = z.object({
   endDate: z.string().optional().nullable(),
   technologies: z.array(z.string()).optional(),
   notes: z.string().optional().nullable(),
+  leadId: z.number().optional().nullable(),
   userId: z.string(),
 });
 
