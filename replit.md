@@ -26,6 +26,7 @@ The application follows a client-server architecture.
     - **Social Media Detection**: Scrapes and stores social media links from websites and via DuckDuckGo, highlighting businesses without websites but with social presence.
     - **Email Integration**: Per-user SMTP email integration allows each user to connect their own email provider (Gmail, Outlook, Yahoo, Zoho, or any SMTP host including business email). Users configure SMTP settings in Account Settings with presets and test connection. Admin retains Gmail API access. Outreach emails are sent from the user's own connected email, with fallback to "Open in Email App" (mailto) if no provider is connected. Emails are logged in the activity timeline.
     - **Business Intelligence**: Lead detail dialogs include BBB rating, Google rating/reviews, sitemap, and robots.txt status.
+    - **Job Search (Find Work)**: Pro-only feature with dedicated sidebar navigation. Includes a scraping page (Find Work), a Scraped Jobs page for browsing all scraped listings with filters, and a Saved Jobs page for bookmarked jobs. Users can save/unsave jobs from any job listing view. The sidebar dynamically switches between CRM and Job Search navigation based on the current page.
     - **SaaS Subscription**: Implemented with Stripe for subscription management, including a Free tier and a Pro plan ($30/month) with usage limits (discoveries, leads) and plan comparison. Includes subscription cancellation, resumption, and billing portal access.
     - **Legal Pages**: Dedicated Terms of Service and Privacy Policy pages.
 
