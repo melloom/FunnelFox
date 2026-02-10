@@ -219,6 +219,32 @@ export default function FindWorkPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30">
+      <Dialog open={!isSubscribed && !isLoading} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md [&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-purple-600" />
+              Upgrade to Pro
+            </DialogTitle>
+            <DialogDescription>
+              The Find Work feature is only available for Pro users. Upgrade now to access real-time job scraping and freelance projects.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-4">
+            <Button asChild className="w-full bg-purple-600 hover:bg-purple-700">
+              <Link href="/subscription">
+                Upgrade Now - $30/mo
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/">
+                Back to Dashboard
+              </Link>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         {/* Header Section */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl border-0 p-6 lg:p-8 text-white">
