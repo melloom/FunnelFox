@@ -28,7 +28,6 @@ import {
   Mail,
   Camera,
   ExternalLink,
-  SlidersHorizontal,
 } from "lucide-react";
 import {
   Dialog,
@@ -126,14 +125,6 @@ export default function DiscoverPage() {
   const [lastSearch, setLastSearch] = useState<{ category: string; location: string } | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [maxResultsInitialized, setMaxResultsInitialized] = useState(false);
-  
-  // Advanced filters
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [websiteFilter, setWebsiteFilter] = useState<"all" | "has" | "none">("all");
-  const [socialFilter, setSocialFilter] = useState<"all" | "social-only">("all");
-  const [contactFilter, setContactFilter] = useState<"all" | "missing-phone" | "missing-email" | "missing-any">("all");
-  const [industryFilter, setIndustryFilter] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
 
   const { data: subscription } = useQuery<{
     planStatus: string;
@@ -371,84 +362,6 @@ export default function DiscoverPage() {
                 )}
               </Button>
             </div>
-          </div>
-
-          {/* Advanced Filters */}
-          <div className="border-t pt-4">
-            <button
-              type="button"
-              className="flex items-center gap-2 text-sm text-muted-foreground bg-transparent border-0 cursor-pointer p-0 hover:text-foreground"
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              {showAdvancedFilters ? "Hide" : "Show"} Advanced Filters
-            </button>
-            
-            {showAdvancedFilters && (
-              <div className="mt-4 space-y-4 p-4 bg-muted/30 rounded-md">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Website Status</label>
-                    <Select value={websiteFilter} onValueChange={(value: "all" | "has" | "none") => setWebsiteFilter(value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by website" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All businesses</SelectItem>
-                        <SelectItem value="has">Has website</SelectItem>
-                        <SelectItem value="none">No website</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Social Presence</label>
-                    <Select value={socialFilter} onValueChange={(value: "all" | "social-only") => setSocialFilter(value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by social" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All businesses</SelectItem>
-                        <SelectItem value="social-only">Social-only presence</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Contact Info</label>
-                    <Select value={contactFilter} onValueChange={(value: "all" | "missing-phone" | "missing-email" | "missing-any") => setContactFilter(value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by contact" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All businesses</SelectItem>
-                        <SelectItem value="missing-phone">Missing phone</SelectItem>
-                        <SelectItem value="missing-email">Missing email</SelectItem>
-                        <SelectItem value="missing-any">Missing any contact</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Industry</label>
-                    <Input
-                      placeholder="Filter by industry..."
-                      value={industryFilter}
-                      onChange={(e) => setIndustryFilter(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Location Filter</label>
-                    <Input
-                      placeholder="City or state..."
-                      value={locationFilter}
-                      onChange={(e) => setLocationFilter(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>

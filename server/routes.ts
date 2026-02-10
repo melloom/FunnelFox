@@ -44,7 +44,7 @@ export async function registerRoutes(
 
   app.get("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+      const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const lead = await storage.getLead(id);
       if (!lead) return res.status(404).json({ error: "Lead not found" });
@@ -68,17 +68,9 @@ export async function registerRoutes(
         }
       }
 
-      const parsed = insertLeadSchema.parse(req.body) as any;
+      const parsed = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(parsed);
       await storage.createActivity({ leadId: lead.id, action: "created", details: "Lead created" });
-      if (parsed.status) {
-        const stageLabel = PIPELINE_STAGES.find((s) => s.value === parsed.status)?.label || parsed.status;
-        await storage.createActivity({
-          leadId: lead.id,
-          action: "stage_changed",
-          details: `Moved to ${stageLabel}`,
-        });
-      }
       res.status(201).json(lead);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -90,33 +82,13 @@ export async function registerRoutes(
 
   app.patch("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+      const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const existing = await storage.getLead(id);
       if (!existing) return res.status(404).json({ error: "Lead not found" });
       const updateSchema = insertLeadSchema.partial();
-      const parsed = updateSchema.parse(req.body) as any;
-      
-      // Track manually edited fields
-      const manuallyEdited = [...(existing.manuallyEditedFields || [])];
-      const updateData: any = { ...parsed };
-      
-      // Check which fields were manually edited
-      const fieldsToTrack = ['contactEmail', 'contactPhone', 'companyName', 'location', 'industry'];
-      for (const field of fieldsToTrack) {
-        if (parsed[field as keyof typeof parsed] !== undefined && 
-            parsed[field as keyof typeof parsed] !== (existing as any)[field]) {
-          if (!manuallyEdited.includes(field)) {
-            manuallyEdited.push(field);
-          }
-        }
-      }
-      
-      if (manuallyEdited.length > (existing.manuallyEditedFields || []).length) {
-        updateData.manuallyEditedFields = manuallyEdited;
-      }
-      
-      const updated = await storage.updateLead(id, updateData);
+      const parsed = updateSchema.parse(req.body);
+      const updated = await storage.updateLead(id, parsed);
       if (!updated) return res.status(404).json({ error: "Lead not found" });
 
       if (parsed.status && parsed.status !== existing.status) {
@@ -165,7 +137,7 @@ export async function registerRoutes(
 
   app.delete("/api/leads/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+      const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const deleted = await storage.deleteLead(id);
       if (!deleted) return res.status(404).json({ error: "Lead not found" });
@@ -197,7 +169,7 @@ export async function registerRoutes(
       }
       const intIds = ids.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id));
       const updateSchema = insertLeadSchema.partial();
-      const parsed = updateSchema.parse(data) as any;
+      const parsed = updateSchema.parse(data);
       const updated = await storage.updateLeads(intIds, parsed);
       if (parsed.status) {
         const stageLabel = PIPELINE_STAGES.find((s) => s.value === parsed.status)?.label || parsed.status;
@@ -220,7 +192,7 @@ export async function registerRoutes(
 
   app.get("/api/leads/:id/activities", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+      const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const activities = await storage.getActivities(id);
       res.json(activities);
@@ -231,7 +203,7 @@ export async function registerRoutes(
 
   app.post("/api/leads/:id/activities", isAuthenticated, async (req, res) => {
     try {
-      const leadId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+      const leadId = parseInt(req.params.id);
       if (isNaN(leadId)) return res.status(400).json({ error: "Invalid ID" });
       const { action, details } = req.body;
       if (!action) return res.status(400).json({ error: "action is required" });
@@ -288,7 +260,7 @@ export async function registerRoutes(
 
   app.post("/api/leads/:id/enrich", isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+      const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
       const lead = await storage.getLead(id);
       if (!lead) return res.status(404).json({ error: "Lead not found" });
@@ -303,31 +275,19 @@ export async function registerRoutes(
       if (analysis.screenshotUrl) updateData.screenshotUrl = analysis.screenshotUrl;
       if (analysis.socialMedia && analysis.socialMedia.length > 0) updateData.socialMedia = analysis.socialMedia;
       if (analysis.technologies && analysis.technologies.length > 0) updateData.detectedTechnologies = analysis.technologies;
-      
-      // Only update contact info if not manually edited
-      const manuallyEdited = lead.manuallyEditedFields || [];
       if (analysis.contactInfo) {
-        if (analysis.contactInfo.emails?.length && !lead.contactEmail && !manuallyEdited.includes('contactEmail')) {
+        if (analysis.contactInfo.emails?.length && !lead.contactEmail) {
           updateData.contactEmail = analysis.contactInfo.emails[0];
         }
-        if (analysis.contactInfo.phones?.length && !lead.contactPhone && !manuallyEdited.includes('contactPhone')) {
+        if (analysis.contactInfo.phones?.length && !lead.contactPhone) {
           updateData.contactPhone = analysis.contactInfo.phones[0];
         }
       }
-      
       if (analysis.googleRating != null) updateData.googleRating = analysis.googleRating;
       if (analysis.googleReviewCount != null) updateData.googleReviewCount = analysis.googleReviewCount;
       if (analysis.hasSitemap != null) updateData.hasSitemap = analysis.hasSitemap;
       if (analysis.hasRobotsTxt != null) updateData.hasRobotsTxt = analysis.hasRobotsTxt;
       if (analysis.sitemapIssues) updateData.sitemapIssues = analysis.sitemapIssues;
-      
-      // Add data sources and confidence from enhanced scraper
-      if ((analysis as any).dataSources) {
-        updateData.dataSources = (analysis as any).dataSources;
-      }
-      if ((analysis as any).confidence != null) {
-        updateData.confidence = (analysis as any).confidence;
-      }
 
       const updated = await storage.updateLead(id, updateData);
       await storage.createActivity({ leadId: id, action: "notes_updated", details: "Lead enriched with website analysis" });
@@ -372,43 +332,65 @@ export async function registerRoutes(
       const cached = searchMs < 500;
 
       const existingLeads = await storage.getLeads();
-      const existingDomains = new Set() as Set<string>;
-      const existingNames = new Set() as Set<string>;
-      const existingPhones = new Set() as Set<string>;
+      const existingDomains = new Set<string>();
+      const existingNames = new Set<string>();
+      const existingPhones = new Set<string>();
       for (const l of existingLeads) {
         if (l.websiteUrl && l.websiteUrl !== "none") {
-          const domain = l.websiteUrl.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase();
-          existingDomains.add(domain);
+          try {
+            let u = l.websiteUrl;
+            if (!u.startsWith("http")) u = `https://${u}`;
+            existingDomains.add(new URL(u).hostname.replace(/^www\./, ""));
+          } catch {}
         }
-        if (l.companyName) {
-          existingNames.add(l.companyName.toLowerCase());
-        }
+        const normalized = l.companyName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, "")
+          .replace(/\b(the|and|of|in|at|by|for|llc|inc|corp|co|ltd)\b/g, "")
+          .replace(/\s+/g, "")
+          .slice(0, 40);
+        existingNames.add(normalized);
         if (l.contactPhone) {
-          const phone = l.contactPhone.replace(/[^0-9]/g, "").slice(-10);
-          if (phone.length >= 10) existingPhones.add(phone);
           existingPhones.add(l.contactPhone.replace(/[^0-9]/g, "").slice(-10));
         }
       }
 
-      const isDuplicate = function(name: string, url: string | undefined, phone: string | undefined): boolean {
+      function isDuplicate(name: string, url: string | undefined, phone: string | undefined): boolean {
         const nameKey = name
           .toLowerCase()
           .replace(/[^a-z0-9\s]/g, "")
           .replace(/\b(the|and|of|in|at|by|for|llc|inc|corp|co|ltd)\b/g, "")
           .replace(/\s+/g, "")
-          .trim();
-        if (nameKey.length < 3) return false;
-        if (url && url !== "none") {
-          const domain = url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase();
-          if (existingDomains.has(domain)) return true;
-        }
+          .slice(0, 40);
+
         if (existingNames.has(nameKey)) return true;
+
+        for (const existing of existingNames) {
+          if (nameKey.length >= 5 && existing.length >= 5) {
+            if (existing.includes(nameKey) || nameKey.includes(existing)) {
+              const shorter = Math.min(nameKey.length, existing.length);
+              const longer = Math.max(nameKey.length, existing.length);
+              if (shorter / longer >= 0.75) return true;
+            }
+          }
+        }
+
+        if (url) {
+          try {
+            let u = url;
+            if (!u.startsWith("http")) u = `https://${u}`;
+            const domain = new URL(u).hostname.replace(/^www\./, "");
+            if (existingDomains.has(domain)) return true;
+          } catch {}
+        }
+
         if (phone) {
           const phoneKey = phone.replace(/[^0-9]/g, "").slice(-10);
-          if (phoneKey.length >= 10 && existingPhones.has(phoneKey)) return true;
+          if (phoneKey.length >= 7 && existingPhones.has(phoneKey)) return true;
         }
+
         return false;
-      };
+      }
 
       const newBusinesses = businesses.filter((biz) => {
         return !isDuplicate(biz.name, biz.url, biz.phone);
@@ -464,8 +446,8 @@ export async function registerRoutes(
               contactName: null,
               contactEmail: bizEmail,
               contactPhone: bizPhone,
-              socialMedia: biz.socialMedia || undefined,
-              detectedTechnologies: undefined,
+              socialMedia: biz.socialMedia || null,
+              detectedTechnologies: null,
               screenshotUrl: null,
             });
           })
@@ -489,7 +471,7 @@ export async function registerRoutes(
             if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
 
             const allSocials = [...(biz.socialMedia || []), ...(analysis.socialMedia || [])];
-            const uniqueSocials = allSocials.length ? Array.from(new Map(allSocials.map(s => [s.split(":")[0], s])).values()) : undefined;
+            const uniqueSocials = allSocials.length ? [...new Map(allSocials.map(s => [s.split(":")[0], s])).values()] : null;
 
             const contactEmail = analysis.contactInfo?.emails?.[0] || null;
             const contactPhone = biz.phone || analysis.contactInfo?.phones?.[0] || null;
@@ -518,15 +500,15 @@ export async function registerRoutes(
               contactEmail,
               contactPhone,
               socialMedia: uniqueSocials,
-              detectedTechnologies: analysis.technologies || undefined,
+              detectedTechnologies: analysis.technologies || null,
               screenshotUrl: analysis.screenshotUrl || null,
               bbbRating: biz.bbbRating || null,
-              bbbAccredited: biz.bbbAccredited || undefined,
-              googleRating: analysis.googleRating || undefined,
-              googleReviewCount: analysis.googleReviewCount || undefined,
-              hasSitemap: analysis.hasSitemap || undefined,
-              hasRobotsTxt: analysis.hasRobotsTxt || undefined,
-              sitemapIssues: analysis.sitemapIssues || undefined,
+              bbbAccredited: biz.bbbAccredited || null,
+              googleRating: analysis.googleRating || null,
+              googleReviewCount: analysis.googleReviewCount || null,
+              hasSitemap: analysis.hasSitemap || null,
+              hasRobotsTxt: analysis.hasRobotsTxt || null,
+              sitemapIssues: analysis.sitemapIssues || null,
             });
           })
         );

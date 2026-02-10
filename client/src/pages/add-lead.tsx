@@ -43,16 +43,18 @@ import { insertLeadSchema } from "@shared/schema";
 import type { Lead } from "@shared/schema";
 import { useState, useMemo, useCallback, useRef } from "react";
 
-const formSchema = z.object({
+const formSchema = insertLeadSchema.pick({
+  companyName: true,
+  websiteUrl: true,
+  contactName: true,
+  contactEmail: true,
+  contactPhone: true,
+  industry: true,
+  location: true,
+  notes: true,
+}).extend({
   companyName: z.string().min(1, "Company name is required"),
   websiteUrl: z.string().optional().default(""),
-  contactName: z.string().optional(),
-  contactEmail: z.string().email().optional().nullable(),
-  contactPhone: z.string().optional().nullable(),
-  industry: z.string().optional().nullable(),
-  location: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  status: z.string().optional().default("new"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -90,111 +92,18 @@ function findDuplicates(name: string, website: string, leads: Lead[]): Lead[] {
     : "";
 
   return leads.filter((lead) => {
-    // Exact URL match (highest priority)
     if (normalizedUrl && lead.websiteUrl && lead.websiteUrl !== "none") {
       const existingUrl = lead.websiteUrl
         .replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase();
       if (existingUrl === normalizedUrl) return true;
     }
-
-    // Exact name match (high priority)
     if (normalizedName.length >= 3) {
       const existingName = normalizeForCompare(lead.companyName);
       if (existingName === normalizedName) return true;
+      if (normalizedName.length >= 5 && (existingName.includes(normalizedName) || normalizedName.includes(existingName))) return true;
     }
-
-    // Handle social media vs real website scenarios
-    if (normalizedUrl) {
-      const isSocialUrl = detectSocialMediaUrl(normalizedUrl);
-      if (isSocialUrl && lead.socialMedia?.length) {
-        // Check if this lead has the same social media profile
-        const hasSameSocial = lead.socialMedia.some((social: string) => {
-          const socialUrl = social.split(":")[1] || "";
-          const normalizedSocial = socialUrl.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase();
-          return normalizedSocial === normalizedUrl;
-        });
-        if (hasSameSocial) return true;
-      }
-    }
-
-    // Partial name match with additional criteria (medium priority)
-    if (normalizedName.length >= 5) {
-      const existingName = normalizeForCompare(lead.companyName);
-      const nameSimilarity = calculateStringSimilarity(normalizedName, existingName);
-      
-      // If names are very similar, check other factors
-      if (nameSimilarity > 0.8) {
-        // Check if location matches
-        if (lead.location) {
-          const existingLocation = normalizeForCompare(lead.location);
-          if (existingLocation) {
-            return true;
-          }
-        }
-        
-        // Check if phone matches (we'll use form values later)
-        if (lead.contactPhone) {
-          return true;
-        }
-      }
-    }
-
-    // Fuzzy name match (low priority - only if very high similarity)
-    if (normalizedName.length >= 5) {
-      const existingName = normalizeForCompare(lead.companyName);
-      if (existingName.includes(normalizedName) || normalizedName.includes(existingName)) {
-        const shorter = Math.min(normalizedName.length, existingName.length);
-        const longer = Math.max(normalizedName.length, existingName.length);
-        if (shorter / longer >= 0.85) { // Increased threshold for better precision
-          return true;
-        }
-      }
-    }
-
     return false;
   });
-}
-
-function calculateStringSimilarity(a: string, b: string): number {
-  if (a === b) return 1;
-  if (!a || !b) return 0;
-  
-  const longer = a.length > b.length ? a : b;
-  const shorter = a.length > b.length ? b : a;
-  if (longer.length === 0) return 1;
-
-  // Simple Levenshtein distance implementation
-  const costs: number[] = [];
-  for (let i = 0; i <= longer.length; i++) {
-    let lastValue = i;
-    for (let j = 0; j <= shorter.length; j++) {
-      if (i === 0) {
-        costs[j] = j;
-      } else if (j > 0) {
-        let newValue = costs[j - 1];
-        if (longer[i - 1] !== shorter[j - 1]) {
-          newValue = Math.min(newValue, lastValue, costs[j]) + 1;
-        }
-        costs[j - 1] = lastValue;
-        lastValue = newValue;
-      }
-    }
-    if (i > 0) costs[shorter.length] = lastValue;
-  }
-  
-  return (longer.length - costs[shorter.length]) / longer.length;
-}
-
-function detectSocialMediaUrl(url: string): string | null {
-  const socialDomains = ['facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com', 'linkedin.com', 'youtube.com', 'pinterest.com'];
-  const normalized = url.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
-  
-  for (const domain of socialDomains) {
-    if (normalized === domain || normalized.endsWith('.' + domain)) {
-      return normalized;
-    }
-  }
-  return null;
 }
 
 function looksLikeUrl(str: string): boolean {
@@ -230,7 +139,6 @@ export default function AddLeadPage() {
       industry: "",
       location: "",
       notes: "",
-      status: "new",
     },
   });
 
@@ -356,7 +264,7 @@ export default function AddLeadPage() {
     mutationFn: async (values: FormValues) => {
       const res = await apiRequest("POST", "/api/leads", {
         ...values,
-        websiteUrl: (typeof values.websiteUrl === "string" ? values.websiteUrl.trim() : "none") || "none",
+        websiteUrl: values.websiteUrl?.trim() || "none",
         status: "new",
         source: "manual",
       });
@@ -589,19 +497,16 @@ export default function AddLeadPage() {
                 name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Address</FormLabel>
+                    <FormLabel>Location</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="123 Main St, City, State ZIP"
-                        autoComplete="street-address"
+                        placeholder="City, State"
+                        autoComplete="address-level2"
                         {...field}
                         value={field.value || ""}
                         data-testid="input-location"
                       />
                     </FormControl>
-                    <p className="text-[11px] text-muted-foreground">
-                      Enter complete address including street, city, state, and ZIP for better accuracy
-                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

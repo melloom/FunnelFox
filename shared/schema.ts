@@ -52,38 +52,12 @@ export const leads = pgTable("leads", {
   hasSitemap: boolean("has_sitemap"),
   hasRobotsTxt: boolean("has_robots_txt"),
   sitemapIssues: text("sitemap_issues").array(),
-  dataSources: text("data_sources").array(),
-  confidence: integer("confidence"),
-  manuallyEditedFields: text("manually_edited_fields").array(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertLeadSchema = z.object({
-  companyName: z.string().min(1).max(100),
-  websiteUrl: z.string().url().optional().nullable(),
-  contactEmail: z.string().email().optional().nullable(),
-  contactPhone: z.string().optional().nullable(),
-  industry: z.string().max(50).optional().nullable(),
-  location: z.string().max(200).optional().nullable(),
-  notes: z.string().max(1000).optional().nullable(),
-  source: z.string().default("manual"),
-  status: z.string().default("new"),
-  websiteScore: z.number().optional(),
-  websiteIssues: z.array(z.string()).optional(),
-  contactName: z.string().optional().nullable(),
-  socialMedia: z.array(z.string()).optional(),
-  detectedTechnologies: z.array(z.string()).optional(),
-  screenshotUrl: z.string().optional().nullable(),
-  bbbRating: z.string().optional().nullable(),
-  bbbAccredited: z.boolean().optional(),
-  googleRating: z.number().optional(),
-  googleReviewCount: z.number().optional(),
-  hasSitemap: z.boolean().optional(),
-  hasRobotsTxt: z.boolean().optional(),
-  sitemapIssues: z.array(z.string()).optional(),
-  dataSources: z.array(z.string()).optional(),
-  confidence: z.number().optional(),
-  manuallyEditedFields: z.array(z.string()).optional(),
+export const insertLeadSchema = createInsertSchema(leads).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type InsertLead = z.infer<typeof insertLeadSchema>;
@@ -97,10 +71,9 @@ export const activityLog = pgTable("activity_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertActivitySchema = z.object({
-  leadId: z.number(),
-  action: z.string(),
-  details: z.string().optional().nullable(),
+export const insertActivitySchema = createInsertSchema(activityLog).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type InsertActivity = z.infer<typeof insertActivitySchema>;

@@ -70,7 +70,6 @@ import {
   FileJson,
   Sheet,
   MoreVertical,
-  RefreshCw,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -301,20 +300,6 @@ function LeadDetailDialog({
     },
   });
 
-  const refreshMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("POST", `/api/leads/${id}/enrich`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id, "activities"] });
-      toast({ title: "Lead data refreshed" });
-    },
-    onError: () => {
-      toast({ title: "Failed to refresh lead data", variant: "destructive" });
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/leads/${id}`);
@@ -378,45 +363,6 @@ function LeadDetailDialog({
               </Badge>
             )}
           </div>
-
-          {(lead as any).dataSources && (
-            <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/30">
-              <Bot className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex-1">
-                <p className="text-xs font-medium text-muted-foreground">Data Sources</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {((lead as any).dataSources as string[]).map((source, i) => (
-                    <Badge key={i} variant="outline" className="text-[10px]">
-                      {source === 'social_url' ? 'Social URL' : 
-                       source === 'social_scrape' ? 'Social Scrape' :
-                       source === 'website_scrape' ? 'Website Scrape' :
-                       source === 'instagram_web_search' ? 'Instagram Search' :
-                       source === 'real_website_scrape' ? 'Real Website' : source}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              {(lead as any).confidence && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Confidence:</span>
-                  <div className="flex items-center gap-1">
-                    <div className="w-16 h-1.5 rounded-full bg-muted">
-                      <div 
-                        className={`h-full rounded-full transition-all ${
-                          (lead as any).confidence >= 80 ? "bg-emerald-500" :
-                          (lead as any).confidence >= 60 ? "bg-yellow-500" :
-                          (lead as any).confidence >= 40 ? "bg-orange-500" :
-                          "bg-red-500"
-                        }`}
-                        style={{ width: `${(lead as any).confidence}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium">{(lead as any).confidence}%</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {leadScore.reasons.length > 0 && (
             <div className="text-xs text-muted-foreground space-y-0.5">
@@ -805,16 +751,6 @@ function LeadDetailDialog({
                 Email Lead
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refreshMutation.mutate(lead.id)}
-              disabled={refreshMutation.isPending}
-              data-testid="button-refresh-lead"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
             <Button
               variant="ghost"
               size="sm"

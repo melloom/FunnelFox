@@ -2778,8 +2778,6 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
   contactPhone?: string;
   socialMedia?: string[];
   description?: string;
-  dataSources?: string[];
-  confidence?: number;
 }> {
   let fullUrl = inputUrl.trim();
   if (!fullUrl.startsWith("http")) {
@@ -2794,17 +2792,11 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
     contactPhone?: string;
     socialMedia?: string[];
     description?: string;
-    dataSources?: string[];
-    confidence?: number;
-  } = {
-    dataSources: [],
-    confidence: 0
-  };
+  } = {};
 
   const socialDetected = detectSocialMediaUrl(fullUrl);
   if (socialDetected) {
     result.socialMedia = [socialDetected];
-    result.dataSources!.push("social_url");
   }
 
   try {
@@ -2830,7 +2822,6 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
     const isSocialMedia = Object.keys(SOCIAL_MEDIA_DOMAINS).some(
       (d) => host === d || host.endsWith(`.${d}`)
     );
-    const isInstagram = host.includes("instagram.com");
 
     if (isSocialMedia) {
       const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
@@ -2843,14 +2834,10 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
         .trim();
       if (name && name.length > 1 && name.length < 80) {
         result.companyName = name;
-        result.confidence! += 30;
       }
 
       const ogDesc = $('meta[property="og:description"]').attr("content")?.trim();
-      if (ogDesc) {
-        result.description = ogDesc.slice(0, 300);
-        result.confidence! += 10;
-      }
+      if (ogDesc) result.description = ogDesc.slice(0, 300);
 
       const bodyText = $("body").text();
       const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
@@ -2859,16 +2846,12 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
         const lo = email.toLowerCase();
         if (lo.endsWith(".png") || lo.endsWith(".jpg") || lo.includes("example.com") || lo.includes("facebook.com")) continue;
         result.contactEmail = email;
-        result.confidence! += 20;
         break;
       }
 
       const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
       const phoneMatches = bodyText.match(phoneRegex) || [];
-      if (phoneMatches.length > 0) {
-        result.contactPhone = phoneMatches[0];
-        result.confidence! += 20;
-      }
+      if (phoneMatches.length > 0) result.contactPhone = phoneMatches[0];
 
       const websiteLink = $('a[href]').filter((_i, el) => {
         const href = $(el).attr("href") || "";
@@ -2876,10 +2859,7 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
         return (text.includes("website") || text.includes("visit") || text.includes("site")) &&
           href.startsWith("http") && !detectSocialMediaUrl(href);
       }).first().attr("href");
-      if (websiteLink) {
-        result.websiteUrl = websiteLink;
-        result.confidence! += 25;
-      }
+      if (websiteLink) result.websiteUrl = websiteLink;
 
       const locationPatterns = [
         /(?:located|based)\s+(?:in|at)\s+([^.!?<]+)/i,
@@ -2889,59 +2869,19 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
         const match = bodyText.match(pattern);
         if (match && match[1]) {
           result.location = match[1].trim().slice(0, 100);
-          result.confidence! += 15;
           break;
         }
       }
 
-      // Special Instagram handling: if no website found, search for it
-      if (isInstagram && !result.websiteUrl && result.companyName) {
-        try {
-          console.log(`[Instagram] Searching for real website for: ${result.companyName}`);
-          const webSearchResult = await searchBusinessesByName(result.companyName, result.location || "");
-          const realBusiness = webSearchResult.find(b => b.url && !detectSocialMediaUrl(b.url));
-          if (realBusiness?.url) {
-            result.websiteUrl = realBusiness.url;
-            result.confidence! += 40;
-            result.dataSources!.push("instagram_web_search");
-            console.log(`[Instagram] Found real website: ${realBusiness.url}`);
-            
-            // Scrape the real website for more info
-            try {
-              const realSiteInfo = await scrapeUrlForBusinessInfo(realBusiness.url);
-              if (realSiteInfo.contactEmail && !result.contactEmail) {
-                result.contactEmail = realSiteInfo.contactEmail;
-                result.confidence! += 15;
-              }
-              if (realSiteInfo.contactPhone && !result.contactPhone) {
-                result.contactPhone = realSiteInfo.contactPhone;
-                result.confidence! += 15;
-              }
-              if (realSiteInfo.location && !result.location) {
-                result.location = realSiteInfo.location;
-                result.confidence! += 10;
-              }
-              if (realSiteInfo.description && !result.description) {
-                result.description = realSiteInfo.description;
-                result.confidence! += 5;
-              }
-              if (realSiteInfo.socialMedia?.length) {
-                const existing = new Set(result.socialMedia || []);
-                for (const s of realSiteInfo.socialMedia) {
-                  if (!existing.has(s)) {
-                    if (!result.socialMedia) result.socialMedia = [];
-                    result.socialMedia.push(s);
-                    existing.add(s);
-                  }
-                }
-              }
-              result.dataSources!.push("real_website_scrape");
-            } catch (e) {
-              console.log("[Instagram] Failed to scrape real website:", e);
-            }
+      const moreSocials = extractSocialLinksFromHtml(html, $);
+      if (moreSocials.length > 0) {
+        const existing = new Set(result.socialMedia || []);
+        for (const s of moreSocials) {
+          if (!existing.has(s)) {
+            if (!result.socialMedia) result.socialMedia = [];
+            result.socialMedia.push(s);
+            existing.add(s);
           }
-        } catch (e) {
-          console.log("[Instagram] Failed to search for real website:", e);
         }
       }
 
@@ -2996,37 +2936,22 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
       name = name.replace(/\s*[-|].{0,50}$/, "").trim();
       if (name && name.length > 1 && name.length < 80) {
         result.companyName = name;
-        result.confidence! += 40;
       }
       result.websiteUrl = parsedUrl.origin;
-      result.dataSources!.push("website_scrape");
 
       const contactInfo = extractContactInfo(html, $, fullUrl);
-      if (contactInfo.emails?.length) {
-        result.contactEmail = contactInfo.emails[0];
-        result.confidence! += 25;
-      }
-      if (contactInfo.phones?.length) {
-        result.contactPhone = contactInfo.phones[0];
-        result.confidence! += 25;
-      }
+      if (contactInfo.emails?.length) result.contactEmail = contactInfo.emails[0];
+      if (contactInfo.phones?.length) result.contactPhone = contactInfo.phones[0];
 
       const socials = extractSocialLinksFromHtml(html, $);
       if (socials.length > 0) {
         result.socialMedia = [...(result.socialMedia || []), ...socials];
-        result.confidence! += 10;
       }
 
       const ogDesc = $('meta[property="og:description"]').attr("content")?.trim();
       const metaDesc = $('meta[name="description"]').attr("content")?.trim();
-      if (ogDesc) {
-        result.description = ogDesc.slice(0, 300);
-        result.confidence! += 10;
-      }
-      else if (metaDesc) {
-        result.description = metaDesc.slice(0, 300);
-        result.confidence! += 5;
-      }
+      if (ogDesc) result.description = ogDesc.slice(0, 300);
+      else if (metaDesc) result.description = metaDesc.slice(0, 300);
 
       const addrSchema = $('script[type="application/ld+json"]').toArray();
       for (const script of addrSchema) {
@@ -3037,7 +2962,6 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
             const parts = [addr.streetAddress, addr.addressLocality, addr.addressRegion, addr.postalCode].filter(Boolean);
             if (parts.length > 0) {
               result.location = parts.join(", ").slice(0, 100);
-              result.confidence! += 15;
               break;
             }
           }
@@ -3048,9 +2972,6 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
     console.error("[scrapeUrlForBusinessInfo] Error:", err);
   }
 
-  // Cap confidence at 100
-  result.confidence = Math.min(result.confidence || 0, 100);
-  
   return result;
 }
 
