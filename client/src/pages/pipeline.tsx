@@ -57,6 +57,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplateDialog } from "@/components/email-template-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { calculateLeadScore, getScoreColor } from "@/lib/lead-scoring";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -323,9 +324,28 @@ function PipelineLeadDetailDialog({
     },
   });
 
+  const updateLeadMutation = useMutation({
+    mutationFn: async (data: { id: number; location?: string; socialMedia?: string[] }) => {
+      await apiRequest("PATCH", `/api/leads/${data.id}`, {
+        location: data.location,
+        socialMedia: data.socialMedia,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({ title: "Lead updated successfully" });
+      setEditingLead(false);
+    },
+  });
+
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
+  const [editingLead, setEditingLead] = useState(false);
+  const [editForm, setEditForm] = useState({
+    location: lead.location || "",
+    socialMedia: lead.socialMedia || [],
+  });
 
   if (!lead) return null;
 
@@ -436,6 +456,17 @@ function PipelineLeadDetailDialog({
               <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
               <span>{lead.location || <span className="text-muted-foreground italic">Not found</span>}</span>
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditingLead(true)}
+              className="text-xs"
+            >
+              Edit Lead Info
+            </Button>
           </div>
 
           {lead.socialMedia && lead.socialMedia.length > 0 && (
@@ -738,6 +769,78 @@ function PipelineLeadDetailDialog({
         onClose={() => setEmailDialogOpen(false)}
       />
     )}
+    <Dialog open={editingLead} onOpenChange={setEditingLead}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Lead Information</DialogTitle>
+          <DialogDescription>
+            Update the lead's address and social media profiles
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Address/Location</label>
+            <Input
+              value={editForm.location}
+              onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
+              placeholder="Enter address or location"
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Social Media</label>
+            <div className="space-y-2">
+              {editForm.socialMedia.map((social, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    value={social}
+                    onChange={(e) => {
+                      const newSocial = [...editForm.socialMedia];
+                      newSocial[index] = e.target.value;
+                      setEditForm(prev => ({ ...prev, socialMedia: newSocial }));
+                    }}
+                    placeholder="platform:url (e.g., facebook:https://...)"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newSocial = editForm.socialMedia.filter((_, i) => i !== index);
+                      setEditForm(prev => ({ ...prev, socialMedia: newSocial }));
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditForm(prev => ({ ...prev, socialMedia: [...prev.socialMedia, ""] }))}
+              >
+                Add Social Media
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingLead(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateLeadMutation.mutate({
+                id: lead.id,
+                location: editForm.location || undefined,
+                socialMedia: editForm.socialMedia.filter(s => s.trim())
+              })}
+              disabled={updateLeadMutation.isPending}
+            >
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
