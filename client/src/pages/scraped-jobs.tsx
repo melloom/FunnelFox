@@ -166,9 +166,9 @@ export default function ScrapedJobsPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Select value={selectedSource} onValueChange={setSelectedSource}>
-              <SelectTrigger data-testid="select-source">
+              <SelectTrigger data-testid="select-source" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -181,7 +181,7 @@ export default function ScrapedJobsPage() {
             </Select>
 
             <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger data-testid="select-type">
+              <SelectTrigger data-testid="select-type" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -194,7 +194,7 @@ export default function ScrapedJobsPage() {
             </Select>
 
             <Select value={selectedExperience} onValueChange={setSelectedExperience}>
-              <SelectTrigger data-testid="select-experience">
+              <SelectTrigger data-testid="select-experience" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -238,93 +238,93 @@ export default function ScrapedJobsPage() {
           {jobs.map(job => (
             <Card key={job.id} className="hover-elevate" data-testid={`card-job-${job.id}`}>
               <CardContent className="p-5">
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  <div className="flex-1 space-y-3">
-                    <div className="space-y-1.5">
-                      <h3 className="text-lg font-semibold" data-testid={`text-job-title-${job.id}`}>
-                        {job.title}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{job.company}</span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {job.location}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {job.postedDate}
-                        </span>
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                    <div className="flex-1 space-y-3">
+                      <div className="space-y-1.5">
+                        <h3 className="text-lg font-semibold" data-testid={`text-job-title-${job.id}`}>
+                          {job.title}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">{job.company}</span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {job.location}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {job.postedDate}
+                          </span>
+                        </div>
                       </div>
+
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+                        {job.description}
+                      </p>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge variant="secondary">{job.type}</Badge>
+                        <Badge variant="outline">{job.experience}</Badge>
+                        {job.remote && <Badge variant="outline">Remote</Badge>}
+                        {job.technologies?.slice(0, 5).map(tech => (
+                          <Badge key={tech} variant="outline">{tech}</Badge>
+                        ))}
+                      </div>
+
+                      {job.requirements && job.requirements.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground">Key Requirements:</p>
+                          <ul className="text-xs text-muted-foreground space-y-0.5">
+                            {job.requirements.slice(0, 3).map((req, i) => (
+                              <li key={i} className="flex items-start gap-1.5">
+                                <div className="w-1 h-1 bg-muted-foreground rounded-full mt-1.5 flex-shrink-0"></div>
+                                <span>{req}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
 
-                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-                      {job.description}
-                    </p>
+                    <div className="flex flex-col gap-3 min-w-fit w-full md:w-auto">
+                      {job.salary && (
+                        <div className="flex items-center gap-1.5 font-semibold text-green-600 dark:text-green-400">
+                          <DollarSign className="w-4 h-4" />
+                          <span>{job.salary}</span>
+                        </div>
+                      )}
 
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="secondary">{job.type}</Badge>
-                      <Badge variant="outline">{job.experience}</Badge>
-                      {job.remote && <Badge variant="outline">Remote</Badge>}
-                      {job.technologies?.slice(0, 5).map(tech => (
-                        <Badge key={tech} variant="outline">{tech}</Badge>
-                      ))}
-                    </div>
-
-                    {job.requirements && job.requirements.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground">Key Requirements:</p>
-                        <ul className="text-xs text-muted-foreground space-y-0.5">
-                          {job.requirements.slice(0, 3).map((req, i) => (
-                            <li key={i} className="flex items-start gap-1.5">
-                              <div className="w-1 h-1 bg-muted-foreground rounded-full mt-1.5 flex-shrink-0"></div>
-                              <span>{req}</span>
-                            </li>
-                          ))}
-                        </ul>
+                      <div className="flex flex-col xs:flex-row md:flex-col gap-2">
+                        <Button size="sm" asChild data-testid={`button-apply-${job.id}`} className="w-full">
+                          <a href={job.url} target="_blank" rel="noopener noreferrer" className="gap-2">
+                            <ExternalLink className="w-3 h-3" />
+                            Apply
+                          </a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={savedJobIds.includes(job.id) ? "default" : "outline"}
+                          onClick={() => toggleSave(job.id)}
+                          disabled={saveMutation.isPending || unsaveMutation.isPending}
+                          className="gap-1.5 w-full"
+                          data-testid={`button-save-${job.id}`}
+                        >
+                          {savedJobIds.includes(job.id) ? (
+                            <>
+                              <BookmarkCheck className="w-3 h-3" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Bookmark className="w-3 h-3" />
+                              Save
+                            </>
+                          )}
+                        </Button>
                       </div>
-                    )}
+
+                      <Badge variant="outline" className="text-xs w-fit md:ml-auto">{job.source}</Badge>
+                    </div>
                   </div>
-
-                  <div className="flex flex-col gap-3 min-w-fit">
-                    {job.salary && (
-                      <div className="flex items-center gap-1.5 font-semibold text-green-600 dark:text-green-400">
-                        <DollarSign className="w-4 h-4" />
-                        <span>{job.salary}</span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2">
-                      <Button size="sm" asChild data-testid={`button-apply-${job.id}`}>
-                        <a href={job.url} target="_blank" rel="noopener noreferrer" className="gap-2">
-                          <ExternalLink className="w-3 h-3" />
-                          Apply
-                        </a>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={savedJobIds.includes(job.id) ? "default" : "outline"}
-                        onClick={() => toggleSave(job.id)}
-                        disabled={saveMutation.isPending || unsaveMutation.isPending}
-                        className="gap-1.5"
-                        data-testid={`button-save-${job.id}`}
-                      >
-                        {savedJobIds.includes(job.id) ? (
-                          <>
-                            <BookmarkCheck className="w-3 h-3" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <Bookmark className="w-3 h-3" />
-                            Save
-                          </>
-                        )}
-                      </Button>
-                    </div>
-
-                    <Badge variant="outline" className="text-xs">{job.source}</Badge>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           ))}

@@ -119,13 +119,13 @@ export default function SavedJobsPage() {
             {filteredJobs.map(job => (
               <Card key={job.id} className="hover-elevate" data-testid={`card-saved-job-${job.id}`}>
                 <CardContent className="p-5">
-                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="flex-1 space-y-3">
                       <div className="space-y-1.5">
                         <h3 className="text-lg font-semibold" data-testid={`text-job-title-${job.id}`}>
                           {job.title}
                         </h3>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                           <span className="font-medium text-foreground">{job.company}</span>
                           <span className="flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
@@ -158,7 +158,7 @@ export default function SavedJobsPage() {
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-3 min-w-fit">
+                    <div className="flex flex-col gap-3 min-w-fit w-full md:w-auto">
                       {job.salary && (
                         <div className="flex items-center gap-1.5 font-semibold text-green-600 dark:text-green-400">
                           <DollarSign className="w-4 h-4" />
@@ -166,8 +166,8 @@ export default function SavedJobsPage() {
                         </div>
                       )}
 
-                      <div className="flex flex-col sm:flex-row lg:flex-col gap-2">
-                        <Button size="sm" asChild data-testid={`button-apply-${job.id}`}>
+                      <div className="flex flex-col xs:flex-row md:flex-col gap-2">
+                        <Button size="sm" asChild data-testid={`button-apply-${job.id}`} className="w-full">
                           <a href={job.url} target="_blank" rel="noopener noreferrer" className="gap-2">
                             <ExternalLink className="w-3 h-3" />
                             Apply
@@ -179,13 +179,14 @@ export default function SavedJobsPage() {
                           onClick={() => unsaveMutation.mutate(job.id)}
                           disabled={unsaveMutation.isPending}
                           data-testid={`button-unsave-${job.id}`}
+                          className="w-full"
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
                           Remove
                         </Button>
                       </div>
 
-                      <Badge variant="outline" className="text-xs">{job.source}</Badge>
+                      <Badge variant="outline" className="text-xs w-fit md:ml-auto">{job.source}</Badge>
                     </div>
                   </div>
                 </CardContent>
