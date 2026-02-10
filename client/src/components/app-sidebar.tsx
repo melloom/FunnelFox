@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, Crown, Settings, Briefcase } from "lucide-react";
+import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, Crown, Settings, Briefcase, FolderOpen } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ const mainNavItems = [
   { title: "Discover Leads", url: "/discover", icon: Search },
   { title: "All Leads", url: "/leads", icon: Users },
   { title: "Add Lead", url: "/add", icon: Plus },
+  { title: "Ongoing Projects", url: "/projects", icon: FolderOpen },
   { title: "Find Work", url: "/find-work", icon: Briefcase },
 ];
 

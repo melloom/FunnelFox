@@ -854,51 +854,86 @@ export async function registerRoutes(
 
   app.post("/api/jobs/scrape", isAuthenticated, async (req, res) => {
     try {
-      const { sources, keywords } = req.body;
+      const { sources, keywords, includeFreelance } = req.body;
       const userId = req.session.userId;
       
-      // Import the job scraper
-      const { scrapeJobsFromMultipleSources } = await import('./scraper');
+      // Import the scrapers
+      const { scrapeJobsFromMultipleSources, scrapeFreelanceProjects } = await import('./scraper');
       
-      // Use real scraping with the provided keywords
+      // Scrape regular jobs
       const scrapedJobs = await scrapeJobsFromMultipleSources(
         keywords || ["web developer", "frontend", "backend", "full stack", "react", "node.js"]
       );
       
-      // Save jobs to database
-      const savedJobs = [];
-      for (const job of scrapedJobs) {
+      // Scrape freelance projects if requested
+      let freelanceProjects: any[] = [];
+      if (includeFreelance) {
+        freelanceProjects = await scrapeFreelanceProjects(
+          keywords || ["web development", "react", "node.js", "wordpress", "javascript"]
+        );
+      }
+      
+      // Combine all results
+      const allResults = [...scrapedJobs, ...freelanceProjects];
+      
+      // Save to database (simplified for now)
+      const savedResults = [];
+      for (const item of allResults) {
         try {
-          const jobData = {
-            title: job.title,
-            company: job.company,
-            location: job.location,
-            salary: job.salary || null,
-            type: job.type,
-            experience: job.experience,
-            description: job.description,
-            requirements: job.requirements || [],
-            postedDate: job.postedDate,
-            source: job.source,
-            url: job.url,
-            technologies: job.technologies || [],
-            remote: job.remote,
-            userId,
-          };
+          let data: any;
           
-          const savedJob = await storage.createJob(jobData);
-          savedJobs.push(savedJob);
+          if ('company' in item) {
+          // It's a job
+            data = {
+              title: item.title,
+              company: item.company,
+              location: item.location,
+              salary: item.salary || null,
+              type: item.type,
+              experience: item.experience,
+              description: item.description,
+              requirements: item.requirements || [],
+              postedDate: item.postedDate,
+              source: item.source,
+              url: item.url,
+              technologies: item.technologies || [],
+              remote: item.remote,
+              userId,
+            };
+          } else {
+          // It's a freelance project
+            data = {
+              title: item.title,
+              company: item.postedBy || 'Freelance Client',
+              location: item.location,
+              salary: item.budget,
+              type: item.budgetType === 'hourly' ? 'contract' : 'project',
+              experience: item.experience,
+              description: item.description,
+              requirements: item.skills || [],
+              postedDate: item.postedDate,
+              source: item.source,
+              url: item.url,
+              technologies: item.skills || [],
+              remote: item.remote,
+              userId,
+            };
+          }
+          
+          const saved = await storage.createJob(data);
+          savedResults.push(saved);
         } catch (error) {
-          console.error(`Failed to save job: ${job.title}`, error);
+          console.error(`Failed to save item: ${item.title}`, error);
         }
       }
       
-      console.log(`[jobScrape] Successfully scraped and saved ${savedJobs.length} jobs`);
+      console.log(`[jobScrape] Successfully scraped and saved ${savedResults.length} items (${scrapedJobs.length} jobs, ${freelanceProjects.length} freelance projects)`);
       
       res.json({
-        jobsFound: savedJobs.length,
+        jobsFound: savedResults.length,
         sourcesScraped: sources?.length || 2,
-        jobs: savedJobs
+        jobs: savedResults,
+        freelanceProjects: freelanceProjects.length
       });
     } catch (err) {
       console.error("Job scraping error:", err);

@@ -27,6 +27,7 @@ import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
 import AccountPage from "@/pages/account";
 import SubscriptionPage from "@/pages/subscription";
+import ProjectsPage from "@/pages/projects";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import VerifyEmailPage from "@/pages/verify-email";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/discover" component={DiscoverPage} />
       <Route path="/leads" component={LeadsPage} />
       <Route path="/add" component={AddLeadPage} />
+      <Route path="/projects" component={ProjectsPage} />
       <Route path="/find-work" component={FindWorkPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/subscription" component={SubscriptionPage} />

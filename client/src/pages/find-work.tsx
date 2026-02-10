@@ -34,6 +34,10 @@ const JOB_SOURCES = [
   { value: "glassdoor", label: "Glassdoor" },
   { value: "stackoverflow", label: "Stack Overflow Jobs" },
   { value: "remoteok", label: "RemoteOK" },
+  { value: "upwork", label: "Upwork" },
+  { value: "fiverr", label: "Fiverr" },
+  { value: "facebook", label: "Facebook Groups" },
+  { value: "reddit", label: "Reddit" },
 ];
 
 const JOB_TYPES = [
@@ -112,6 +116,35 @@ export default function FindWorkPage() {
     }
   };
 
+  const handleScrapeFreelanceProjects = async () => {
+    setIsScraping(true);
+    try {
+      const res = await apiRequest("POST", "/api/jobs/scrape", {
+        sources: ["upwork", "fiverr", "facebook", "reddit"],
+        keywords: ["web development", "react", "node.js", "wordpress", "javascript"],
+        includeFreelance: true,
+      });
+      
+      if (!res.ok) throw new Error("Failed to scrape freelance projects");
+      
+      const result = await res.json();
+      toast({
+        title: "Freelance Projects Scraped Successfully!",
+        description: `Found ${result.freelanceProjects} new freelance projects from ${result.sourcesScraped} sources.`,
+      });
+      
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Freelance Scraping Failed",
+        description: "Unable to scrape freelance projects. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
   const toggleTech = (tech: string) => {
     setSelectedTech(prev => 
       prev.includes(tech) 
@@ -156,7 +189,7 @@ export default function FindWorkPage() {
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-wrap gap-4 items-center">
               <Button 
                 onClick={handleScrapeJobs} 
                 disabled={isScraping}
@@ -175,6 +208,17 @@ export default function FindWorkPage() {
               >
                 <Search className="w-4 h-4" />
                 Refresh
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={handleScrapeFreelanceProjects} 
+                disabled={isScraping}
+                className="gap-2 border-purple-200 hover:bg-purple-50 transition-all duration-200"
+                size="lg"
+              >
+                <Briefcase className={`w-4 h-4 ${isScraping ? 'animate-spin' : ''}`} />
+                {isScraping ? "Scraping Freelance..." : "Scrape Freelance Projects"}
               </Button>
             </div>
           </div>
