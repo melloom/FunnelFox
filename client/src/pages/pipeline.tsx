@@ -347,9 +347,6 @@ function PipelineLeadDetailDialog({
     socialMedia: [] as string[],
   });
 
-  if (!lead) return null;
-
-  // Initialize edit form when lead is available
   useEffect(() => {
     if (lead) {
       setEditForm({
@@ -358,6 +355,8 @@ function PipelineLeadDetailDialog({
       });
     }
   }, [lead]);
+
+  if (!lead) return null;
 
   const noWebsite = !lead.websiteUrl || lead.websiteUrl === "none";
   const currentStageIndex = PIPELINE_STAGES.findIndex((s) => s.value === lead.status);
