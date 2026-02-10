@@ -927,6 +927,66 @@ export async function registerRoutes(
     }
   });
 
+  // Saved Jobs routes
+  app.get("/api/saved-jobs", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const savedJobRecords = await storage.getSavedJobs(userId);
+      const jobIds = savedJobRecords.map(s => s.jobId);
+      if (jobIds.length === 0) return res.json([]);
+      const allJobs = await storage.getJobs(userId);
+      const jobMap = new Map(allJobs.map(j => [j.id, j]));
+      const result = savedJobRecords
+        .filter(s => jobMap.has(s.jobId))
+        .map(s => ({ ...jobMap.get(s.jobId)!, savedAt: s.savedAt, savedNotes: s.notes }));
+      res.json(result);
+    } catch (err) {
+      console.error("Failed to fetch saved jobs:", err);
+      res.status(500).json({ error: "Failed to fetch saved jobs" });
+    }
+  });
+
+  app.get("/api/saved-jobs/ids", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const ids = await storage.getSavedJobIds(userId);
+      res.json(ids);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch saved job ids" });
+    }
+  });
+
+  app.post("/api/saved-jobs/:jobId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const jobId = parseInt(req.params.jobId as string);
+      if (isNaN(jobId)) return res.status(400).json({ error: "Invalid job ID" });
+      const already = await storage.isJobSaved(jobId, userId);
+      if (already) return res.json({ success: true, message: "Already saved" });
+      const saved = await storage.saveJob({ jobId, userId, notes: req.body.notes });
+      res.json(saved);
+    } catch (err) {
+      console.error("Failed to save job:", err);
+      res.status(500).json({ error: "Failed to save job" });
+    }
+  });
+
+  app.delete("/api/saved-jobs/:jobId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const jobId = parseInt(req.params.jobId as string);
+      if (isNaN(jobId)) return res.status(400).json({ error: "Invalid job ID" });
+      await storage.unsaveJob(jobId, userId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to unsave job" });
+    }
+  });
+
   // Project Routes
   app.get("/api/projects", isAuthenticated, async (req, res) => {
     try {

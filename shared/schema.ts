@@ -182,11 +182,27 @@ export const insertProjectSchema = z.object({
   userId: z.string(),
 });
 
+export const savedJobs = pgTable("saved_jobs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  jobId: integer("job_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  notes: text("notes"),
+  savedAt: timestamp("saved_at").notNull().defaultNow(),
+});
+
+export const insertSavedJobSchema = z.object({
+  jobId: z.number(),
+  userId: z.string(),
+  notes: z.string().optional(),
+});
+
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activityLog.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
+export type InsertSavedJob = z.infer<typeof insertSavedJobSchema>;
+export type SavedJob = typeof savedJobs.$inferSelect;
 
 export * from "./models/auth";
