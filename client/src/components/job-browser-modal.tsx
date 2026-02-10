@@ -30,26 +30,26 @@ const scraperFeatures = [
   {
     icon: Database,
     title: "Multi-Platform Scraping",
-    description: "We scrape from Upwork, Freelancer, Fiverr, PeoplePerHour, and more - all in one place",
-    platforms: ["Upwork", "Freelancer", "Fiverr", "PeoplePerHour", "Guru", "Toptal"]
-  },
-  {
-    icon: RefreshCw,
-    title: "Real-Time Updates",
-    description: "Jobs are updated hourly so you never miss an opportunity",
-    frequency: "Every 60 minutes"
+    description: "We scrape from 13+ platforms including LinkedIn, Glassdoor, AngelList, Indeed, RemoteOK, Upwork, Fiverr, Freelancer.com, PeoplePerHour, Guru, Stack Overflow, GitHub, and more - all in one place",
+    platforms: ["LinkedIn", "Glassdoor", "AngelList", "Indeed", "RemoteOK", "Upwork", "Fiverr", "Freelancer.com", "PeoplePerHour", "Guru", "Stack Overflow", "GitHub"]
   },
   {
     icon: Target,
-    title: "Smart Filtering",
-    description: "Filter by technology, experience level, budget, and location automatically",
-    filters: ["React", "Node.js", "Python", "Remote", "Senior Level"]
+    title: "AI-Powered Job Ranking",
+    description: "Our intelligent scoring algorithm ranks jobs by relevance, quality, freshness, and platform authority to show you the best opportunities first",
+    filters: ["Relevance Score", "Quality Score", "Freshness Score", "Platform Authority", "Smart Ranking"]
+  },
+  {
+    icon: RefreshCw,
+    title: "Advanced Deduplication",
+    description: "Multi-layer deduplication removes duplicate postings across platforms while keeping the highest quality version",
+    verification: "AI-powered deduplication + quality preservation"
   },
   {
     icon: Shield,
-    title: "Verified Listings",
-    description: "We verify job authenticity and filter out spam and low-quality postings",
-    verification: "AI-powered verification"
+    title: "Real-Time Intelligence",
+    description: "Continuous monitoring with intelligent rate limiting, proxy rotation, and spam filtering ensures reliable, up-to-date job listings",
+    frequency: "Every 15-30 minutes with smart caching"
   }
 ];
 
@@ -63,34 +63,112 @@ const sampleJobs = [
     salary: "$120k - $160k",
     posted: "2 hours ago",
     skills: ["React", "Node.js", "TypeScript", "PostgreSQL"],
-    platform: "Upwork",
+    platform: "LinkedIn",
     rating: 4.8,
     scraped: true,
   },
   {
     id: 2,
+    title: "Frontend Developer - React Specialist",
+    company: "Digital Agency",
+    location: "San Francisco, CA",
+    type: "Full-time",
+    salary: "$90k - $120k",
+    posted: "1 hour ago",
+    skills: ["React", "TypeScript", "Redux", "Tailwind"],
+    platform: "Glassdoor",
+    rating: 4.7,
+    scraped: true,
+  },
+  {
+    id: 3,
+    title: "Full Stack Developer - Startup",
+    company: "Tech Startup",
+    location: "Remote",
+    type: "Full-time",
+    salary: "$80k - $110k + equity",
+    posted: "30 minutes ago",
+    skills: ["Vue.js", "Node.js", "PostgreSQL", "Docker"],
+    platform: "AngelList",
+    rating: 4.6,
+    scraped: true,
+  },
+  {
+    id: 4,
     title: "E-commerce Website Development",
     company: "Retail Startup",
     location: "New York, NY",
     type: "Contract",
     salary: "$5,000 - $8,000",
-    posted: "1 hour ago",
+    posted: "3 hours ago",
     skills: ["React", "Node.js", "MongoDB", "Stripe API"],
-    platform: "Freelancer",
+    platform: "Upwork",
     rating: 4.5,
     scraped: true,
   },
   {
-    id: 3,
+    id: 5,
     title: "WordPress Website Redesign",
     company: "Local Business",
     location: "Los Angeles, CA",
     type: "Project",
     salary: "$2,000 - $3,500",
-    posted: "30 minutes ago",
+    posted: "4 hours ago",
     skills: ["WordPress", "PHP", "CSS", "JavaScript"],
-    platform: "Upwork",
+    platform: "Freelancer.com",
     rating: 4.2,
+    scraped: true,
+  },
+  {
+    id: 6,
+    title: "Remote Node.js Developer",
+    company: "SaaS Company",
+    location: "Remote",
+    type: "Part-time",
+    salary: "$60 - $80/hr",
+    posted: "5 hours ago",
+    skills: ["Node.js", "Express", "MongoDB", "AWS"],
+    platform: "PeoplePerHour",
+    rating: 4.4,
+    scraped: true,
+  },
+  {
+    id: 7,
+    title: "Full Stack Web Application",
+    company: "Tech Company",
+    location: "Austin, TX",
+    type: "Full-time",
+    salary: "$100k - $130k",
+    posted: "6 hours ago",
+    skills: ["Angular", "Node.js", "PostgreSQL", "Docker"],
+    platform: "Indeed",
+    rating: 4.5,
+    scraped: true,
+  },
+  {
+    id: 8,
+    title: "Frontend Developer - React",
+    company: "Startup",
+    location: "Remote",
+    type: "Contract",
+    salary: "$70 - $90/hr",
+    posted: "8 hours ago",
+    skills: ["React", "JavaScript", "CSS", "HTML"],
+    platform: "Stack Overflow",
+    rating: 4.3,
+    scraped: true,
+  },
+  {
+    id: 9,
+    title: "Full Stack Developer",
+    company: "Open Source Project",
+    location: "Remote",
+    type: "Volunteer",
+    salary: "Open Source",
+    posted: "12 hours ago",
+    skills: ["Python", "Django", "PostgreSQL", "Docker"],
+    platform: "GitHub",
+    rating: 4.1,
     scraped: true,
   },
 ];
@@ -278,7 +356,7 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
                     <h3 className="text-lg font-semibold">Our Scraper Power</h3>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-primary">6+</div>
+                        <div className="text-2xl font-bold text-primary">13+</div>
                         <div className="text-xs text-muted-foreground">Platforms</div>
                       </div>
                       <div className="text-center">
@@ -287,10 +365,10 @@ export function JobBrowserModal({ open, onOpenChange }: JobBrowserModalProps) {
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-primary">24/7</div>
-                        <div className="text-xs text-muted-foreground">Monitoring</div>
+                        <div className="text-xs text-muted-foreground">AI Monitoring</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-primary">95%</div>
+                        <div className="text-2xl font-bold text-primary">98%</div>
                         <div className="text-xs text-muted-foreground">Accuracy</div>
                       </div>
                     </div>

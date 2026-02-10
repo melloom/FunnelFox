@@ -750,33 +750,91 @@ export async function registerRoutes(
   app.get("/api/location-search", isAuthenticated, async (req, res) => {
     try {
       const q = (req.query.q as string || "").trim();
-      if (q.length < 3) return res.json([]);
+      if (q.length < 2) return res.json([]);
 
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=8&countrycodes=us`,
-        { headers: { "User-Agent": "FunnelFox/1.0" } }
-      );
-      const data = await response.json();
+      // Try multiple geocoding providers for better results
+      const geocodePromises = [
+        // Nominatim (OpenStreetMap)
+        fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=8&countrycodes=us`,
+          { headers: { "User-Agent": "FunnelFox/1.0" } }
+        ).then(r => r.json()).catch(() => []),
+        
+        // Add OpenCage if API key is available
+        ...(process.env.OPENCAGE_API_KEY ? [
+          fetch(
+            `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(q)}&key=${process.env.OPENCAGE_API_KEY}&countrycode=us&limit=5`,
+            { headers: { "User-Agent": "FunnelFox/1.0" } }
+          ).then(r => r.json()).catch(() => [])
+        ] : [])
+      ];
 
-      const qLower = q.toLowerCase();
-      const seen = new Set<string>();
-      const results: Array<{ city: string; state: string; formatted: string }> = [];
+      const results = await Promise.allSettled(geocodePromises);
+      const allLocations: Array<{ city: string; state: string; formatted: string; confidence: number; source: string }> = [];
 
-      for (const item of data) {
-        const addr = item.address || {};
-        const city = addr.city || addr.town || addr.village || addr.hamlet || "";
-        const state = addr.state || "";
-        if (!city || !state) continue;
-        const formatted = `${city}, ${state}`;
-        const key = formatted.toLowerCase();
-        if (seen.has(key)) continue;
-        if (!key.includes(qLower) && !city.toLowerCase().startsWith(qLower) && !state.toLowerCase().startsWith(qLower)) continue;
-        seen.add(key);
-        results.push({ city, state, formatted });
-        if (results.length >= 6) break;
+      // Process Nominatim results
+      if (results[0].status === "fulfilled") {
+        const data = results[0].value;
+        for (const item of data) {
+          const addr = item.address || {};
+          const city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || "";
+          const state = addr.state || "";
+          if (!city || !state) continue;
+          
+          const formatted = `${city}, ${state}`;
+          const key = formatted.toLowerCase();
+          
+          if (!allLocations.some(loc => loc.formatted.toLowerCase() === key)) {
+            allLocations.push({ 
+              city, 
+              state, 
+              formatted,
+              confidence: item.importance ? Math.round(item.importance * 100) : 75,
+              source: "nominatim"
+            });
+          }
+        }
       }
 
-      res.json(results);
+      // Process OpenCage results if available
+      if (results[1]?.status === "fulfilled") {
+        const data = results[1].value;
+        if (data.status?.code === 200 && data.results) {
+          for (const item of data.results) {
+            const components = item.components || {};
+            const city = components.city || components.town || components.village || components.county || "";
+            const state = components.state || "";
+            if (!city || !state) continue;
+            
+            const formatted = `${city}, ${state}`;
+            const key = formatted.toLowerCase();
+            
+            if (!allLocations.some(loc => loc.formatted.toLowerCase() === key)) {
+              allLocations.push({ 
+                city, 
+                state, 
+                formatted,
+                confidence: Math.round(item.confidence || 75),
+                source: "opencage"
+              });
+            }
+          }
+        }
+      }
+
+      // Sort by confidence and filter by query relevance
+      const qLower = q.toLowerCase();
+      const filteredResults = allLocations
+        .filter(loc => 
+          loc.formatted.toLowerCase().includes(qLower) ||
+          loc.city.toLowerCase().includes(qLower) ||
+          loc.state.toLowerCase().includes(qLower)
+        )
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 6)
+        .map(({ city, state, formatted }) => ({ city, state, formatted }));
+
+      res.json(filteredResults);
     } catch (err) {
       console.error("Location search error:", err);
       res.json([]);

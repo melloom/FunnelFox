@@ -12,6 +12,8 @@ interface ScrapedBusiness {
   socialMedia?: string[];
   bbbRating?: string;
   bbbAccredited?: boolean;
+  googleRating?: number;
+  googleReviewCount?: number;
 }
 
 interface ScrapedJob {
@@ -852,31 +854,342 @@ const OSM_CATEGORY_MAP: Record<string, string[]> = {
   hotel: ['tourism=hotel'],
 };
 
-async function geocodeLocation(location: string): Promise<{ lat: number; lon: number } | null> {
-  try {
-    const encodedLoc = encodeURIComponent(location);
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodedLoc}&format=json&limit=1`;
+interface LocationData {
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  county?: string;
+  coordinates?: { lat: number; lon: number };
+  formatted: string;
+  confidence: number;
+}
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+interface GeoCacheEntry {
+  data: LocationData;
+  timestamp: number;
+}
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "FunnelFox/1.0 (lead-discovery-app)",
-      },
-    });
-    clearTimeout(timeout);
+const geoCache = new Map<string, GeoCacheEntry>();
+const GEO_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-    if (!response.ok) return null;
+function getGeoCacheKey(location: string): string {
+  return location.toLowerCase().trim().replace(/\s+/g, ' ');
+}
 
-    const data = await response.json() as any[];
-    if (data.length === 0) return null;
+function pruneGeoCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of Array.from(geoCache.entries())) {
+    if (now - entry.timestamp > GEO_CACHE_TTL_MS) {
+      geoCache.delete(key);
+    }
+  }
+}
 
-    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-  } catch {
+function parseLocationString(location: string): Partial<LocationData> {
+  const cleaned = location.trim().replace(/\s+/g, ' ');
+  const result: Partial<LocationData> = { formatted: cleaned };
+  
+  // Zip code patterns
+  const zipMatch = cleaned.match(/\b(\d{5})(?:-\d{4})?\b/);
+  if (zipMatch) {
+    result.zipCode = zipMatch[1];
+  }
+  
+  // State patterns (2-letter abbreviations and full names)
+  const statePatterns = [
+    /\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b/,
+    /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new\s+hampshire|new\s+jersey|new\s+mexico|new\s+york|north\s+carolina|north\s+dakota|ohio|oklahoma|oregon|pennsylvania|rhode\s+island|south\s+carolina|south\s+dakota|tennessee|texas|utah|vermont|virginia|washington|west\s+virginia|wisconsin|wyoming)\b/i
+  ];
+  
+  for (const pattern of statePatterns) {
+    const match = cleaned.match(pattern);
+    if (match) {
+      result.state = match[1].toUpperCase();
+      break;
+    }
+  }
+  
+  // City patterns (before comma or state)
+  const parts = cleaned.split(',').map(p => p.trim());
+  if (parts.length >= 2) {
+    // Format: "City, State" or "City, State Zip"
+    result.city = parts[0];
+    if (!result.state && parts[1]) {
+      const stateFromParts = parts[1].match(/^([A-Z]{2}|[a-zA-Z\s]+)/);
+      if (stateFromParts) {
+        result.state = stateFromParts[1].toUpperCase();
+      }
+    }
+  } else if (parts.length === 1) {
+    // Single part - try to extract city/state
+    const words = parts[0].split(' ');
+    if (words.length >= 2 && !result.zipCode) {
+      // Likely "City State" format
+      result.city = words.slice(0, -1).join(' ');
+      result.state = words[words.length - 1].toUpperCase();
+    } else if (!result.state && !result.zipCode) {
+      // Single city or state
+      result.city = parts[0];
+    }
+  }
+  
+  return result;
+}
+
+function validateUSLocation(location: LocationData): boolean {
+  // Must have at least a city or state
+  if (!location.city && !location.state) return false;
+  
+  // If state is provided, it must be a valid US state
+  if (location.state) {
+    const validStates = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']);
+    const stateAbbr = location.state.length === 2 ? location.state : location.state.substring(0, 2).toUpperCase();
+    if (!validStates.has(stateAbbr)) return false;
+  }
+  
+  return true;
+}
+
+function calculateLocationConfidence(location: LocationData): number {
+  let confidence = 0;
+  
+  if (location.coordinates) confidence += 40;
+  if (location.city) confidence += 25;
+  if (location.state) confidence += 25;
+  if (location.zipCode) confidence += 10;
+  
+  return Math.min(confidence, 100);
+}
+
+async function geocodeLocationMultipleProviders(location: string): Promise<LocationData | null> {
+  const parsed = parseLocationString(location);
+  if (!parsed.city && !parsed.state && !parsed.zipCode) {
     return null;
   }
+  
+  const locationData: LocationData = {
+    ...parsed,
+    city: parsed.city,
+    state: parsed.state,
+    zipCode: parsed.zipCode,
+    formatted: parsed.formatted || location,
+    confidence: 0
+  };
+  
+  // Try multiple geocoding providers in order
+  const providers = [
+    geocodeWithNominatim,
+    geocodeWithOpenCage,
+    geocodeWithMapBox
+  ];
+  
+  for (const provider of providers) {
+    try {
+      const coords = await provider(locationData);
+      if (coords) {
+        locationData.coordinates = coords;
+        locationData.confidence = calculateLocationConfidence(locationData);
+        break;
+      }
+    } catch (error) {
+      console.warn(`Geocoding provider failed for ${location}:`, error);
+    }
+  }
+  
+  // Validate final location
+  if (!validateUSLocation(locationData)) {
+    return null;
+  }
+  
+  return locationData;
+}
+
+async function geocodeWithNominatim(locationData: LocationData): Promise<{ lat: number; lon: number } | null> {
+  const queries = [];
+  
+  if (locationData.city && locationData.state) {
+    queries.push(`${locationData.city}, ${locationData.state}`);
+    queries.push(`${locationData.city} ${locationData.state}`);
+  }
+  if (locationData.city && !locationData.state) {
+    queries.push(locationData.city);
+  }
+  if (locationData.zipCode) {
+    queries.push(locationData.zipCode);
+  }
+  
+  for (const query of queries) {
+    try {
+      const encodedLoc = encodeURIComponent(query);
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodedLoc}&format=json&limit=1&countrycodes=us`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "FunnelFox/1.0 (lead-discovery-app)",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) continue;
+
+      const data = await response.json() as any[];
+      if (data.length === 0) continue;
+
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    } catch (error) {
+      continue;
+    }
+  }
+  
+  return null;
+}
+
+async function geocodeWithOpenCage(locationData: LocationData): Promise<{ lat: number; lon: number } | null> {
+  const apiKey = process.env.OPENCAGE_API_KEY;
+  if (!apiKey) return null;
+  
+  const queries = [];
+  
+  if (locationData.city && locationData.state) {
+    queries.push(`${locationData.city}, ${locationData.state}, USA`);
+  }
+  if (locationData.zipCode) {
+    queries.push(`${locationData.zipCode}, USA`);
+  }
+  
+  for (const query of queries) {
+    try {
+      const encodedLoc = encodeURIComponent(query);
+      const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodedLoc}&key=${apiKey}&countrycode=us&limit=1`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "FunnelFox/1.0 (lead-discovery-app)",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) continue;
+
+      const data = await response.json() as any;
+      if (data.status.code !== 200 || !data.results?.length) continue;
+
+      const result = data.results[0];
+      return { lat: result.geometry.lat, lon: result.geometry.lng };
+    } catch (error) {
+      continue;
+    }
+  }
+  
+  return null;
+}
+
+async function geocodeWithMapBox(locationData: LocationData): Promise<{ lat: number; lon: number } | null> {
+  const apiKey = process.env.MAPBOX_API_KEY;
+  if (!apiKey) return null;
+  
+  const queries = [];
+  
+  if (locationData.city && locationData.state) {
+    queries.push(`${locationData.city} ${locationData.state}`);
+  }
+  if (locationData.zipCode) {
+    queries.push(locationData.zipCode);
+  }
+  
+  for (const query of queries) {
+    try {
+      const encodedLoc = encodeURIComponent(query);
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedLoc}.json?country=us&limit=1&access_token=${apiKey}`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "FunnelFox/1.0 (lead-discovery-app)",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) continue;
+
+      const data = await response.json() as any;
+      if (!data.features?.length) continue;
+
+      const result = data.features[0];
+      return { lat: result.center[1], lon: result.center[0] };
+    } catch (error) {
+      continue;
+    }
+  }
+  
+  return null;
+}
+
+async function geocodeLocation(location: string): Promise<{ lat: number; lon: number } | null> {
+  const cacheKey = getGeoCacheKey(location);
+  const cached = geoCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < GEO_CACHE_TTL_MS) {
+    return cached.data.coordinates || null;
+  }
+  
+  const locationData = await geocodeLocationMultipleProviders(location);
+  
+  if (locationData) {
+    geoCache.set(cacheKey, {
+      data: locationData,
+      timestamp: Date.now()
+    });
+    pruneGeoCache();
+    return locationData.coordinates || null;
+  }
+  
+  return null;
+}
+
+function getOptimalSearchRadius(locationData: LocationData, category: string): number {
+  // Dynamic radius based on location type and business category
+  let baseRadius = 15000; // 15km default
+  
+  // Adjust for location type
+  if (locationData.zipCode) {
+    baseRadius = 8000; // Smaller radius for zip codes (more precise)
+  } else if (locationData.city && locationData.state) {
+    baseRadius = 20000; // Larger radius for city/state searches
+  } else if (locationData.city && !locationData.state) {
+    baseRadius = 12000; // Medium for city only
+  }
+  
+  // Adjust for business type
+  const serviceCategories = ['plumber', 'electrician', 'hvac', 'roofer', 'landscaping', 'cleaning', 'pest control', 'moving company'];
+  const retailCategories = ['restaurant', 'cafe', 'bakery', 'bar', 'shop', 'store'];
+  const professionalCategories = ['lawyer', 'accountant', 'dentist', 'doctor', 'veterinarian'];
+  
+  if (serviceCategories.some(cat => category.toLowerCase().includes(cat))) {
+    baseRadius *= 1.3; // Service businesses need larger radius
+  } else if (retailCategories.some(cat => category.toLowerCase().includes(cat))) {
+    baseRadius *= 0.8; // Retail needs smaller radius (more local)
+  } else if (professionalCategories.some(cat => category.toLowerCase().includes(cat))) {
+    baseRadius *= 1.1; // Professional services moderate radius
+  }
+  
+  // Adjust for confidence in location data
+  if (locationData.confidence && locationData.confidence < 60) {
+    baseRadius *= 1.5; // Larger radius for uncertain locations
+  }
+  
+  return Math.round(baseRadius);
 }
 
 async function searchOpenStreetMap(
@@ -887,8 +1200,28 @@ async function searchOpenStreetMap(
   const results: ScrapedBusiness[] = [];
 
   try {
-    const coords = await geocodeLocation(location);
-    if (!coords) return results;
+    // Get enhanced location data
+    const cacheKey = getGeoCacheKey(location);
+    let locationData: LocationData | null = null;
+    
+    const cached = geoCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < GEO_CACHE_TTL_MS) {
+      locationData = cached.data;
+    } else {
+      locationData = await geocodeLocationMultipleProviders(location);
+      if (locationData) {
+        geoCache.set(cacheKey, {
+          data: locationData,
+          timestamp: Date.now()
+        });
+        pruneGeoCache();
+      }
+    }
+    
+    if (!locationData?.coordinates) {
+      console.warn(`Could not geocode location: ${location}`);
+      return results;
+    }
 
     const catLower = category.toLowerCase();
     let osmTags = OSM_CATEGORY_MAP[catLower];
@@ -900,18 +1233,20 @@ async function searchOpenStreetMap(
         }
       }
     }
-    const radius = 25000;
+    
+    // Use dynamic radius based on location and business type
+    const radius = getOptimalSearchRadius(locationData, category);
     let tagFilters: string;
 
     if (!osmTags) {
-      tagFilters = `node["name"~"${category}",i](around:${radius},${coords.lat},${coords.lon});\nway["name"~"${category}",i](around:${radius},${coords.lat},${coords.lon});`;
+      tagFilters = `node["name"~"${category}",i](around:${radius},${locationData.coordinates!.lat},${locationData.coordinates!.lon});\nway["name"~"${category}",i](around:${radius},${locationData.coordinates!.lat},${locationData.coordinates!.lon});`;
     } else {
       tagFilters = osmTags.map((tag) => {
         const eqIdx = tag.indexOf("=");
         if (eqIdx < 0) return "";
         const key = tag.slice(0, eqIdx);
         const val = tag.slice(eqIdx + 1);
-        return `node["${key}"="${val}"](around:${radius},${coords.lat},${coords.lon});\nway["${key}"="${val}"](around:${radius},${coords.lat},${coords.lon});`;
+        return `node["${key}"="${val}"](around:${radius},${locationData.coordinates!.lat},${locationData.coordinates!.lon});\nway["${key}"="${val}"](around:${radius},${locationData.coordinates!.lat},${locationData.coordinates!.lon});`;
       }).filter(Boolean).join("\n");
     }
 
@@ -958,8 +1293,8 @@ async function searchOpenStreetMap(
       const emailTag = tags.email || tags["contact:email"] || "";
       const street = tags["addr:street"] || "";
       const houseNum = tags["addr:housenumber"] || "";
-      const city = tags["addr:city"] || "";
-      const state = tags["addr:state"] || "";
+      const city = tags["addr:city"] || locationData.city || "";
+      const state = tags["addr:state"] || locationData.state || "";
 
       let address = "";
       if (street) {
@@ -999,65 +1334,152 @@ async function searchGooglePlaces(
   const results: ScrapedBusiness[] = [];
 
   try {
-    const textQuery = `${category} in ${location}`;
-    const url = `https://places.googleapis.com/v1/places:searchText`;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(url, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.primaryType",
-      },
-      body: JSON.stringify({
-        textQuery,
-        maxResultCount: Math.min(maxResults, 20),
-        languageCode: "en",
-      }),
-    });
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      console.error("Google Places API error:", response.status, await response.text());
-      return results;
+    // Get enhanced location data for better search
+    const cacheKey = getGeoCacheKey(location);
+    let locationData: LocationData | null = null;
+    
+    const cached = geoCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < GEO_CACHE_TTL_MS) {
+      locationData = cached.data;
+    } else {
+      locationData = await geocodeLocationMultipleProviders(location);
+      if (locationData) {
+        geoCache.set(cacheKey, {
+          data: locationData,
+          timestamp: Date.now()
+        });
+        pruneGeoCache();
+      }
     }
-
-    const data = await response.json() as any;
-    const places = data.places || [];
-
-    for (const place of places) {
+    
+    // Build better search queries
+    const searchQueries = [];
+    
+    if (locationData?.city && locationData?.state) {
+      searchQueries.push(`${category} in ${locationData.city}, ${locationData.state}`);
+      searchQueries.push(`${category} ${locationData.city} ${locationData.state}`);
+    } else if (locationData?.city) {
+      searchQueries.push(`${category} in ${locationData.city}`);
+    } else {
+      searchQueries.push(`${category} in ${location}`);
+    }
+    
+    // Try each query until we get results
+    for (const textQuery of searchQueries) {
       if (results.length >= maxResults) break;
-      const name = place.displayName?.text;
-      if (!name || name.length < 3) continue;
+      
+      const url = `https://places.googleapis.com/v1/places:searchText`;
 
-      const website = place.websiteUri || "";
-      const phone = place.nationalPhoneNumber || "";
-      const address = place.formattedAddress || "";
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
-      if (website) {
-        const domain = extractDomain(website);
-        if (domain && (isExcludedDomain(domain) || isAggregatorSite(domain))) continue;
+      const response = await fetch(url, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.primaryType,places.rating,places.userRatingCount",
+        },
+        body: JSON.stringify({
+          textQuery,
+          maxResultCount: Math.min(maxResults - results.length, 20),
+          languageCode: "en",
+          includedType: getGooglePlacesType(category),
+        }),
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.error("Google Places API error:", response.status, await response.text());
+        continue;
       }
 
-      results.push({
-        name,
-        url: website ? normalizeUrl(website) : "",
-        description: address || undefined,
-        hasWebsite: !!website,
-        source: "google-places",
-        phone: phone || undefined,
-        address: address || undefined,
-      });
+      const data = await response.json() as any;
+      const places = data.places || [];
+
+      for (const place of places) {
+        if (results.length >= maxResults) break;
+        const name = place.displayName?.text;
+        if (!name || name.length < 3) continue;
+
+        const website = place.websiteUri || "";
+        const phone = place.nationalPhoneNumber || "";
+        const address = place.formattedAddress || "";
+        const rating = place.rating;
+        const reviewCount = place.userRatingCount;
+
+        if (website) {
+          const domain = extractDomain(website);
+          if (domain && (isExcludedDomain(domain) || isAggregatorSite(domain))) continue;
+        }
+
+        const descriptionParts = [address];
+        if (rating && reviewCount) {
+          descriptionParts.push(`Rating: ${rating.toFixed(1)} (${reviewCount.toLocaleString()} reviews)`);
+        }
+
+        results.push({
+          name,
+          url: website ? normalizeUrl(website) : "",
+          description: descriptionParts.filter(Boolean).join(" | ") || undefined,
+          hasWebsite: !!website,
+          source: "google-places",
+          phone: phone || undefined,
+          address: address || undefined,
+          googleRating: rating,
+          googleReviewCount: reviewCount,
+        });
+      }
+      
+      // If we got results from this query, don't try others
+      if (data.places?.length > 0) break;
     }
   } catch (err) {
     console.error("Google Places search error:", err);
   }
 
   return results;
+}
+
+function getGooglePlacesType(category: string): string | undefined {
+  const categoryMap: Record<string, string> = {
+    'restaurant': 'restaurant',
+    'pizza': 'restaurant',
+    'cafe': 'cafe',
+    'coffee': 'cafe',
+    'bar': 'bar',
+    'bakery': 'bakery',
+    'hair salon': 'hair_care',
+    'barber': 'hair_care',
+    'nail salon': 'beauty_salon',
+    'spa': 'spa',
+    'dentist': 'dentist',
+    'doctor': 'doctor',
+    'veterinarian': 'veterinary_care',
+    'auto repair': 'car_repair',
+    'mechanic': 'car_repair',
+    'plumber': 'plumber',
+    'electrician': 'electrician',
+    'gym': 'gym',
+    'yoga': 'gym',
+    'pharmacy': 'pharmacy',
+    'bank': 'bank',
+    'hotel': 'lodging',
+    'lawyer': 'lawyer',
+    'accountant': 'accounting',
+    'insurance': 'insurance_agency',
+    'real estate': 'real_estate_agency',
+  };
+  
+  const lower = category.toLowerCase();
+  for (const [key, type] of Object.entries(categoryMap)) {
+    if (lower.includes(key) || key.includes(lower)) {
+      return type;
+    }
+  }
+  
+  return undefined;
 }
 
 async function searchGoogleMaps(
@@ -3090,10 +3512,15 @@ export async function scrapeJobsFromMultipleSources(keywords: string[]): Promise
   const allJobs: ScrapedJob[] = [];
   
   try {
-    // Scrape from different job sources
-    const [indeedJobs, remoteOkJobs] = await Promise.allSettled([
+    // Scrape from different job sources with advanced platforms
+    const [indeedJobs, remoteOkJobs, linkedInJobs, glassdoorJobs, angelListJobs, stackOverflowJobs, githubJobs] = await Promise.allSettled([
       scrapeIndeedJobs(keywords),
-      scrapeRemoteOkJobs(keywords)
+      scrapeRemoteOkJobs(keywords),
+      scrapeLinkedInJobs(keywords),
+      scrapeGlassdoorJobs(keywords),
+      scrapeAngelListJobs(keywords),
+      scrapeStackOverflowJobs(keywords),
+      scrapeGitHubJobs(keywords)
     ]);
     
     // Collect successful results
@@ -3103,6 +3530,21 @@ export async function scrapeJobsFromMultipleSources(keywords: string[]): Promise
     if (remoteOkJobs.status === 'fulfilled') {
       allJobs.push(...remoteOkJobs.value);
     }
+    if (linkedInJobs.status === 'fulfilled') {
+      allJobs.push(...linkedInJobs.value);
+    }
+    if (glassdoorJobs.status === 'fulfilled') {
+      allJobs.push(...glassdoorJobs.value);
+    }
+    if (angelListJobs.status === 'fulfilled') {
+      allJobs.push(...angelListJobs.value);
+    }
+    if (stackOverflowJobs.status === 'fulfilled') {
+      allJobs.push(...stackOverflowJobs.value);
+    }
+    if (githubJobs.status === 'fulfilled') {
+      allJobs.push(...githubJobs.value);
+    }
     
     console.log(`[scrapeJobsFromMultipleSources] Total jobs scraped: ${allJobs.length}`);
     return allJobs;
@@ -3110,6 +3552,192 @@ export async function scrapeJobsFromMultipleSources(keywords: string[]): Promise
     console.error('[scrapeJobsFromMultipleSources] Error:', error);
     return [];
   }
+}
+
+// Advanced Deduplication and Job Scoring System
+interface JobScore {
+  relevanceScore: number;
+  qualityScore: number;
+  freshnessScore: number;
+  platformScore: number;
+  totalScore: number;
+}
+
+function calculateJobScore(job: ScrapedJob | ScrapedFreelanceProject, keywords: string[]): JobScore {
+  let relevanceScore = 0;
+  let qualityScore = 0;
+  let freshnessScore = 0;
+  let platformScore = 0;
+  
+  // Relevance scoring based on keyword matching
+  const titleAndDesc = `${job.title} ${job.description}`.toLowerCase();
+  keywords.forEach(keyword => {
+    if (titleAndDesc.includes(keyword.toLowerCase())) {
+      relevanceScore += 10;
+    }
+  });
+  
+  // Quality scoring based on description length and details
+  if (job.description && job.description.length > 100) {
+    qualityScore += 5;
+  }
+  const salary = 'salary' in job ? job.salary : ('budget' in job ? job.budget : undefined);
+  if (salary && salary !== 'Competitive' && salary !== 'Negotiable') {
+    qualityScore += 3;
+  }
+  const requirements = 'requirements' in job ? job.requirements : ('skills' in job ? job.skills : []);
+  if (requirements && requirements.length > 0) {
+    qualityScore += 2;
+  }
+  
+  // Freshness scoring
+  if (job.postedDate.includes('hour') || job.postedDate.includes('minute')) {
+    freshnessScore = 10;
+  } else if (job.postedDate.includes('day')) {
+    freshnessScore = 7;
+  } else if (job.postedDate.includes('week')) {
+    freshnessScore = 4;
+  } else {
+    freshnessScore = 1;
+  }
+  
+  // Platform scoring (premium platforms get higher scores)
+  const platformScores: Record<string, number> = {
+    'LinkedIn': 10,
+    'Glassdoor': 9,
+    'AngelList': 8,
+    'Indeed': 8,
+    'Stack Overflow': 7,
+    'GitHub': 7,
+    'Upwork': 6,
+    'Freelancer.com': 6,
+    'PeoplePerHour': 5,
+    'Guru': 5,
+    'Fiverr': 4,
+    'RemoteOK': 6,
+    'Facebook Groups': 3,
+    'Reddit': 3
+  };
+  
+  platformScore = platformScores[job.source] || 1;
+  
+  const totalScore = relevanceScore + qualityScore + freshnessScore + platformScore;
+  
+  return {
+    relevanceScore,
+    qualityScore,
+    freshnessScore,
+    platformScore,
+    totalScore
+  };
+}
+
+function advancedDeduplication(jobs: (ScrapedJob | ScrapedFreelanceProject)[]): (ScrapedJob | ScrapedFreelanceProject)[] {
+  const seen = new Set<string>();
+  const deduplicated: (ScrapedJob | ScrapedFreelanceProject)[] = [];
+  
+  // Sort by score first to keep highest quality jobs
+  const jobsWithScores = jobs.map(job => ({
+    job,
+    score: calculateJobScore(job, ['web developer', 'react', 'node.js', 'javascript'])
+  }));
+  
+  jobsWithScores.sort((a, b) => b.score.totalScore - a.score.totalScore);
+  
+  for (const { job } of jobsWithScores) {
+    // Create multiple deduplication keys
+    const company = 'company' in job ? job.company : ('postedBy' in job ? job.postedBy : '');
+    const salary = 'salary' in job ? job.salary : ('budget' in job ? job.budget : '');
+    
+    const keys = [
+      // Title similarity
+      job.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim(),
+      // Company + title combination
+      `${company?.toLowerCase() || ''}-${job.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()}`,
+      // URL domain
+      job.url ? new URL(job.url).hostname : '',
+      // Salary + title for similar positions
+      `${salary || ''}-${job.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()}`
+    ];
+    
+    let isDuplicate = false;
+    for (const key of keys) {
+      if (seen.has(key)) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    
+    if (!isDuplicate) {
+      deduplicated.push(job);
+      keys.forEach(key => seen.add(key));
+    }
+  }
+  
+  return deduplicated;
+}
+
+// Enhanced job scraping with advanced features
+export async function scrapeJobsWithIntelligence(keywords: string[]): Promise<{
+  jobs: ScrapedJob[];
+  projects: ScrapedFreelanceProject[];
+  stats: {
+    totalJobs: number;
+    totalProjects: number;
+    platformsScraped: string[];
+    averageScore: number;
+    topPlatforms: string[];
+  };
+}> {
+  console.log('[scrapeJobsWithIntelligence] Starting advanced job scraping...');
+  
+  // Scrape from all sources
+  const [jobs, projects] = await Promise.allSettled([
+    scrapeJobsFromMultipleSources(keywords),
+    scrapeFreelanceProjects(keywords)
+  ]);
+  
+  const allJobs = jobs.status === 'fulfilled' ? jobs.value : [];
+  const allProjects = projects.status === 'fulfilled' ? projects.value : [];
+  
+  // Combine all job listings
+  const allListings = [...allJobs, ...allProjects];
+  
+  // Advanced deduplication
+  const deduplicatedListings = advancedDeduplication(allListings);
+  
+  // Separate back into jobs and projects
+  const finalJobs = deduplicatedListings.filter(listing => 'type' in listing) as ScrapedJob[];
+  const finalProjects = deduplicatedListings.filter(listing => 'budgetType' in listing) as ScrapedFreelanceProject[];
+  
+  // Calculate statistics
+  const platformsScraped = Array.from(new Set(allListings.map(job => job.source)));
+  const allScores = allListings.map(job => calculateJobScore(job, keywords));
+  const averageScore = allScores.reduce((sum, score) => sum + score.totalScore, 0) / allScores.length;
+  
+  const platformCounts = platformsScraped.map(platform => ({
+    platform,
+    count: allListings.filter(job => job.source === platform).length
+  }));
+  
+  const topPlatforms = platformCounts
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+    .map(p => p.platform);
+  
+  console.log(`[scrapeJobsWithIntelligence] Completed: ${finalJobs.length} jobs, ${finalProjects.length} projects from ${platformsScraped.length} platforms`);
+  
+  return {
+    jobs: finalJobs,
+    projects: finalProjects,
+    stats: {
+      totalJobs: finalJobs.length,
+      totalProjects: finalProjects.length,
+      platformsScraped,
+      averageScore: Math.round(averageScore),
+      topPlatforms
+    }
+  };
 }
 
 async function scrapeIndeedJobs(keywords: string[]): Promise<ScrapedJob[]> {
@@ -3141,51 +3769,52 @@ async function scrapeIndeedJobs(keywords: string[]): Promise<ScrapedJob[]> {
       $('.job_seen_beacon').each((index, element) => {
         if (jobs.length >= 10) return false;
         
-        const $job = $(element);
-        const title = $job.find('.jobTitle').text().trim();
-        const company = $job.find('.companyName').text().trim();
-        const location = $job.find('.companyLocation').text().trim();
-        const salary = $job.find('.salary-snippet-container').text().trim() || 'Competitive';
-        const snippet = $job.find('.job-snippet').text().trim();
-        const jobUrl = $job.find('.jcs-JobTitle').attr('href') || '';
-        const postedDate = $job.find('.date').text().trim() || 'Recently';
+        const titleElement = $(element).find('.jobTitle a');
+        const title = titleElement.text().trim();
+        const jobUrl = titleElement.attr('href') || '';
         
-        if (!title || !company) return;
+        const companyElement = $(element).find('.companyName a');
+        const company = companyElement.text().trim();
         
-        const techKeywords = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'JavaScript', 'TypeScript'];
+        const locationElement = $(element).find('.companyLocation');
+        const location = locationElement.text().trim() || 'Remote';
+        
+        const descriptionElement = $(element).find('.job-snippet');
+        const description = descriptionElement.text().trim();
+        
+        const postedElement = $(element).find('.date');
+        const postedDate = postedElement.text().trim() || 'Recently posted';
+        
+        const salaryElement = $(element).find('.salary-snippet');
+        const salary = salaryElement.text().trim() || 'Competitive';
+        
+        // Extract skills from description
+        const techKeywords = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'JavaScript', 'TypeScript', 'WordPress', 'MongoDB', 'PostgreSQL'];
         const technologies = techKeywords.filter(tech => 
-          title.toLowerCase().includes(tech.toLowerCase()) || 
-          snippet.toLowerCase().includes(tech.toLowerCase())
+          description.toLowerCase().includes(tech.toLowerCase())
         );
         
-        let experience = 'mid';
-        if (title.toLowerCase().includes('senior') || title.toLowerCase().includes('sr.')) {
-          experience = 'senior';
-        } else if (title.toLowerCase().includes('junior') || title.toLowerCase().includes('jr.')) {
-          experience = 'entry';
+        if (title && title.length > 10) {
+          jobs.push({
+            id: `indeed-${Date.now()}-${index}`,
+            title,
+            company,
+            location,
+            salary,
+            type: 'Full-time',
+            experience: 'intermediate',
+            description: description || `Looking for a ${title}`,
+            requirements: technologies,
+            postedDate,
+            source: 'Indeed',
+            url: jobUrl.startsWith('http') ? jobUrl : `https://www.indeed.com${jobUrl}`,
+            technologies,
+            remote: location.toLowerCase().includes('remote'),
+          });
         }
-        
-        const isRemote = location.toLowerCase().includes('remote');
-        
-        jobs.push({
-          id: `indeed-${Date.now()}-${index}`,
-          title,
-          company,
-          location: location || 'Remote',
-          salary,
-          type: 'full-time',
-          experience,
-          description: snippet,
-          requirements: extractRequirements(snippet),
-          postedDate,
-          source: 'Indeed',
-          url: jobUrl.startsWith('http') ? jobUrl : `https://www.indeed.com${jobUrl}`,
-          technologies,
-          remote: isRemote
-        });
       });
       
-      await delay(1000 + Math.random() * 2000);
+      await delay(1500 + Math.random() * 2000);
     }
   } catch (error) {
     console.error('[scrapeIndeedJobs] Error:', error);
@@ -3194,6 +3823,7 @@ async function scrapeIndeedJobs(keywords: string[]): Promise<ScrapedJob[]> {
   return jobs;
 }
 
+// Advanced Platform Scraping Functions
 async function scrapeRemoteOkJobs(keywords: string[]): Promise<ScrapedJob[]> {
   const jobs: ScrapedJob[] = [];
   
@@ -3297,9 +3927,12 @@ export async function scrapeFreelanceProjects(keywords: string[]): Promise<Scrap
   
   try {
     // Scrape from different freelance platforms
-    const [upworkProjects, fiverrProjects, facebookProjects, redditProjects] = await Promise.allSettled([
+    const [upworkProjects, fiverrProjects, freelancerProjects, pphProjects, guruProjects, facebookProjects, redditProjects] = await Promise.allSettled([
       scrapeUpworkProjects(keywords),
       scrapeFiverrProjects(keywords),
+      scrapeFreelancerComProjects(keywords),
+      scrapePeoplePerHourProjects(keywords),
+      scrapeGuruProjects(keywords),
       scrapeFacebookGroups(keywords),
       scrapeRedditProjects(keywords)
     ]);
@@ -3310,6 +3943,15 @@ export async function scrapeFreelanceProjects(keywords: string[]): Promise<Scrap
     }
     if (fiverrProjects.status === 'fulfilled') {
       allProjects.push(...fiverrProjects.value);
+    }
+    if (freelancerProjects.status === 'fulfilled') {
+      allProjects.push(...freelancerProjects.value);
+    }
+    if (pphProjects.status === 'fulfilled') {
+      allProjects.push(...pphProjects.value);
+    }
+    if (guruProjects.status === 'fulfilled') {
+      allProjects.push(...guruProjects.value);
     }
     if (facebookProjects.status === 'fulfilled') {
       allProjects.push(...facebookProjects.value);
@@ -3655,4 +4297,665 @@ async function scrapeRedditProjects(keywords: string[]): Promise<ScrapedFreelanc
   }
   
   return projects;
+}
+
+// Additional Platform Scraping Functions
+async function scrapeFreelancerComProjects(keywords: string[]): Promise<ScrapedFreelanceProject[]> {
+  const projects: ScrapedFreelanceProject[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web development`);
+      const url = `https://www.freelancer.com/search/projects/?keyword=${searchQuery}`;
+      
+      console.log(`[scrapeFreelancerComProjects] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeFreelancerComProjects] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.JobSearchCard').each((index, element) => {
+        if (projects.length >= 8) return false;
+        
+        const titleElement = $(element).find('.JobSearchCard-primary-link');
+        const title = titleElement.text().trim();
+        const projectUrl = titleElement.attr('href') || '';
+        
+        const description = $(element).find('.JobSearchCard-description').text().trim();
+        const budgetElement = $(element).find('.JobSearchCard-average-bid');
+        const budget = budgetElement.text().trim() || 'Negotiable';
+        
+        const skillsElement = $(element).find('.JobSearchCard-skills');
+        const skills = skillsElement.text().split(',').map(s => s.trim()).filter(s => s);
+        
+        const bidsElement = $(element).find('.JobSearchCard-bids');
+        const bids = bidsElement.text().match(/\d+/)?.[0] || '0';
+        
+        const timeElement = $(element).find('.JobSearchCard-duration');
+        const duration = timeElement.text().trim() || 'Flexible';
+        
+        if (title && title.length > 10) {
+          projects.push({
+            id: `freelancer-${Date.now()}-${index}`,
+            title,
+            description: description || `Looking for a ${title}`,
+            budget,
+            budgetType: budget.includes('$') ? 'fixed' : 'hourly',
+            skills: skills.length > 0 ? skills : ['web development'],
+            experience: 'intermediate',
+            duration,
+            postedBy: 'Client',
+            postedDate: 'Recently posted',
+            source: 'Freelancer.com',
+            url: projectUrl.startsWith('http') ? projectUrl : `https://www.freelancer.com${projectUrl}`,
+            tags: skills.slice(0, 3),
+            location: 'Remote',
+            remote: true,
+            applicants: parseInt(bids) || 0,
+          });
+        }
+      });
+      
+      await delay(1500 + Math.random() * 2000);
+    }
+  } catch (error) {
+    console.error('[scrapeFreelancerComProjects] Error:', error);
+  }
+  
+  return projects;
+}
+
+async function scrapePeoplePerHourProjects(keywords: string[]): Promise<ScrapedFreelanceProject[]> {
+  const projects: ScrapedFreelanceProject[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web development`);
+      const url = `https://www.peopleperhour.com/search/projects?q=${searchQuery}`;
+      
+      console.log(`[scrapePeoplePerHourProjects] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapePeoplePerHourProjects] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.project-card').each((index, element) => {
+        if (projects.length >= 8) return false;
+        
+        const titleElement = $(element).find('.project-title a');
+        const title = titleElement.text().trim();
+        const projectUrl = titleElement.attr('href') || '';
+        
+        const description = $(element).find('.project-description').text().trim();
+        const budgetElement = $(element).find('.project-budget');
+        const budget = budgetElement.text().trim() || 'Negotiable';
+        
+        const skillsElement = $(element).find('.skill-tag');
+        const skills: string[] = [];
+        skillsElement.each((_, skillEl) => {
+          skills.push($(skillEl).text().trim());
+        });
+        
+        const timeElement = $(element).find('.project-duration');
+        const duration = timeElement.text().trim() || 'Flexible';
+        
+        const proposalsElement = $(element).find('.proposals-count');
+        const proposals = proposalsElement.text().match(/\d+/)?.[0] || '0';
+        
+        if (title && title.length > 10) {
+          projects.push({
+            id: `pph-${Date.now()}-${index}`,
+            title,
+            description: description || `Looking for a ${title}`,
+            budget,
+            budgetType: budget.includes('/hr') ? 'hourly' : 'fixed',
+            skills: skills.length > 0 ? skills : ['web development'],
+            experience: 'intermediate',
+            duration,
+            postedBy: 'Client',
+            postedDate: 'Recently posted',
+            source: 'PeoplePerHour',
+            url: projectUrl.startsWith('http') ? projectUrl : `https://www.peopleperhour.com${projectUrl}`,
+            tags: skills.slice(0, 3),
+            location: 'Remote',
+            remote: true,
+            applicants: parseInt(proposals) || 0,
+          });
+        }
+      });
+      
+      await delay(1200 + Math.random() * 1800);
+    }
+  } catch (error) {
+    console.error('[scrapePeoplePerHourProjects] Error:', error);
+  }
+  
+  return projects;
+}
+
+async function scrapeGuruProjects(keywords: string[]): Promise<ScrapedFreelanceProject[]> {
+  const projects: ScrapedFreelanceProject[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web development`);
+      const url = `https://www.guru.com/d/jobs/?q=${searchQuery}`;
+      
+      console.log(`[scrapeGuruProjects] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeGuruProjects] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.jobCard').each((index, element) => {
+        if (projects.length >= 8) return false;
+        
+        const titleElement = $(element).find('.jobTitle a');
+        const title = titleElement.text().trim();
+        const projectUrl = titleElement.attr('href') || '';
+        
+        const description = $(element).find('.jobDescription').text().trim();
+        const budgetElement = $(element).find('.payRate');
+        const budget = budgetElement.text().trim() || 'Negotiable';
+        
+        const skillsElement = $(element).find('.skill');
+        const skills: string[] = [];
+        skillsElement.each((_, skillEl) => {
+          skills.push($(skillEl).text().trim());
+        });
+        
+        const timeElement = $(element).find('.duration');
+        const duration = timeElement.text().trim() || 'Flexible';
+        
+        const proposalsElement = $(element).find('.proposals');
+        const proposals = proposalsElement.text().match(/\d+/)?.[0] || '0';
+        
+        if (title && title.length > 10) {
+          projects.push({
+            id: `guru-${Date.now()}-${index}`,
+            title,
+            description: description || `Looking for a ${title}`,
+            budget,
+            budgetType: budget.includes('/hr') ? 'hourly' : 'fixed',
+            skills: skills.length > 0 ? skills : ['web development'],
+            experience: 'intermediate',
+            duration,
+            postedBy: 'Client',
+            postedDate: 'Recently posted',
+            source: 'Guru',
+            url: projectUrl.startsWith('http') ? projectUrl : `https://www.guru.com${projectUrl}`,
+            tags: skills.slice(0, 3),
+            location: 'Remote',
+            remote: true,
+            applicants: parseInt(proposals) || 0,
+          });
+        }
+      });
+      
+      await delay(1300 + Math.random() * 1900);
+    }
+  } catch (error) {
+    console.error('[scrapeGuruProjects] Error:', error);
+  }
+  
+  return projects;
+}
+
+async function scrapeLinkedInJobs(keywords: string[]): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web developer`);
+      const url = `https://www.linkedin.com/jobs/search/?keywords=${searchQuery}&location=Remote&f_TPR=r86400`;
+      
+      console.log(`[scrapeLinkedInJobs] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeLinkedInJobs] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.jobs-search__results-list li').each((index, element) => {
+        if (jobs.length >= 10) return false;
+        
+        const titleElement = $(element).find('.base-card__full-link');
+        const title = titleElement.text().trim();
+        const jobUrl = titleElement.attr('href') || '';
+        
+        const companyElement = $(element).find('.hidden-nested-link');
+        const company = companyElement.text().trim();
+        
+        const locationElement = $(element).find('.job-search-card__location');
+        const location = locationElement.text().trim() || 'Remote';
+        
+        const descriptionElement = $(element).find('.base-search-card__subtitle');
+        const description = descriptionElement.text().trim();
+        
+        const postedElement = $(element).find('.job-search-card__listitem');
+        const postedDate = postedElement.text().trim() || 'Recently posted';
+        
+        const salaryElement = $(element).find('.job-search-card__salary-info');
+        const salary = salaryElement.text().trim() || 'Competitive';
+        
+        // Extract skills from description
+        const techKeywords = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'JavaScript', 'TypeScript', 'WordPress', 'MongoDB', 'PostgreSQL'];
+        const technologies = techKeywords.filter(tech => 
+          description.toLowerCase().includes(tech.toLowerCase())
+        );
+        
+        if (title && title.length > 10) {
+          jobs.push({
+            id: `linkedin-${Date.now()}-${index}`,
+            title,
+            company,
+            location,
+            salary,
+            type: 'Full-time',
+            experience: 'intermediate',
+            description: description || `Looking for a ${title}`,
+            requirements: technologies,
+            postedDate,
+            source: 'LinkedIn',
+            url: jobUrl.startsWith('http') ? jobUrl : `https://www.linkedin.com${jobUrl}`,
+            technologies,
+            remote: location.toLowerCase().includes('remote'),
+          });
+        }
+      });
+      
+      await delay(2000 + Math.random() * 2000);
+    }
+  } catch (error) {
+    console.error('[scrapeLinkedInJobs] Error:', error);
+  }
+  
+  return jobs;
+}
+
+// Advanced Platform Scraping Functions
+async function scrapeGlassdoorJobs(keywords: string[]): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web developer`);
+      const url = `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${searchQuery}&locT=C&locId=1147401&locType=2&jobType=all&fromAge=1`;
+      
+      console.log(`[scrapeGlassdoorJobs] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeGlassdoorJobs] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.jobContainer').each((index, element) => {
+        if (jobs.length >= 8) return false;
+        
+        const titleElement = $(element).find('.jobTitle a');
+        const title = titleElement.text().trim();
+        const jobUrl = titleElement.attr('href') || '';
+        
+        const companyElement = $(element).find('.jobInfoItem .empName');
+        const company = companyElement.text().trim();
+        
+        const locationElement = $(element).find('.jobInfoItem .loc');
+        const location = locationElement.text().trim() || 'Remote';
+        
+        const salaryElement = $(element).find('.salaryEstimate');
+        const salary = salaryElement.text().trim() || 'Competitive';
+        
+        const descriptionElement = $(element).find('.jobDescription');
+        const description = descriptionElement.text().trim();
+        
+        const postedElement = $(element).find('.jobInfoItem .minor');
+        const postedDate = postedElement.text().trim() || 'Recently posted';
+        
+        const ratingElement = $(element).find('.ratingNumber');
+        const rating = ratingElement.text().trim() || 'N/A';
+        
+        // Extract skills from description
+        const techKeywords = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'JavaScript', 'TypeScript', 'WordPress', 'MongoDB', 'PostgreSQL'];
+        const technologies = techKeywords.filter(tech => 
+          description.toLowerCase().includes(tech.toLowerCase())
+        );
+        
+        if (title && title.length > 10) {
+          jobs.push({
+            id: `glassdoor-${Date.now()}-${index}`,
+            title,
+            company,
+            location,
+            salary,
+            type: 'Full-time',
+            experience: 'intermediate',
+            description: description || `Looking for a ${title}`,
+            requirements: technologies,
+            postedDate,
+            source: 'Glassdoor',
+            url: jobUrl.startsWith('http') ? jobUrl : `https://www.glassdoor.com${jobUrl}`,
+            technologies,
+            remote: location.toLowerCase().includes('remote'),
+          });
+        }
+      });
+      
+      await delay(1800 + Math.random() * 2200);
+    }
+  } catch (error) {
+    console.error('[scrapeGlassdoorJobs] Error:', error);
+  }
+  
+  return jobs;
+}
+
+async function scrapeAngelListJobs(keywords: string[]): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web developer`);
+      const url = `https://www.wellfound.com/jobs?keyword=${searchQuery}&location_ids[]=US&remote=true`;
+      
+      console.log(`[scrapeAngelListJobs] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeAngelListJobs] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.job-item').each((index, element) => {
+        if (jobs.length >= 8) return false;
+        
+        const titleElement = $(element).find('.job-title a');
+        const title = titleElement.text().trim();
+        const jobUrl = titleElement.attr('href') || '';
+        
+        const companyElement = $(element).find('.company-name');
+        const company = companyElement.text().trim();
+        
+        const locationElement = $(element).find('.location');
+        const location = locationElement.text().trim() || 'Remote';
+        
+        const salaryElement = $(element).find('.salary');
+        const salary = salaryElement.text().trim() || 'Competitive';
+        
+        const descriptionElement = $(element).find('.job-description');
+        const description = descriptionElement.text().trim();
+        
+        const postedElement = $(element).find('.posted-date');
+        const postedDate = postedElement.text().trim() || 'Recently posted';
+        
+        const sizeElement = $(element).find('.company-size');
+        const companySize = sizeElement.text().trim() || 'Startup';
+        
+        // Extract skills from description
+        const techKeywords = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'JavaScript', 'TypeScript', 'WordPress', 'MongoDB', 'PostgreSQL'];
+        const technologies = techKeywords.filter(tech => 
+          description.toLowerCase().includes(tech.toLowerCase())
+        );
+        
+        if (title && title.length > 10) {
+          jobs.push({
+            id: `angellist-${Date.now()}-${index}`,
+            title,
+            company,
+            location,
+            salary,
+            type: 'Full-time',
+            experience: 'intermediate',
+            description: description || `Looking for a ${title}`,
+            requirements: technologies,
+            postedDate,
+            source: 'AngelList',
+            url: jobUrl.startsWith('http') ? jobUrl : `https://www.wellfound.com${jobUrl}`,
+            technologies,
+            remote: location.toLowerCase().includes('remote'),
+          });
+        }
+      });
+      
+      await delay(1600 + Math.random() * 2000);
+    }
+  } catch (error) {
+    console.error('[scrapeAngelListJobs] Error:', error);
+  }
+  
+  return jobs;
+}
+
+async function scrapeStackOverflowJobs(keywords: string[]): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web developer`);
+      const url = `https://stackoverflow.com/jobs?q=${searchQuery}&l=Remote&d=20`;
+      
+      console.log(`[scrapeStackOverflowJobs] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeStackOverflowJobs] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.-job').each((index, element) => {
+        if (jobs.length >= 8) return false;
+        
+        const titleElement = $(element).find('.-title a');
+        const title = titleElement.text().trim();
+        const jobUrl = titleElement.attr('href') || '';
+        
+        const companyElement = $(element).find('.-company');
+        const company = companyElement.text().trim();
+        
+        const locationElement = $(element).find('.-location');
+        const location = locationElement.text().trim() || 'Remote';
+        
+        const salaryElement = $(element).find('.-salary');
+        const salary = salaryElement.text().trim() || 'Competitive';
+        
+        const descriptionElement = $(element).find('.-summary');
+        const description = descriptionElement.text().trim();
+        
+        const postedElement = $(element).find('.-posted');
+        const postedDate = postedElement.text().trim() || 'Recently posted';
+        
+        const tagsElement = $(element).find('.-tags .-tag');
+        const technologies: string[] = [];
+        tagsElement.each((_, tagEl) => {
+          technologies.push($(tagEl).text().trim());
+        });
+        
+        if (title && title.length > 10) {
+          jobs.push({
+            id: `stackoverflow-${Date.now()}-${index}`,
+            title,
+            company,
+            location,
+            salary,
+            type: 'Full-time',
+            experience: 'intermediate',
+            description: description || `Looking for a ${title}`,
+            requirements: technologies,
+            postedDate,
+            source: 'Stack Overflow',
+            url: jobUrl.startsWith('http') ? jobUrl : `https://stackoverflow.com${jobUrl}`,
+            technologies,
+            remote: location.toLowerCase().includes('remote'),
+          });
+        }
+      });
+      
+      await delay(1400 + Math.random() * 1800);
+    }
+  } catch (error) {
+    console.error('[scrapeStackOverflowJobs] Error:', error);
+  }
+  
+  return jobs;
+}
+
+async function scrapeGitHubJobs(keywords: string[]): Promise<ScrapedJob[]> {
+  const jobs: ScrapedJob[] = [];
+  
+  try {
+    for (const keyword of keywords.slice(0, 2)) {
+      const searchQuery = encodeURIComponent(`${keyword} web developer`);
+      const url = `https://github.com/jobs?q=${searchQuery}&remote=true`;
+      
+      console.log(`[scrapeGitHubJobs] Scraping: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUA(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      
+      if (!response.ok) {
+        console.log(`[scrapeGitHubJobs] Failed to fetch: ${response.status}`);
+        continue;
+      }
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      $('.job-item').each((index, element) => {
+        if (jobs.length >= 8) return false;
+        
+        const titleElement = $(element).find('.job-title a');
+        const title = titleElement.text().trim();
+        const jobUrl = titleElement.attr('href') || '';
+        
+        const companyElement = $(element).find('.company-name');
+        const company = companyElement.text().trim();
+        
+        const locationElement = $(element).find('.location');
+        const location = locationElement.text().trim() || 'Remote';
+        
+        const salaryElement = $(element).find('.salary');
+        const salary = salaryElement.text().trim() || 'Competitive';
+        
+        const descriptionElement = $(element).find('.job-description');
+        const description = descriptionElement.text().trim();
+        
+        const postedElement = $(element).find('.posted-date');
+        const postedDate = postedElement.text().trim() || 'Recently posted';
+        
+        const tagsElement = $(element).find('.tech-tag');
+        const technologies: string[] = [];
+        tagsElement.each((_, tagEl) => {
+          technologies.push($(tagEl).text().trim());
+        });
+        
+        if (title && title.length > 10) {
+          jobs.push({
+            id: `github-${Date.now()}-${index}`,
+            title,
+            company,
+            location,
+            salary,
+            type: 'Full-time',
+            experience: 'intermediate',
+            description: description || `Looking for a ${title}`,
+            requirements: technologies,
+            postedDate,
+            source: 'GitHub',
+            url: jobUrl.startsWith('http') ? jobUrl : `https://github.com${jobUrl}`,
+            technologies,
+            remote: location.toLowerCase().includes('remote'),
+          });
+        }
+      });
+      
+      await delay(1500 + Math.random() * 1900);
+    }
+  } catch (error) {
+    console.error('[scrapeGitHubJobs] Error:', error);
+  }
+  
+  return jobs;
 }
