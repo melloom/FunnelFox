@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { JobBrowserModal } from "@/components/job-browser-modal";
 import {
   Search,
   Globe,
@@ -28,6 +29,7 @@ import {
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import foxLogo from "@assets/fox_1770439380079.png";
 
 const fadeUp = {
@@ -106,14 +108,16 @@ function FeatureCard({
   title,
   description,
   badge,
+  index,
 }: {
   icon: typeof Search;
   title: string;
   description: string;
   badge?: string;
+  index?: number;
 }) {
   return (
-    <motion.div variants={fadeUp}>
+    <motion.div variants={fadeUp} custom={index}>
       <Card className="hover-elevate h-full relative overflow-hidden">
         {badge && (
           <Badge className="absolute top-3 right-3 z-10 bg-primary text-primary-foreground text-xs font-medium px-2 py-1">
@@ -133,6 +137,8 @@ function FeatureCard({
 }
 
 export default function LandingPage() {
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
       <motion.header
@@ -200,12 +206,10 @@ export default function LandingPage() {
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
-              <Link href="/find-work">
-                <Button variant="outline" size="lg" data-testid="button-find-work-nav">
-                  <Briefcase className="w-4 h-4 mr-2" />
-                  Browse Jobs
-                </Button>
-              </Link>
+              <Button variant="outline" size="lg" onClick={() => setIsJobModalOpen(true)} data-testid="button-find-work-nav">
+                <Briefcase className="w-4 h-4 mr-2" />
+                Browse Jobs
+              </Button>
             </motion.div>
           </motion.div>
         </section>
@@ -232,96 +236,109 @@ export default function LandingPage() {
           whileInView="visible"
           viewport={{ once: true, margin: "-60px" }}
           variants={staggerContainer}
-          className="px-5 pb-14 sm:pb-20 max-w-6xl mx-auto w-full"
+          className="px-5 py-16 sm:py-24 max-w-6xl mx-auto w-full"
         >
-          <motion.div variants={fadeUp} custom={0} className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight" data-testid="text-features-heading">
-              Your entire business workflow, automated
-            </h2>
-            <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-              Find the prospect, prove they need you, send the pitch, track deals, manage projects, and find jobs — all in one platform.
-            </p>
+          <motion.div variants={fadeUp} custom={0} className="text-center mb-16">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+                <Zap className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-primary">All-in-One Platform</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight" data-testid="text-features-heading">
+                Your entire business workflow,
+                <span className="text-primary"> automated</span>
+              </h2>
+              <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                Find the prospect, prove they need you, send the pitch, track deals, manage projects, and find jobs — all in one powerful platform.
+              </p>
+            </div>
           </motion.div>
           
-          <Tabs defaultValue="lead-generation" className="w-full max-w-4xl mx-auto">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
-              <TabsTrigger value="lead-generation" className="data-[state=active]:bg-background">
-                <Search className="w-4 h-4 mr-2" />
-                Lead Generation
-              </TabsTrigger>
-              <TabsTrigger value="project-management" className="data-[state=active]:bg-background">
-                <Code className="w-4 h-4 mr-2" />
-                Project Management
-              </TabsTrigger>
-              <TabsTrigger value="job-search" className="data-[state=active]:bg-background">
-                <Briefcase className="w-4 h-4 mr-2" />
-                Job Search
-              </TabsTrigger>
-            </TabsList>
+          <div className="bg-gradient-to-br from-background via-background to-muted/20 rounded-2xl border border-border/50 shadow-xl p-8">
+            <Tabs defaultValue="lead-generation" className="w-full max-w-5xl mx-auto">
+              <TabsList className="flex flex-col sm:grid sm:grid-cols-3 w-full h-auto sm:h-14 bg-background/80 backdrop-blur-sm border border-border/50 rounded-xl p-1 sm:p-1 mb-8 sm:mb-12 gap-2 sm:gap-0">
+                <TabsTrigger value="lead-generation" className="data-[state=active]:bg-background data-[state=active]:shadow-md rounded-lg text-sm font-medium transition-all duration-200 justify-start sm:justify-center px-4 py-3 sm:py-0">
+                  <Search className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Lead Generation</span>
+                </TabsTrigger>
+                <TabsTrigger value="project-management" className="data-[state=active]:bg-background data-[state=active]:shadow-md rounded-lg text-sm font-medium transition-all duration-200 justify-start sm:justify-center px-4 py-3 sm:py-0">
+                  <Code className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Project Management</span>
+                </TabsTrigger>
+                <TabsTrigger value="job-search" className="data-[state=active]:bg-background data-[state=active]:shadow-md rounded-lg text-sm font-medium transition-all duration-200 justify-start sm:justify-center px-4 py-3 sm:py-0">
+                  <Briefcase className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">Job Search</span>
+                </TabsTrigger>
+              </TabsList>
             
-            <TabsContent value="lead-generation" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {features.slice(0, 6).map((feature) => (
-                  <FeatureCard key={feature.title} {...feature} />
+            <TabsContent value="lead-generation" className="space-y-8 mt-8">
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={staggerContainer}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              >
+                {features.slice(0, 6).map((feature, index) => (
+                  <FeatureCard key={feature.title} {...feature} index={index} />
                 ))}
-              </div>
+              </motion.div>
             </TabsContent>
             
-            <TabsContent value="project-management" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="hover-elevate">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-                        <Code className="w-6 h-6 text-blue-600" />
+            <TabsContent value="project-management" className="space-y-8 mt-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="hover-elevate border-border/50 shadow-lg">
+                  <CardContent className="p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+                        <Code className="w-7 h-7 text-blue-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold">Project Management</h3>
+                        <h3 className="text-xl font-semibold">Project Management</h3>
                         <p className="text-sm text-muted-foreground">Track all your client projects in one place</p>
                       </div>
                     </div>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Convert leads to projects with one click</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Track timelines, budgets, and priorities</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Visual project cards with status indicators</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Technology stack organization</span>
                       </li>
                     </ul>
                   </CardContent>
                 </Card>
-                <Card className="hover-elevate">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center">
-                        <Target className="w-6 h-6 text-green-600" />
+                <Card className="hover-elevate border-border/50 shadow-lg">
+                  <CardContent className="p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center">
+                        <Target className="w-7 h-7 text-green-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold">Lead-to-Project Pipeline</h3>
+                        <h3 className="text-xl font-semibold">Lead-to-Project Pipeline</h3>
                         <p className="text-sm text-muted-foreground">Seamless workflow from lead to client</p>
                       </div>
                     </div>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <ArrowRight className="w-4 h-4 text-blue-500" />
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-3">
+                        <ArrowRight className="w-5 h-5 text-blue-500 flex-shrink-0" />
                         <span>Discover leads → Convert to projects</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <ArrowRight className="w-4 h-4 text-blue-500" />
+                      <li className="flex items-center gap-3">
+                        <ArrowRight className="w-5 h-5 text-blue-500 flex-shrink-0" />
                         <span>Track progress → Close deals</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <ArrowRight className="w-4 h-4 text-blue-500" />
+                      <li className="flex items-center gap-3">
+                        <ArrowRight className="w-5 h-5 text-blue-500 flex-shrink-0" />
                         <span>Manage multiple clients simultaneously</span>
                       </li>
                     </ul>
@@ -330,61 +347,61 @@ export default function LandingPage() {
               </div>
             </TabsContent>
             
-            <TabsContent value="job-search" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="hover-elevate">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center">
-                        <Briefcase className="w-6 h-6 text-orange-600" />
+            <TabsContent value="job-search" className="space-y-8 mt-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="hover-elevate border-border/50 shadow-lg">
+                  <CardContent className="p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center">
+                        <Briefcase className="w-7 h-7 text-orange-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold">Job Scraper</h3>
+                        <h3 className="text-xl font-semibold">Job Scraper</h3>
                         <p className="text-sm text-muted-foreground">Find web development opportunities</p>
                       </div>
                     </div>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Multiple job platforms integrated</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Upwork, Freelancer, and more</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Filter by technology and experience</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <li className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span>Remote and on-site opportunities</span>
                       </li>
                     </ul>
                   </CardContent>
                 </Card>
-                <Card className="hover-elevate">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                        <TrendingUp className="w-6 h-6 text-purple-600" />
+                <Card className="hover-elevate border-border/50 shadow-lg">
+                  <CardContent className="p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                        <TrendingUp className="w-7 h-7 text-purple-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold">Career Growth</h3>
+                        <h3 className="text-xl font-semibold">Career Growth</h3>
                         <p className="text-sm text-muted-foreground">Expand your web dev business</p>
                       </div>
                     </div>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <Star className="w-4 h-4 text-yellow-500" />
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-3">
+                        <Star className="w-5 h-5 text-yellow-500 flex-shrink-0" />
                         <span>Find higher-paying projects</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <Star className="w-4 h-4 text-yellow-500" />
+                      <li className="flex items-center gap-3">
+                        <Star className="w-5 h-5 text-yellow-500 flex-shrink-0" />
                         <span>Build your client portfolio</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-blue-500" />
+                      <li className="flex items-center gap-3">
+                        <Clock className="w-5 h-5 text-blue-500 flex-shrink-0" />
                         <span>Save time on job searching</span>
                       </li>
                     </ul>
@@ -393,6 +410,7 @@ export default function LandingPage() {
               </div>
             </TabsContent>
           </Tabs>
+          </div>
         </motion.section>
 
         <motion.section
@@ -423,12 +441,10 @@ export default function LandingPage() {
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   </Link>
-                  <Link href="/find-work">
-                    <Button variant="outline" size="lg" className="border-primary/20 hover:bg-primary/10" data-testid="button-jobs-cta">
-                      <Briefcase className="w-4 h-4 mr-2" />
-                      Browse Jobs
-                    </Button>
-                  </Link>
+                  <Button variant="outline" size="lg" className="border-primary/20 hover:bg-primary/10" onClick={() => setIsJobModalOpen(true)} data-testid="button-jobs-cta">
+                    <Briefcase className="w-4 h-4 mr-2" />
+                    Browse Jobs
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -450,6 +466,8 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <JobBrowserModal open={isJobModalOpen} onOpenChange={setIsJobModalOpen} />
     </div>
   );
 }

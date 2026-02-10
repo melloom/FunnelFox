@@ -119,10 +119,11 @@ export default function DiscoverPage() {
   const [customCategory, setCustomCategory] = useState("");
   const [location, setLocationValue] = useState("");
   const [maxResults, setMaxResults] = useState("5");
+  const [websiteFilter, setWebsiteFilter] = useState<"all" | "with-website" | "no-website">("all");
   const [results, setResults] = useState<DiscoverResult | null>(null);
   const [geolocating, setGeolocating] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
-  const [lastSearch, setLastSearch] = useState<{ category: string; location: string } | null>(null);
+  const [lastSearch, setLastSearch] = useState<{ category: string; location: string; websiteFilter: string } | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [maxResultsInitialized, setMaxResultsInitialized] = useState(false);
 
@@ -181,10 +182,10 @@ export default function DiscoverPage() {
     const searchCategory = category === "custom" ? customCategory : category;
     if (!searchCategory || !location) return;
 
-    const isSameSearch = lastSearch?.category === searchCategory && lastSearch?.location === location;
+    const isSameSearch = lastSearch?.category === searchCategory && lastSearch?.location === location && lastSearch?.websiteFilter === websiteFilter;
     const nextPage = page > 1 ? page : (isSameSearch ? searchPage : 1);
 
-    setLastSearch({ category: searchCategory, location });
+    setLastSearch({ category: searchCategory, location, websiteFilter });
     setSearchPage(nextPage);
     discoverMutation.mutate(nextPage);
   };
@@ -200,6 +201,7 @@ export default function DiscoverPage() {
         location,
         maxResults: parseInt(maxResults),
         page,
+        websiteFilter,
       });
       return res.json() as Promise<DiscoverResult>;
     },
@@ -311,6 +313,21 @@ export default function DiscoverPage() {
                   </Button>
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Website Filter</label>
+              <Select value={websiteFilter} onValueChange={(value: "all" | "with-website" | "no-website") => setWebsiteFilter(value)}>
+                <SelectTrigger className="w-full">
+                  <Globe className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="Filter by website status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Businesses</SelectItem>
+                  <SelectItem value="with-website">Businesses with Websites</SelectItem>
+                  <SelectItem value="no-website">Businesses without Websites</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex items-end gap-3 flex-wrap sm:flex-nowrap">

@@ -312,7 +312,7 @@ export async function registerRoutes(
       }
       planMaxResults = limit.maxResultsPerSearch;
 
-      const { category, location, maxResults, page } = req.body;
+      const { category, location, maxResults, page, websiteFilter } = req.body;
       if (!category || !location) {
         return res.status(400).json({ error: "Category and location are required" });
       }
@@ -393,11 +393,19 @@ export async function registerRoutes(
         return !isDuplicate(biz.name, biz.url, biz.phone);
       });
 
+      // Apply website filter
+      let filteredBusinesses = newBusinesses;
+      if (websiteFilter === "with-website") {
+        filteredBusinesses = newBusinesses.filter((b) => b.hasWebsite && b.url);
+      } else if (websiteFilter === "no-website") {
+        filteredBusinesses = newBusinesses.filter((b) => !b.hasWebsite || !b.url);
+      }
+
       const results = [];
       const BATCH_SIZE = 3;
 
-      const withWebsite = newBusinesses.filter((b) => b.hasWebsite && b.url);
-      const withoutWebsite = newBusinesses.filter((b) => !b.hasWebsite || !b.url);
+      const withWebsite = filteredBusinesses.filter((b) => b.hasWebsite && b.url);
+      const withoutWebsite = filteredBusinesses.filter((b) => !b.hasWebsite || !b.url);
 
       const ENRICH_BATCH = 4;
       for (let ei = 0; ei < withoutWebsite.length; ei += ENRICH_BATCH) {
