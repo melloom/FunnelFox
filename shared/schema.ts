@@ -44,6 +44,7 @@ export type PipelineStage = typeof PIPELINE_STAGES[number]["value"];
 
 export const leads = pgTable("leads", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
   companyName: text("company_name").notNull(),
   websiteUrl: text("website_url").notNull(),
   contactName: text("contact_name"),
@@ -92,6 +93,7 @@ export const insertLeadSchema = z.object({
   hasSitemap: z.boolean().optional(),
   hasRobotsTxt: z.boolean().optional(),
   sitemapIssues: z.array(z.string()).optional(),
+  userId: z.string(),
 });
 
 export type InsertLead = z.infer<typeof insertLeadSchema>;

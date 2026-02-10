@@ -20,14 +20,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
-  getLeads(): Promise<Lead[]>;
+  getLeads(userId: string): Promise<Lead[]>;
   getLead(id: number): Promise<Lead | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: number, data: Partial<InsertLead>): Promise<Lead | undefined>;
   deleteLead(id: number): Promise<boolean>;
   deleteLeads(ids: number[]): Promise<number>;
   updateLeads(ids: number[], data: Partial<InsertLead>): Promise<number>;
-  getActivities(leadId: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
   getActivitiesForLeads(leadIds: number[]): Promise<Activity[]>;
   getLeadCount(): Promise<number>;
@@ -37,6 +36,8 @@ export interface IStorage {
   deleteJob(id: number, userId: string): Promise<boolean>;
   deleteJobs(ids: number[], userId: string): Promise<number>;
   getJobCount(userId: string): Promise<number>;
+  // Helper method for lead deduplication
+  findLeadByWebsiteForUser(websiteUrl: string, userId: string): Promise<Lead | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -55,8 +56,8 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getLeads(): Promise<Lead[]> {
-    return db.select().from(leads).orderBy(desc(leads.createdAt));
+  async getLeads(userId: string): Promise<Lead[]> {
+    return db.select().from(leads).where(eq(leads.userId, userId)).orderBy(desc(leads.createdAt));
   }
 
   async getLead(id: number): Promise<Lead | undefined> {
@@ -67,6 +68,15 @@ export class DatabaseStorage implements IStorage {
   async createLead(lead: InsertLead): Promise<Lead> {
     const [created] = await db.insert(leads).values(lead).returning();
     return created;
+  }
+
+  // Check if user already has a lead with this website URL
+  async findLeadByWebsiteForUser(websiteUrl: string, userId: string): Promise<Lead | null> {
+    const [lead] = await db.select()
+      .from(leads)
+      .where(and(eq(leads.websiteUrl, websiteUrl), eq(leads.userId, userId)))
+      .limit(1);
+    return lead || null;
   }
 
   async updateLead(id: number, data: Partial<InsertLead>): Promise<Lead | undefined> {

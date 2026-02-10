@@ -33,9 +33,13 @@ export async function registerRoutes(
   registerAuthRoutes(app);
   registerStripeRoutes(app);
 
-  app.get("/api/leads", isAuthenticated, async (_req, res) => {
+  app.get("/api/leads", isAuthenticated, async (req, res) => {
     try {
-      const leads = await storage.getLeads();
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const leads = await storage.getLeads(userId);
       res.json(leads);
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch leads" });
@@ -57,18 +61,11 @@ export async function registerRoutes(
   app.post("/api/leads", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId;
-      if (userId) {
-        const existingLeads = await storage.getLeads();
-        const leadCheck = await checkLeadLimit(userId, existingLeads.length);
-        if (!leadCheck.allowed) {
-          return res.status(403).json({
-            error: `Free plan limited to ${leadCheck.limit} saved leads. Upgrade to Pro for unlimited.`,
-            limitReached: true,
-          });
-        }
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
       }
-
-      const parsed = insertLeadSchema.parse(req.body);
+      
+      const parsed = insertLeadSchema.parse({ ...req.body, userId });
       const lead = await storage.createLead(parsed);
       await storage.createActivity({ leadId: lead.id, action: "created", details: "Lead created" });
       res.status(201).json(lead);
@@ -301,19 +298,19 @@ export async function registerRoutes(
   app.post("/api/discover", isAuthenticated, async (req, res) => {
     try {
       const userId = req.session.userId;
-      let planMaxResults = 50;
-      if (userId) {
-        const limit = await checkDiscoveryLimit(userId);
-        if (!limit.allowed) {
-          return res.status(403).json({
-            error: `You've reached your monthly limit of ${limit.limit} leads. Upgrade to Pro for more.`,
-            limitReached: true,
-            remaining: limit.remaining,
-            limit: limit.limit,
-          });
-        }
-        planMaxResults = limit.maxResultsPerSearch;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
       }
+      
+      let planMaxResults = 50;
+      const limit = await checkDiscoveryLimit(userId);
+      if (!limit.allowed) {
+        return res.status(403).json({
+          error: `You've reached your monthly limit of ${limit.limit} leads. Upgrade to Pro for more.`,
+          limitReached: true,
+        });
+      }
+      planMaxResults = limit.maxResultsPerSearch;
 
       const { category, location, maxResults, page } = req.body;
       if (!category || !location) {
@@ -331,7 +328,7 @@ export async function registerRoutes(
       const searchMs = Date.now() - searchStart;
       const cached = searchMs < 500;
 
-      const existingLeads = await storage.getLeads();
+      const existingLeads = await storage.getLeads(userId);
       const existingDomains = new Set<string>();
       const existingNames = new Set<string>();
       const existingPhones = new Set<string>();
@@ -421,17 +418,7 @@ export async function registerRoutes(
             const notesParts: string[] = [];
             if (biz.description) notesParts.push(biz.description);
             if (biz.address) notesParts.push(`Address: ${biz.address}`);
-            if (biz.socialMedia?.length) {
-              notesParts.push(`Has social media but no website - great lead`);
-            } else {
-              notesParts.push("No website detected - needs a website built");
-            }
             if (biz.source && biz.source !== "web") notesParts.push(`Source: ${biz.source}`);
-
-            const issues = ["No website found", "Business needs a website built from scratch"];
-            if (biz.socialMedia?.length) {
-              issues.push(`Active on social media (${biz.socialMedia.map(s => s.split(":")[0]).join(", ")}) but no website`);
-            }
 
             return storage.createLead({
               companyName: biz.name,
@@ -440,7 +427,7 @@ export async function registerRoutes(
               location: biz.address || location,
               status: "new",
               websiteScore: 0,
-              websiteIssues: issues,
+              websiteIssues: ["No website found", "Business needs a website built from scratch"],
               notes: notesParts.join(" | ") || undefined,
               source: "auto-discover",
               contactName: undefined,
@@ -449,12 +436,13 @@ export async function registerRoutes(
               socialMedia: biz.socialMedia || undefined,
               detectedTechnologies: undefined,
               screenshotUrl: undefined,
+              userId: userId, // ← USER-SPECIFIC STORAGE
             });
           })
         );
 
         for (const result of enrichResults) {
-          if (result.status === "fulfilled") {
+          if (result.status === "fulfilled" && result.value) {
             results.push(result.value);
           }
         }
@@ -464,6 +452,17 @@ export async function registerRoutes(
         const batch = withWebsite.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
           batch.map(async (biz) => {
+            // Check if this user already has this lead
+            const existingLead = await storage.findLeadByWebsiteForUser(
+              biz.url || "none", 
+              userId
+            );
+            
+            if (existingLead) {
+              // Skip - user already has this lead
+              return null;
+            }
+            
             const analysis = await analyzeWebsite(biz.url, biz.name, biz.address || location);
             const notesParts: string[] = [];
             if (biz.description) notesParts.push(biz.description);
@@ -509,12 +508,13 @@ export async function registerRoutes(
               hasSitemap: analysis.hasSitemap || undefined,
               hasRobotsTxt: analysis.hasRobotsTxt || undefined,
               sitemapIssues: analysis.sitemapIssues || undefined,
+              userId: userId, // ← USER-SPECIFIC STORAGE
             });
           })
         );
 
         for (const result of batchResults) {
-          if (result.status === "fulfilled") {
+          if (result.status === "fulfilled" && result.value) {
             results.push(result.value);
           }
         }
