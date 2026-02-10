@@ -43,18 +43,16 @@ import { insertLeadSchema } from "@shared/schema";
 import type { Lead } from "@shared/schema";
 import { useState, useMemo, useCallback, useRef } from "react";
 
-const formSchema = insertLeadSchema.pick({
-  companyName: true,
-  websiteUrl: true,
-  contactName: true,
-  contactEmail: true,
-  contactPhone: true,
-  industry: true,
-  location: true,
-  notes: true,
-}).extend({
-  companyName: z.string().min(1, "Company name is required"),
+const formSchema = z.object({
+  companyName: z.string().optional(),
   websiteUrl: z.string().optional().default(""),
+  contactName: z.string().optional(),
+  contactEmail: z.string().email().optional().nullable(),
+  contactPhone: z.string().optional().nullable(),
+  industry: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  status: z.string().optional().default("new"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -139,6 +137,7 @@ export default function AddLeadPage() {
       industry: "",
       location: "",
       notes: "",
+      status: "new",
     },
   });
 
