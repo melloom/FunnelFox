@@ -3365,16 +3365,73 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
         const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
         const phoneMatches = bodyText.match(phoneRegex) || [];
         
+        console.log(`[scrapeUrlForBusinessInfo] Found ${phoneMatches.length} potential phone numbers on ${inputUrl}`);
+        
         // Filter and prioritize phone numbers by context relevance
         const filteredPhones = phoneMatches.filter(phone => {
           const cleanPhone = phone.replace(/[^0-9]/g, "");
+          
           // Exclude obviously fake/generic numbers
-          if (cleanPhone === "0000000000" || cleanPhone === "1111111111" || cleanPhone === "1234567890") return false;
+          if (cleanPhone === "0000000000" || cleanPhone === "1111111111" || cleanPhone === "1234567890") {
+            console.log(`[scrapeUrlForBusinessInfo] Excluding fake number: ${phone}`);
+            return false;
+          }
           // Exclude very short numbers after cleaning
-          if (cleanPhone.length < 10) return false;
-          // Exclude Meta's known customer service numbers
-          const metaNumbers = ["6505434800", "6503087300", "6505434800"]; // Meta/Facebook corporate numbers
-          if (metaNumbers.includes(cleanPhone)) return false;
+          if (cleanPhone.length < 10) {
+            console.log(`[scrapeUrlForBusinessInfo] Excluding short number: ${phone} (${cleanPhone.length} digits)`);
+            return false;
+          }
+          
+          // Exclude known platform/customer service numbers
+          const platformNumbers = [
+            // Meta/Facebook corporate numbers
+            "6505434800", "6503087300", "6505434800",
+            // Common platform numbers that appear in social media pages
+            "8005551234", "8005550199", "8005550198", "8005555555",
+            "8885551234", "8885550199", "8885550198", "8885555555",
+            "8775551234", "8775550199", "8775550198", "8775555555",
+            "8665551234", "8665550199", "8665550198", "8665555555",
+            // Instagram/Meta support numbers
+            "6505434800", "6502530000", "6503326800",
+            // Bookify and similar platform numbers
+            "8558228255", "8008228255", "8888228255",
+            // Generic pattern numbers often used in social media templates
+            "5555555555", "5551234567", "5558675309"
+          ];
+          
+          if (platformNumbers.includes(cleanPhone)) {
+            console.log(`[scrapeUrlForBusinessInfo] Excluding platform number: ${phone}`);
+            return false;
+          }
+          
+          // Exclude numbers with obvious patterns that suggest they're platform templates
+          if (cleanPhone.startsWith("555") || cleanPhone.startsWith("800") || cleanPhone.startsWith("888") || cleanPhone.startsWith("877") || cleanPhone.startsWith("866")) {
+            console.log(`[scrapeUrlForBusinessInfo] Excluding toll-free/pattern number: ${phone}`);
+            return false;
+          }
+          
+          // Exclude numbers that appear in common social media footer/contact sections
+          const phoneLower = phone.toLowerCase();
+          const suspiciousContexts = [
+            "contact us", "customer service", "support", "help", "advertising",
+            "business help", "creator support", "media inquiries", "press inquiries",
+            "general inquiries", "report a problem", "community guidelines"
+          ];
+          
+          // Check if phone appears near suspicious context in the body text
+          for (const context of suspiciousContexts) {
+            const contextIndex = bodyText.toLowerCase().indexOf(context);
+            if (contextIndex !== -1) {
+              const phoneIndex = bodyText.toLowerCase().indexOf(phone.toLowerCase());
+              // If phone appears within 100 characters of suspicious context, exclude it
+              if (Math.abs(contextIndex - phoneIndex) < 100) {
+                console.log(`[scrapeUrlForBusinessInfo] Excluding number near suspicious context "${context}": ${phone}`);
+                return false;
+              }
+            }
+          }
+          
+          console.log(`[scrapeUrlForBusinessInfo] Accepting phone number: ${phone}`);
           return true;
         });
         

@@ -306,11 +306,31 @@ function LeadDetailDialog({
   const updateLeadField = async (field: string, value: string) => {
     try {
       if (!lead) return;
+      
+      // Optimistic update - update local cache immediately
+      queryClient.setQueryData(["/api/leads", lead.id], (old: Lead | undefined) => {
+        if (!old) return old;
+        return { ...old, [field]: value };
+      });
+      
+      // Also update the leads list cache
+      queryClient.setQueryData<Lead[]>(["/api/leads"], (old: Lead[] | undefined) => {
+        if (!old) return old;
+        return old.map(l => l.id === lead.id ? { ...l, [field]: value } : l);
+      });
+      
       await apiRequest("PATCH", `/api/leads/${lead.id}`, { [field]: value });
+      
+      // Invalidate to ensure server state is in sync
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
+      
       toast({ title: `${field} updated` });
     } catch (error) {
+      // Revert optimistic update on error
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
+      
       toast({ 
         title: "Update failed", 
         description: "Unable to update field. Please try again.",
