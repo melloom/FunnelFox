@@ -38,6 +38,7 @@ import {
   Phone,
   MapPin,
   CheckCircle2,
+  X,
 } from "lucide-react";
 import { insertLeadSchema } from "@shared/schema";
 import type { Lead } from "@shared/schema";
@@ -452,7 +453,8 @@ export default function AddLeadPage() {
                             {...field}
                             onChange={(e) => {
                               field.onChange(e);
-                              if (nameSearchTimeout.current) clearTimeout(nameSearchTimeout.current);
+                              // Only trigger search if user explicitly clicks search button
+                              // Don't automatically search on typing
                             }}
                             data-testid="input-company-name"
                           />
@@ -464,6 +466,7 @@ export default function AddLeadPage() {
                           onClick={() => handleNameSearch(watchedName || "")}
                           disabled={nameSearchLoading || !watchedName?.trim()}
                           data-testid="button-search-name"
+                          title="Search for this business online"
                         >
                           {nameSearchLoading ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -473,7 +476,7 @@ export default function AddLeadPage() {
                         </Button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Not sure? Hit the search icon to find matching businesses online
+                        Type company name directly, or click search to find businesses online
                       </p>
                       <FormMessage />
                     </FormItem>
@@ -481,7 +484,15 @@ export default function AddLeadPage() {
                 />
 
                 {showNameResults && nameSearchResults.length > 0 && (
-                  <div className="mt-1.5 border rounded-md bg-background shadow-md max-h-52 overflow-y-auto" data-testid="name-search-results">
+                  <div className="mt-1.5 border rounded-md bg-background shadow-md max-h-52 overflow-y-auto relative" data-testid="name-search-results">
+                    <button
+                      type="button"
+                      onClick={() => setShowNameResults(false)}
+                      className="absolute top-2 right-2 z-10 p-1 rounded-full bg-background border hover:bg-muted transition-colors"
+                      data-testid="button-close-search-results"
+                    >
+                      <X className="w-3 h-3 text-muted-foreground" />
+                    </button>
                     <div className="p-2 border-b bg-muted/30">
                       <p className="text-[10px] text-muted-foreground font-medium">
                         {nameSearchResults.length} result{nameSearchResults.length !== 1 ? "s" : ""} found — tap to select
@@ -528,7 +539,7 @@ export default function AddLeadPage() {
                     ))}
                     <button
                       type="button"
-                      className="w-full text-center p-2 text-xs text-muted-foreground bg-transparent cursor-pointer"
+                      className="w-full text-center p-2 text-xs text-muted-foreground bg-transparent cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => setShowNameResults(false)}
                       data-testid="button-dismiss-search-results"
                     >
