@@ -71,6 +71,8 @@ import {
   Sheet,
   MoreVertical,
   FolderOpen,
+  Briefcase,
+  User,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -344,6 +346,8 @@ function LeadDetailDialog({
   const [locationValue, setLocationValue] = useState("");
   const [editingCompanyName, setEditingCompanyName] = useState(false);
   const [companyNameValue, setCompanyNameValue] = useState("");
+  const [editingIndustry, setEditingIndustry] = useState(false);
+  const [industryValue, setIndustryValue] = useState("");
 
   if (!lead) return null;
 
@@ -432,6 +436,38 @@ function LeadDetailDialog({
           )}
 
           <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+              {editingCompanyName ? (
+                <Input
+                  value={companyNameValue}
+                  onChange={(e) => setCompanyNameValue(e.target.value)}
+                  onBlur={() => updateLeadField('companyName', companyNameValue)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateLeadField('companyName', companyNameValue);
+                      setEditingCompanyName(false);
+                    }
+                  }}
+                  placeholder="Company name"
+                  className="text-sm h-7"
+                  data-testid="input-company-name"
+                  autoFocus
+                />
+              ) : (
+                <button
+                  onClick={() => {
+                    setCompanyNameValue(lead.companyName || '');
+                    setEditingCompanyName(true);
+                  }}
+                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors font-medium"
+                  data-testid="button-edit-company-name"
+                >
+                  {lead.companyName}
+                </button>
+              )}
+            </div>
+
             {!noWebsite && (
               <div className="flex items-center gap-2 text-sm">
                 <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -447,8 +483,56 @@ function LeadDetailDialog({
               </div>
             )}
 
+            {lead.industry ? (
+              <div className="flex items-center gap-2 text-sm">
+                <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
+                {editingIndustry ? (
+                  <Input
+                    value={industryValue}
+                    onChange={(e) => setIndustryValue(e.target.value)}
+                    onBlur={() => updateLeadField('industry', industryValue)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        updateLeadField('industry', industryValue);
+                        setEditingIndustry(false);
+                      }
+                    }}
+                    placeholder="Industry"
+                    className="text-sm h-7 max-w-[150px]"
+                    data-testid="input-industry"
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIndustryValue(lead.industry || '');
+                      setEditingIndustry(true);
+                    }}
+                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
+                    data-testid="button-edit-industry"
+                  >
+                    <Badge variant="secondary" className="text-xs">{lead.industry}</Badge>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm">
+                <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
+                <button
+                  onClick={() => {
+                    setIndustryValue('');
+                    setEditingIndustry(true);
+                  }}
+                  className="text-muted-foreground italic bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors text-xs"
+                  data-testid="button-add-industry"
+                >
+                  Click to add industry
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 text-sm">
-              <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+              <User className="w-4 h-4 text-muted-foreground shrink-0" />
               {editingContactName ? (
                 <Input
                   value={contactNameValue}
