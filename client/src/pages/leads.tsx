@@ -73,6 +73,7 @@ import {
   FolderOpen,
   Briefcase,
   User,
+  Edit2,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -303,7 +304,7 @@ function LeadDetailDialog({
     },
   });
 
-  const updateLeadField = async (field: string, value: string) => {
+  const updateLeadField = async (field: string, value: string | string[]) => {
     try {
       if (!lead) return;
       
@@ -368,6 +369,10 @@ function LeadDetailDialog({
   const [companyNameValue, setCompanyNameValue] = useState("");
   const [editingIndustry, setEditingIndustry] = useState(false);
   const [industryValue, setIndustryValue] = useState("");
+  const [editingWebsiteUrl, setEditingWebsiteUrl] = useState(false);
+  const [websiteUrlValue, setWebsiteUrlValue] = useState("");
+  const [editingSocialMedia, setEditingSocialMedia] = useState(false);
+  const [socialMediaValue, setSocialMediaValue] = useState("");
 
   if (!lead) return null;
 
@@ -488,18 +493,74 @@ function LeadDetailDialog({
               )}
             </div>
 
-            {!noWebsite && (
+            {!noWebsite ? (
               <div className="flex items-center gap-2 text-sm">
                 <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-                <a
-                  href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary underline underline-offset-2 truncate"
-                  data-testid="link-lead-website"
+                {editingWebsiteUrl ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Input
+                      value={websiteUrlValue}
+                      onChange={(e) => setWebsiteUrlValue(e.target.value)}
+                      onBlur={() => updateLeadField('websiteUrl', websiteUrlValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          updateLeadField('websiteUrl', websiteUrlValue);
+                          setEditingWebsiteUrl(false);
+                        }
+                      }}
+                      placeholder="Website URL"
+                      className="text-sm h-7 flex-1"
+                      data-testid="input-website-url"
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingWebsiteUrl(false)}
+                      className="h-7 px-2"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-1">
+                    <a
+                      href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline underline-offset-2 truncate flex-1"
+                      data-testid="link-lead-website"
+                    >
+                      {lead.websiteUrl}
+                    </a>
+                    <button
+                      onClick={() => {
+                        setWebsiteUrlValue(lead.websiteUrl || '');
+                        setEditingWebsiteUrl(true);
+                      }}
+                      className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-slate-50"
+                      data-testid="button-edit-website-url"
+                      title="Edit website URL"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm">
+                <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+                <button
+                  onClick={() => {
+                    setWebsiteUrlValue('');
+                    setEditingWebsiteUrl(true);
+                  }}
+                  className="text-muted-foreground italic hover:text-primary transition-colors p-1 rounded hover:bg-slate-50 text-xs"
+                  data-testid="button-add-website-url"
                 >
-                  {lead.websiteUrl}
-                </a>
+                  Click to add website URL
+                </button>
               </div>
             )}
 
@@ -708,9 +769,22 @@ function LeadDetailDialog({
             </div>
           </div>
 
-          {lead.socialMedia && lead.socialMedia.length > 0 && (
+          {lead.socialMedia && lead.socialMedia.length > 0 ? (
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Social Media</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-muted-foreground">Social Media</p>
+                <button
+                  onClick={() => {
+                    setSocialMediaValue(lead.socialMedia ? lead.socialMedia.join('\n') : '');
+                    setEditingSocialMedia(true);
+                  }}
+                  className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-slate-50"
+                  data-testid="button-edit-social-media"
+                  title="Edit social media links"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+              </div>
               <div className="space-y-2">
                 {parseSocialMedia(lead.socialMedia).map(({ platform, url }) => {
                   const Icon = SOCIAL_ICONS[platform];
@@ -731,6 +805,57 @@ function LeadDetailDialog({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 flex-1">
+                <p className="text-xs font-medium text-muted-foreground">Social Media</p>
+                <button
+                  onClick={() => {
+                    setSocialMediaValue('');
+                    setEditingSocialMedia(true);
+                  }}
+                  className="text-muted-foreground italic hover:text-primary transition-colors p-1 rounded hover:bg-slate-50 text-xs"
+                  data-testid="button-add-social-media"
+                >
+                  Click to add social media links
+                </button>
+              </div>
+            </div>
+          )}
+
+          {editingSocialMedia && (
+            <div className="space-y-2 p-3 border rounded-md bg-muted/30">
+              <p className="text-xs font-medium text-muted-foreground">Edit Social Media Links</p>
+              <Textarea
+                value={socialMediaValue}
+                onChange={(e) => setSocialMediaValue(e.target.value)}
+                placeholder="Enter social media URLs (one per line)&#10;Example:&#10;https://instagram.com/joespizza&#10;https://facebook.com/joespizza"
+                className="text-sm min-h-[80px]"
+                data-testid="input-social-media"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const urls = socialMediaValue.split('\n').filter(url => url.trim()).map(url => url.trim());
+                    updateLeadField('socialMedia', urls);
+                    setEditingSocialMedia(false);
+                  }}
+                  disabled={!socialMediaValue.trim()}
+                  data-testid="button-save-social-media"
+                >
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingSocialMedia(false)}
+                  data-testid="button-cancel-social-media"
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
           )}
