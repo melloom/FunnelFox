@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { insertLeadSchema } from "@shared/schema";
 import type { Lead } from "@shared/schema";
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 
 const formSchema = z.object({
   companyName: z.string().optional(),
@@ -189,6 +189,18 @@ export default function AddLeadPage() {
       status: "new",
     },
   });
+
+  // Add Escape key handler to close search results
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showNameResults) {
+        setShowNameResults(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showNameResults]);
 
   const watchedName = form.watch("companyName");
   const watchedUrl = form.watch("websiteUrl");
@@ -490,6 +502,7 @@ export default function AddLeadPage() {
                       onClick={() => setShowNameResults(false)}
                       className="absolute top-2 right-2 z-10 p-1 rounded-full bg-background border hover:bg-muted transition-colors"
                       data-testid="button-close-search-results"
+                      title="Close search and use your typed company name"
                     >
                       <X className="w-3 h-3 text-muted-foreground" />
                     </button>
@@ -537,14 +550,24 @@ export default function AddLeadPage() {
                         </div>
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      className="w-full text-center p-2 text-xs text-muted-foreground bg-transparent cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => setShowNameResults(false)}
-                      data-testid="button-dismiss-search-results"
-                    >
-                      Dismiss
-                    </button>
+                    <div className="border-t bg-muted/30 p-2">
+                      <button
+                        type="button"
+                        className="w-full text-center p-2 text-xs text-primary bg-transparent cursor-pointer hover:bg-primary/10 transition-colors rounded border border-primary/20"
+                        onClick={() => setShowNameResults(false)}
+                        data-testid="button-use-my-input"
+                      >
+                        Use my typed company name instead
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full text-center p-2 text-xs text-muted-foreground bg-transparent cursor-pointer hover:bg-muted/50 transition-colors mt-1"
+                        onClick={() => setShowNameResults(false)}
+                        data-testid="button-dismiss-search-results"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
