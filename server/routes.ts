@@ -404,25 +404,25 @@ export async function registerRoutes(
 
       console.log(`[Discover] Found ${businesses.length} businesses, ${newBusinesses.length} are new after global duplicate check`);
 
-      // Take only up to the requested number of unique results
-      const uniqueNewBusinesses = newBusinesses.slice(0, requestedMax);
-      console.log(`[Discover] Requested ${requestedMax}, Found ${businesses.length} total, ${newBusinesses.length} new, using ${uniqueNewBusinesses.length} unique for this search`);
-
-      // Apply website filter
-      let filteredBusinesses = uniqueNewBusinesses;
+      // Apply website filter BEFORE slicing to requestedMax
+      let filteredBusinesses = newBusinesses;
       if (websiteFilter === "with-website") {
-        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => b.hasWebsite && b.url && b.url !== "none");
+        filteredBusinesses = newBusinesses.filter((b: any) => b.hasWebsite && b.url && b.url !== "none");
       } else if (websiteFilter === "no-website") {
-        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => !b.hasWebsite || !b.url || b.url === "none");
+        filteredBusinesses = newBusinesses.filter((b: any) => !b.hasWebsite || !b.url || b.url === "none");
       }
 
-      console.log(`[Discover] After "${websiteFilter}" filter: ${filteredBusinesses.length} leads remaining`);
+      console.log(`[Discover] After "${websiteFilter}" filter: ${filteredBusinesses.length} leads available from ${newBusinesses.length} new businesses`);
+
+      // Take only up to the requested number of unique results AFTER filtering
+      const uniqueNewBusinesses = filteredBusinesses.slice(0, requestedMax);
+      console.log(`[Discover] Requested ${requestedMax}, using ${uniqueNewBusinesses.length} unique for this search`);
 
       const results = [];
       const BATCH_SIZE = 3;
 
-      const withWebsite = filteredBusinesses.filter((b: any) => b.hasWebsite && b.url && b.url !== "none");
-      const withoutWebsite = filteredBusinesses.filter((b: any) => !b.hasWebsite || !b.url || b.url === "none");
+      const withWebsite = uniqueNewBusinesses.filter((b: any) => b.hasWebsite && b.url && b.url !== "none");
+      const withoutWebsite = uniqueNewBusinesses.filter((b: any) => !b.hasWebsite || !b.url || b.url === "none");
 
       const ENRICH_BATCH = 4;
       for (let ei = 0; ei < withoutWebsite.length; ei += ENRICH_BATCH) {
