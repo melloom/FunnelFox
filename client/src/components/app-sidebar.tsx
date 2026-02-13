@@ -54,7 +54,7 @@ export function AppSidebar() {
     queryKey: ["/api/subscription"],
   });
 
-  const handleNavClick = (e: React.MouseEvent, item: any) => {
+  const handleNavClick = (item: any) => (e: React.MouseEvent) => {
     if (item.title === "Find Work" && !subscription?.isAdmin) {
       e.preventDefault();
       toast({
@@ -101,7 +101,7 @@ export function AppSidebar() {
                     asChild
                     isActive={location === item.url}
                   >
-                    <Link href={item.url} onClick={(e) => handleNavClick(e, item)} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
+                    <Link href={item.url} onClick={handleNavClick(item)} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -120,7 +120,7 @@ export function AppSidebar() {
                     asChild
                     isActive={location === item.url}
                   >
-                    <Link href={item.url} onClick={handleNavClick} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
+                    <Link href={item.url} onClick={handleNavClick(item)} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -133,7 +133,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4">
         {subscription && (
-          <Link href="/subscription" onClick={handleNavClick} data-testid="link-sidebar-plan">
+          <Link href="/subscription" onClick={handleNavClick({ title: "Subscription" })} data-testid="link-sidebar-plan">
             <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer">
               {subscription.planStatus === "pro" ? (
                 <Crown className="w-4 h-4 text-primary shrink-0" />
