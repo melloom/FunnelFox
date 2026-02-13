@@ -363,7 +363,7 @@ export async function registerRoutes(
         }
       }
 
-      // Deduplication check
+      // Deduplication check - Refined to reduce false positives
       const isDuplicate = (name: string, url: string | undefined, phone: string | undefined): boolean => {
         const nameKey = name
           .toLowerCase()
@@ -372,24 +372,24 @@ export async function registerRoutes(
           .replace(/\s+/g, "")
           .slice(0, 40);
 
-        // Check against normalized names
-        if (existingNames.has(nameKey)) return true;
-
-        // Check for website duplicates
+        // Check for website duplicates - Most reliable
         if (url && url !== "none") {
           try {
             let u = url;
             if (!u.startsWith("http")) u = `https://${u}`;
             const domain = new URL(u).hostname.replace(/^www\./, "");
-            if (existingDomains.has(domain)) return true;
+            if (domain.length > 3 && existingDomains.has(domain)) return true;
           } catch {}
         }
 
-        // Check for phone duplicates
+        // Check for phone duplicates - High reliability
         if (phone) {
           const phoneKey = phone.replace(/[^0-9]/g, "").slice(-10);
-          if (phoneKey.length >= 7 && existingPhones.has(phoneKey)) return true;
+          if (phoneKey.length >= 10 && existingPhones.has(phoneKey)) return true;
         }
+
+        // Check against normalized names - Only if the name is substantial enough to be unique
+        if (nameKey.length >= 10 && existingNames.has(nameKey)) return true;
 
         return false;
       }

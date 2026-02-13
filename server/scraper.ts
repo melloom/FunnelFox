@@ -459,31 +459,33 @@ export async function searchBusinesses(
 }
 
 function normalizeName(name: string): string {
+  if (!name) return "";
   return name
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\b(the|and|of|in|at|by|for|llc|inc|corp|co|ltd)\b/g, "")
-    .replace(/\s+/g, "")
-    .slice(0, 40);
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 50);
 }
 
 function normalizePhone(phone: string): string {
-  return phone.replace(/[^0-9]/g, "").slice(-10);
+  if (!phone) return "";
+  const cleaned = phone.replace(/[^0-9]/g, "");
+  return cleaned.length >= 10 ? cleaned.slice(-10) : "";
 }
 
-function findFuzzyNameMatch(nameKey: string, byName: Map<string, ScrapedBusiness>): ScrapedBusiness | undefined {
-  if (nameKey.length < 5) return undefined;
-  for (const [existingKey, biz] of Array.from(byName.entries())) {
-    if (existingKey.length < 5) continue;
-    if (existingKey.includes(nameKey) || nameKey.includes(existingKey)) {
-      const shorter = Math.min(nameKey.length, existingKey.length);
-      const longer = Math.max(nameKey.length, existingKey.length);
-      if (shorter / longer >= 0.75) {
-        return biz;
-      }
-    }
-    const similarity = calculateSimilarity(nameKey, existingKey);
-    if (similarity > 0.85) {
+function findFuzzyNameMatch(name: string, byName: Map<string, ScrapedBusiness>): ScrapedBusiness | undefined {
+  const normalizedSearch = normalizeName(name);
+  if (normalizedSearch.length < 10) return undefined;
+  
+  const entries = Array.from(byName.entries());
+  for (const [existingName, biz] of entries) {
+    if (existingName === normalizedSearch) return biz;
+    if (existingName.length < 10) continue;
+    
+    const similarity = calculateSimilarity(normalizedSearch, existingName);
+    if (similarity > 0.92) { // Higher threshold for fuzzy matching
       return biz;
     }
   }
