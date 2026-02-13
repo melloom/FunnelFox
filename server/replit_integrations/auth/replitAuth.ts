@@ -102,7 +102,9 @@ export async function setupAuth(app: Express) {
         emailVerificationExpiry: verificationExpiry,
       });
 
-      const host = process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
+      // Use the first domain from REPLIT_DOMAINS if available, fallback to host or default
+      const domains = process.env.REPLIT_DOMAINS?.split(",") || [];
+      const host = domains.find(d => !d.includes("replit.dev") && !d.includes("repl.co")) || domains[0] || process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
       const verifyUrl = `https://${host}/verify-email?token=${verificationToken}`;
 
       try {
@@ -334,7 +336,8 @@ export async function setupAuth(app: Express) {
         emailVerificationExpiry: newExpiry,
       }).where(eq(users.id, user.id));
 
-      const host = process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
+      const domains = process.env.REPLIT_DOMAINS?.split(",") || [];
+      const host = domains.find(d => !d.includes("replit.dev") && !d.includes("repl.co")) || domains[0] || process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
       const verifyUrl = `https://${host}/verify-email?token=${newToken}`;
 
       await sendEmail(
@@ -383,7 +386,8 @@ export async function setupAuth(app: Express) {
         resetTokenExpiry: expiry,
       }).where(eq(users.id, user.id));
 
-      const host = process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
+      const domains = process.env.REPLIT_DOMAINS?.split(",") || [];
+      const host = domains.find(d => !d.includes("replit.dev") && !d.includes("repl.co")) || domains[0] || process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
       const resetUrl = `https://${host}/reset-password?token=${token}`;
 
       const emailBody = `Hi ${user.firstName || "there"},
