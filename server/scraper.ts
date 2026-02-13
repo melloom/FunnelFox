@@ -722,7 +722,9 @@ async function searchBing(
 
   try {
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://www.bing.com/search?q=${encodedQuery}&count=${Math.max(maxResults, 20)}`;
+    // Request more than requested count to ensure we have enough after filtering
+    const searchCount = Math.max(maxResults * 3, 50);
+    const url = `https://www.bing.com/search?q=${encodedQuery}&count=${searchCount}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);

@@ -320,9 +320,9 @@ export async function registerRoutes(
       const searchPage = Math.max(1, Math.min(page || 1, 10));
       const searchStart = Date.now();
       
-      // Request more results than needed to compensate for duplicates
+      // Request significantly more results than needed to ensure we can meet the exact requested count after deduplication and filtering
       const requestedMax = Math.min(maxResults || 20, planMaxResults);
-      const searchCount = Math.max(requestedMax * 5, 100); // 5x factor to really ensure we find enough unique leads
+      const searchCount = 100; // Fixed large search count to guarantee enough candidates
       
       console.log(`[Discover] Starting search for ${category} in ${location}. Requested: ${requestedMax}, SearchCount: ${searchCount}`);
 
@@ -412,7 +412,14 @@ export async function registerRoutes(
         filteredBusinesses = newBusinesses.filter((b: any) => !b.hasWebsite || !b.url || b.url === "none");
       }
 
-      console.log(`[Discover] After "${websiteFilter}" filter: ${filteredBusinesses.length} leads available from ${newBusinesses.length} new businesses`);
+      console.log(`[Discover] After "${websiteFilter}" filter: ${filteredBusinesses.length} leads available`);
+
+      if (filteredBusinesses.length === 0 && newBusinesses.length > 0) {
+        return res.status(200).json({ 
+          results: [], 
+          message: `Found ${newBusinesses.length} new businesses, but none matched your "${websiteFilter}" filter.` 
+        });
+      }
 
       // Take only up to the requested number of unique results AFTER filtering
       const uniqueNewBusinesses = filteredBusinesses.slice(0, requestedMax);
