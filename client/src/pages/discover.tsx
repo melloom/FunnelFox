@@ -151,14 +151,22 @@ export default function DiscoverPage() {
       async (pos) => {
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&zoom=10`,
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&zoom=18&addressdetails=1`,
             { headers: { "User-Agent": "FunnelFox/1.0" } }
           );
           const data = await res.json();
           const addr = data.address || {};
-          const city = addr.city || addr.town || addr.village || addr.county || "";
+          
+          // Prioritize specific location data
+          const city = addr.city || addr.town || addr.village || addr.suburb || addr.neighbourhood || addr.hamlet || addr.county || "";
           const state = addr.state || "";
-          const locationStr = [city, state].filter(Boolean).join(", ");
+          const postcode = addr.postcode || "";
+          
+          let locationStr = [city, state].filter(Boolean).join(", ");
+          if (postcode && !locationStr.includes(postcode)) {
+            locationStr += ` ${postcode}`;
+          }
+
           if (locationStr) {
             setLocationValue(locationStr);
             toast({ title: "Location found", description: locationStr });
@@ -170,11 +178,16 @@ export default function DiscoverPage() {
         }
         setGeolocating(false);
       },
-      () => {
-        toast({ title: "Location access denied", description: "Allow location access or enter it manually", variant: "destructive" });
+      (err) => {
+        const msg = err.code === 1 ? "Location access denied" : "Location detection failed";
+        toast({ title: msg, description: "Please enter your location manually", variant: "destructive" });
         setGeolocating(false);
       },
-      { timeout: 10000 }
+      { 
+        enableHighAccuracy: true, 
+        timeout: 15000, 
+        maximumAge: 0 
+      }
     );
   };
 
