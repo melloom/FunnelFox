@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   planStatus: varchar("plan_status").default("free"),
   isAdmin: boolean("is_admin").default(false),
   monthlyDiscoveriesUsed: integer("monthly_discoveries_used").default(0),
+  totalLeadsDiscovered: integer("total_leads_discovered").default(0),
   usageResetDate: timestamp("usage_reset_date"),
   resetToken: varchar("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),

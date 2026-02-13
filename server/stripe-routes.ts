@@ -46,7 +46,8 @@ export function registerStripeRoutes(app: Express) {
       const monthlyDiscoveriesUsed = resetNeeded ? 0 : (user.monthlyDiscoveriesUsed || 0);
       const usageResetDate = resetNeeded ? getNextResetDate().toISOString() : (user.usageResetDate ? new Date(user.usageResetDate).toISOString() : null);
 
-      // Use user's total leads count for free plan display
+      // Use user's discovered leads count for free plan display
+      const discoveredLeads = user.totalLeadsDiscovered || 0;
       const totalLeads = await storage.getLeadCountForUser(userId);
 
       let stripeDetails: any = null;
@@ -80,12 +81,12 @@ export function registerStripeRoutes(app: Express) {
           const priceAmount = sub.items?.data?.[0]?.price?.unit_amount;
           const priceInterval = sub.items?.data?.[0]?.price?.recurring?.interval;
           const pm = sub.default_payment_method as any;
-          stripeDetails = {
-            status: sub.status,
-            cancelAtPeriodEnd: sub.cancel_at_period_end,
-            currentPeriodStart: sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : null,
-            currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
-            cancelAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
+            stripeDetails = {
+              status: sub.status,
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+              currentPeriodStart: (sub as any).current_period_start ? new Date((sub as any).current_period_start * 1000).toISOString() : null,
+              currentPeriodEnd: (sub as any).current_period_end ? new Date((sub as any).current_period_end * 1000).toISOString() : null,
+              cancelAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
             priceAmount: priceAmount ? priceAmount / 100 : null,
             priceInterval: priceInterval || null,
             cardBrand: pm?.card?.brand || null,
@@ -110,7 +111,7 @@ export function registerStripeRoutes(app: Express) {
 
       res.json({
         planStatus: isPro ? "pro" : "free",
-        monthlyDiscoveriesUsed: isPro ? monthlyDiscoveriesUsed : totalLeads,
+        monthlyDiscoveriesUsed: isPro ? monthlyDiscoveriesUsed : discoveredLeads,
         discoveryLimit: isPro ? (user.isAdmin ? 999 : 300) : 100,
         leadLimit: isPro ? null : 100,
         totalLeads,
@@ -310,17 +311,10 @@ export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: bo
 
   if (user.isAdmin) return { allowed: true, remaining: 999, limit: 999, isPro: true, maxResultsPerSearch: 50 };
 
+  // Free users: 100 total lifetime leads (based on usage tracking, not current count)
   const limit = isPro ? 300 : 100;
-  
-  if (isPro) {
-    const used = user.monthlyDiscoveriesUsed || 0;
-    const remaining = Math.max(0, limit - used);
-    return { allowed: remaining > 0, remaining, limit, isPro, maxResultsPerSearch: 50 };
-  }
-
-  // Free users: 100 total lifetime leads
-  const totalLeads = await storage.getLeadCountForUser(userId);
-  const remaining = Math.max(0, limit - totalLeads);
+  const discovered = user.totalLeadsDiscovered || 0;
+  const remaining = Math.max(0, limit - discovered);
   
   return { 
     allowed: remaining > 0, 
@@ -334,6 +328,7 @@ export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: bo
 export async function incrementDiscoveryUsage(userId: string, count: number = 1): Promise<void> {
   await db.update(users).set({
     monthlyDiscoveriesUsed: sql`COALESCE(${users.monthlyDiscoveriesUsed}, 0) + ${count}`,
+    totalLeadsDiscovered: sql`COALESCE(${users.totalLeadsDiscovered}, 0) + ${count}`,
     usageResetDate: sql`COALESCE(${users.usageResetDate}, ${getNextResetDate().toISOString()}::timestamp)`,
   }).where(eq(users.id, userId));
 }
