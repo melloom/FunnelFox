@@ -46,6 +46,7 @@ export function registerStripeRoutes(app: Express) {
       const monthlyDiscoveriesUsed = resetNeeded ? 0 : (user.monthlyDiscoveriesUsed || 0);
       const usageResetDate = resetNeeded ? getNextResetDate().toISOString() : (user.usageResetDate ? new Date(user.usageResetDate).toISOString() : null);
 
+      // Use user's total leads count for free plan display
       const totalLeads = await storage.getLeadCountForUser(userId);
 
       let stripeDetails: any = null;
