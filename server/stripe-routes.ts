@@ -110,8 +110,8 @@ export function registerStripeRoutes(app: Express) {
       res.json({
         planStatus: isPro ? "pro" : "free",
         monthlyDiscoveriesUsed,
-        discoveryLimit: isPro ? (user.isAdmin ? 999 : 300) : 25,
-        leadLimit: isPro ? null : 25,
+        discoveryLimit: isPro ? (user.isAdmin ? 999 : 300) : 100,
+        leadLimit: isPro ? null : 100,
         totalLeads,
         stripeSubscriptionId: currentSubId,
         stripeCustomerId: user.stripeCustomerId,
@@ -315,11 +315,11 @@ export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: bo
       monthlyDiscoveriesUsed: 0,
       usageResetDate: nextReset,
     }).where(eq(users.id, userId));
-    const limit = isPro ? 300 : 25;
+    const limit = isPro ? 300 : 100;
     return { allowed: true, remaining: limit, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
   }
 
-  const limit = isPro ? 300 : 25;
+  const limit = isPro ? 300 : 100;
   const used = user.monthlyDiscoveriesUsed || 0;
   const remaining = isPro ? Math.max(0, limit - used) : Math.min(Math.max(0, limit - used), limit);
   return { allowed: remaining > 0, remaining, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
@@ -337,5 +337,5 @@ export async function checkLeadLimit(userId: string, currentLeadCount: number): 
   if (!user) return { allowed: false, limit: 0 };
 
   if (user.isAdmin || user.planStatus === "pro") return { allowed: true, limit: null };
-  return { allowed: currentLeadCount < 25, limit: 25 };
+  return { allowed: currentLeadCount < 100, limit: 100 };
 }

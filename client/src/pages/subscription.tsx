@@ -219,8 +219,8 @@ export default function SubscriptionPage() {
   }
 
   const freeFeatures = [
-    { text: "25 leads / month", included: true },
-    { text: "25 saved leads max", included: true },
+    { text: "100 leads / month", included: true },
+    { text: "100 saved leads max", included: true },
     { text: "Basic website analysis", included: true },
     { text: "Pipeline management", included: true },
     { text: "All data sources", included: false },
