@@ -1,4 +1,4 @@
-function isAggregatorName(name: string): boolean {
+export function isAggregatorName(name: string): boolean {
   const lowName = name.toLowerCase();
   const directoryKeywords = [
     "yellow pages", "yellowpages", "yelp", "tripadvisor", 
@@ -9,7 +9,7 @@ function isAggregatorName(name: string): boolean {
   return directoryKeywords.some(kw => lowName.includes(kw));
 }
 
-function isAggregatorSite(domain: string): boolean {
+export function isAggregatorSite(domain: string): boolean {
   const aggregators = [
     "yelp.com", "yellowpages.com", "bbb.org", "angieslist.com", "angi.com",
     "thumbtack.com", "homeadvisor.com", "nextdoor.com",
@@ -42,7 +42,7 @@ function isAggregatorSite(domain: string): boolean {
   return aggregators.some((ex) => domain.includes(ex));
 }
 
-function isExcludedDomain(domain: string): boolean {
+export function isExcludedDomain(domain: string): boolean {
   const excluded = [
     "facebook.com", "twitter.com", "x.com", "instagram.com",
     "linkedin.com", "youtube.com", "tiktok.com", "pinterest.com",
