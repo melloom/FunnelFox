@@ -2,6 +2,7 @@ import { LayoutDashboard, Users, Plus, Search, Kanban, HelpCircle, CreditCard, C
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import {
   Sidebar,
   SidebarContent,
@@ -42,16 +43,26 @@ const bottomNavItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
+  const { toast } = useToast();
 
   const { data: subscription } = useQuery<{
     planStatus: string;
     monthlyDiscoveriesUsed: number;
     discoveryLimit: number;
+    isAdmin: boolean;
   }>({
     queryKey: ["/api/subscription"],
   });
 
-  const handleNavClick = () => {
+  const handleNavClick = (e: React.MouseEvent, item: any) => {
+    if (item.title === "Find Work" && !subscription?.isAdmin) {
+      e.preventDefault();
+      toast({
+        title: "Coming Soon",
+        description: "The Find Work feature is currently in development and will be available soon.",
+      });
+      return;
+    }
     if (isMobile) {
       setOpenMobile(false);
     }
@@ -90,7 +101,7 @@ export function AppSidebar() {
                     asChild
                     isActive={location === item.url}
                   >
-                    <Link href={item.url} onClick={handleNavClick} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
+                    <Link href={item.url} onClick={(e) => handleNavClick(e, item)} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
