@@ -2243,6 +2243,8 @@ function isListTitle(title: string, category: string): boolean {
     /near\s+(me|you)\b/i,
     /\b(ranking|ratings)\b/i,
     /\breview(s|ed)?\b.*\b(in|near|for)\b/i,
+    /\b(directions|traffic|transit|map|satellite)\b/i,
+    /google\s+maps/i,
   ];
 
   for (const pattern of listPatterns) {
@@ -2283,6 +2285,7 @@ function isAggregatorSite(domain: string): boolean {
     "patch.com", "newsbreak.com",
     "guide.michelin.com", "michelin.com",
     "timeout.com", "eater.com", "infatuation.com", "thrillist.com",
+    "google.com/maps", "maps.google.com", "google.com/search",
   ];
   return aggregators.some((ex) => domain.includes(ex));
 }
@@ -3215,6 +3218,7 @@ function normalizeUrl(url: string): string {
 
 function cleanBusinessName(title: string): string {
   let name = title
+    .replace(/\b(Directions|Maps?|Traffic|Transit|Satellite|Street View)\b.*$/i, "")
     .replace(/\s*[-|–—]\s*(Home|About|Contact|Services|Official|Website|Site|Page|Welcome|Reviews?|Get\s|Your\s|We\s|The\s+Best|A\s+).*$/i, "")
     .replace(/\s*\|.*$/, "")
     .replace(/\s*[-–—]\s*[A-Z][a-z]+,?\s+[A-Z]{2}\s*$/, "")
