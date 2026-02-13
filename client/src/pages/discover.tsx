@@ -448,12 +448,12 @@ export default function DiscoverPage() {
               <CardContent className="py-8 text-center">
                 <AlertTriangle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-sm font-medium">No new leads found</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {results.skipped > 0
-                    ? "All discovered businesses are already in your pipeline."
-                    : "Try a different category or location to find more prospects."}
+                <p className="text-xs text-muted-foreground mt-1 px-4">
+                  {results.found > 0 
+                    ? `We found ${results.found} businesses, but they are all already in your pipeline. Try searching in a different area or category.`
+                    : "We couldn't find any businesses matching your search. Try a different category or broaden your location."}
                 </p>
-                {searchPage <= 3 && (
+                {searchPage <= 3 && results.found > 0 && (
                   <Button
                     variant="outline"
                     className="mt-4"
