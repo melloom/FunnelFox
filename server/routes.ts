@@ -321,15 +321,19 @@ export async function registerRoutes(
       const searchStart = Date.now();
       
       // Request more results than needed to compensate for duplicates
-      const requestedMax = Math.min(maxResults || 10, planMaxResults);
-      const searchCount = Math.max(requestedMax * 3, 50); // Increased factor to 3x to find even more unique leads
+      const requestedMax = Math.min(maxResults || 20, planMaxResults);
+      const searchCount = Math.max(requestedMax * 5, 100); // 5x factor to really ensure we find enough unique leads
       
+      console.log(`[Discover] Starting search for ${category} in ${location}. Requested: ${requestedMax}, SearchCount: ${searchCount}`);
+
       const businesses = await searchBusinesses(
         category,
         location,
         searchCount,
         searchPage
       );
+
+      console.log(`[Discover] searchBusinesses returned ${businesses.length} items`);
       const searchMs = Date.now() - searchStart;
       // Use the first domain from REPLIT_DOMAINS if available, fallback to host or default
       const domains = process.env.REPLIT_DOMAINS?.split(",") || [];
@@ -397,26 +401,34 @@ export async function registerRoutes(
       }
 
       const newBusinesses = businesses.filter((biz: any) => {
-        return !isDuplicate(biz.name, biz.url, biz.phone);
+        const dup = isDuplicate(biz.name, biz.url, biz.phone);
+        if (dup) {
+          // console.log(`[Discover] Filtered duplicate: ${biz.name}`);
+        }
+        return !dup;
       });
+
+      console.log(`[Discover] Found ${businesses.length} businesses, ${newBusinesses.length} are new after global duplicate check`);
 
       // Take only up to the requested number of unique results
       const uniqueNewBusinesses = newBusinesses.slice(0, requestedMax);
-      console.log(`[Discover] Requested ${requestedMax}, Found ${businesses.length} total, ${newBusinesses.length} new, using ${uniqueNewBusinesses.length} unique`);
+      console.log(`[Discover] Requested ${requestedMax}, Found ${businesses.length} total, ${newBusinesses.length} new, using ${uniqueNewBusinesses.length} unique for this search`);
 
       // Apply website filter
       let filteredBusinesses = uniqueNewBusinesses;
       if (websiteFilter === "with-website") {
-        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => b.hasWebsite && b.url);
+        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => b.hasWebsite && b.url && b.url !== "none");
       } else if (websiteFilter === "no-website") {
-        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => !b.hasWebsite || !b.url);
+        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => !b.hasWebsite || !b.url || b.url === "none");
       }
+
+      console.log(`[Discover] After "${websiteFilter}" filter: ${filteredBusinesses.length} leads remaining`);
 
       const results = [];
       const BATCH_SIZE = 3;
 
-      const withWebsite = filteredBusinesses.filter((b: any) => b.hasWebsite && b.url);
-      const withoutWebsite = filteredBusinesses.filter((b: any) => !b.hasWebsite || !b.url);
+      const withWebsite = filteredBusinesses.filter((b: any) => b.hasWebsite && b.url && b.url !== "none");
+      const withoutWebsite = filteredBusinesses.filter((b: any) => !b.hasWebsite || !b.url || b.url === "none");
 
       const ENRICH_BATCH = 4;
       for (let ei = 0; ei < withoutWebsite.length; ei += ENRICH_BATCH) {
