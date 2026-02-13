@@ -39,6 +39,7 @@ export interface IStorage {
   deleteJob(id: number, userId: string): Promise<boolean>;
   deleteJobs(ids: number[], userId: string): Promise<number>;
   getJobCount(userId: string): Promise<number>;
+  getLeadCountForUser(userId: string): Promise<number>;
   // Saved jobs methods
   getSavedJobs(userId: string): Promise<SavedJob[]>;
   saveJob(data: InsertSavedJob): Promise<SavedJob>;
@@ -130,6 +131,11 @@ export class DatabaseStorage implements IStorage {
 
   async getLeadCount(): Promise<number> {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(leads);
+    return Number(result?.count || 0);
+  }
+
+  async getLeadCountForUser(userId: string): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(leads).where(eq(leads.userId, userId));
     return Number(result?.count || 0);
   }
 

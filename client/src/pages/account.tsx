@@ -244,14 +244,14 @@ export default function AccountPage() {
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-lg" data-testid="text-account-name">
+              <h2 className="font-semibold text-lg leading-tight" data-testid="text-account-name">
                 {user.firstName} {user.lastName || ""}
-              </p>
-              <div className="flex items-center gap-1.5 text-muted-foreground">
+              </h2>
+              <div className="flex items-center gap-1.5 text-muted-foreground mt-1">
                 <Mail className="w-3.5 h-3.5 shrink-0" />
                 <span className="text-sm truncate" data-testid="text-account-email">{user.email}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
                 <Calendar className="w-3.5 h-3.5 shrink-0" />
                 <span>Member since {memberSince}</span>
               </div>
@@ -264,7 +264,7 @@ export default function AccountPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
-            Usage This Month
+            {isPro ? "Usage This Month" : "Usage (Lifetime)"}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -274,7 +274,7 @@ export default function AccountPage() {
             <>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm">Monthly Leads</span>
+                  <span className="text-sm">{isPro ? "Monthly Leads" : "Lifetime Leads"}</span>
                   <span className="text-sm text-muted-foreground">
                     {discoveriesUsed} / {discoveryLimit === 999 ? "Unlimited" : discoveryLimit}
                   </span>

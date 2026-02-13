@@ -242,25 +242,25 @@ export default function DiscoverPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-discover-title">
+      <div className="space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight" data-testid="text-discover-title">
           Discover Leads
         </h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+        <p className="text-sm sm:text-base text-muted-foreground max-w-2xl">
           Search for businesses by category and location. We'll analyze their websites and add prospects to your pipeline.
         </p>
         {subscription && (
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <Badge variant={subscription.planStatus === "pro" ? "default" : "secondary"} data-testid="badge-plan-status">
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
+            <Badge variant={subscription.planStatus === "pro" ? "default" : "secondary"} className="px-2.5 py-0.5" data-testid="badge-plan-status">
               {subscription.planStatus === "pro" ? "Pro" : "Free"} Plan
             </Badge>
-            <span className="text-xs text-muted-foreground" data-testid="text-discovery-usage">
-              {subscription.monthlyDiscoveriesUsed} / {subscription.discoveryLimit} leads used this month
+            <span className="text-sm text-muted-foreground font-medium" data-testid="text-discovery-usage">
+              {subscription.planStatus === "pro" ? `${subscription.monthlyDiscoveriesUsed} / ${subscription.discoveryLimit} leads this month` : `${subscription.monthlyDiscoveriesUsed} / ${subscription.discoveryLimit} lifetime leads used`}
             </span>
-            {subscription.planStatus !== "pro" && subscription.monthlyDiscoveriesUsed >= subscription.discoveryLimit && (
-              <a href="/pricing" className="text-xs text-primary hover:underline" data-testid="link-upgrade">
+            {subscription.planStatus !== "pro" && (
+              <Link href="/subscription" className="text-sm text-primary font-semibold hover:underline" data-testid="link-upgrade">
                 Upgrade for more
-              </a>
+              </Link>
             )}
           </div>
         )}

@@ -5,6 +5,7 @@ import { users } from "@shared/models/auth";
 import { leads } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { isAuthenticated } from "./replit_integrations/auth";
+import { storage } from "./storage";
 
 export function registerStripeRoutes(app: Express) {
   app.get("/api/stripe/publishable-key", async (_req: Request, res: Response) => {
@@ -45,8 +46,7 @@ export function registerStripeRoutes(app: Express) {
       const monthlyDiscoveriesUsed = resetNeeded ? 0 : (user.monthlyDiscoveriesUsed || 0);
       const usageResetDate = resetNeeded ? getNextResetDate().toISOString() : (user.usageResetDate ? new Date(user.usageResetDate).toISOString() : null);
 
-      const [leadCountResult] = await db.select({ count: sql<number>`count(*)` }).from(leads).limit(1);
-      const totalLeads = Number(leadCountResult?.count || 0);
+      const totalLeads = await storage.getLeadCountForUser(userId);
 
       let stripeDetails: any = null;
       let currentSubId = user.stripeSubscriptionId;
@@ -109,7 +109,7 @@ export function registerStripeRoutes(app: Express) {
 
       res.json({
         planStatus: isPro ? "pro" : "free",
-        monthlyDiscoveriesUsed,
+        monthlyDiscoveriesUsed: isPro ? monthlyDiscoveriesUsed : totalLeads,
         discoveryLimit: isPro ? (user.isAdmin ? 999 : 300) : 100,
         leadLimit: isPro ? null : 100,
         totalLeads,
@@ -309,20 +309,25 @@ export async function checkDiscoveryLimit(userId: string): Promise<{ allowed: bo
 
   if (user.isAdmin) return { allowed: true, remaining: 999, limit: 999, isPro: true, maxResultsPerSearch: 50 };
 
-  if (user.usageResetDate && new Date() > new Date(user.usageResetDate)) {
-    const nextReset = getNextResetDate();
-    await db.update(users).set({
-      monthlyDiscoveriesUsed: 0,
-      usageResetDate: nextReset,
-    }).where(eq(users.id, userId));
-    const limit = isPro ? 300 : 100;
-    return { allowed: true, remaining: limit, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
+  const limit = isPro ? 300 : 100;
+  
+  if (isPro) {
+    const used = user.monthlyDiscoveriesUsed || 0;
+    const remaining = Math.max(0, limit - used);
+    return { allowed: remaining > 0, remaining, limit, isPro, maxResultsPerSearch: 50 };
   }
 
-  const limit = isPro ? 300 : 100;
-  const used = user.monthlyDiscoveriesUsed || 0;
-  const remaining = isPro ? Math.max(0, limit - used) : Math.min(Math.max(0, limit - used), limit);
-  return { allowed: remaining > 0, remaining, limit, isPro, maxResultsPerSearch: isPro ? 50 : 5 };
+  // Free users: 100 total lifetime leads
+  const totalLeads = await storage.getLeadCountForUser(userId);
+  const remaining = Math.max(0, limit - totalLeads);
+  
+  return { 
+    allowed: remaining > 0, 
+    remaining, 
+    limit, 
+    isPro, 
+    maxResultsPerSearch: 5 
+  };
 }
 
 export async function incrementDiscoveryUsage(userId: string, count: number = 1): Promise<void> {
