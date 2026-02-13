@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache, enrichContactInfo, scrapeUrlForBusinessInfo, searchBusinessesByName } from "./scraper";
+import { searchBusinesses, analyzeWebsite, getSearchCacheStats, clearSearchCache, enrichContactInfo, scrapeUrlForBusinessInfo, searchBusinessesByName, enhancedUrlLookup } from "./scraper";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { sendEmail, isGmailConnected, getGmailAddress } from "./gmail";
 import { registerStripeRoutes, checkDiscoveryLimit, incrementDiscoveryUsage, checkLeadLimit } from "./stripe-routes";
@@ -235,7 +235,7 @@ export async function registerRoutes(
     try {
       const { url } = req.body;
       if (!url || typeof url !== "string") return res.status(400).json({ error: "URL is required" });
-      const info = await scrapeUrlForBusinessInfo(url);
+      const info = await enhancedUrlLookup(url);
       res.json(info);
     } catch (err) {
       console.error("[lookup-url] Error:", err);

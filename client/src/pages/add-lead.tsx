@@ -39,6 +39,10 @@ import {
   MapPin,
   CheckCircle2,
   X,
+  RotateCcw,
+  ShieldCheck,
+  ShieldAlert,
+  Shield,
 } from "lucide-react";
 import { insertLeadSchema } from "@shared/schema";
 import type { Lead } from "@shared/schema";
@@ -82,6 +86,8 @@ interface UrlLookupResult {
   contactPhone?: string;
   socialMedia?: string[];
   description?: string;
+  sources?: string[];
+  confidence?: 'high' | 'medium' | 'low';
 }
 
 interface BusinessSearchResult {
@@ -244,8 +250,9 @@ export default function AddLeadPage() {
         data.websiteUrl && "website",
       ].filter(Boolean);
 
+      const sourceCount = data.sources?.length || 0;
       if (fieldsFound.length > 0) {
-        toast({ title: `Found: ${fieldsFound.join(", ")}` });
+        toast({ title: `Found ${fieldsFound.length} fields from ${sourceCount} source${sourceCount !== 1 ? 's' : ''}` });
       } else {
         toast({ title: "No info found from that URL", variant: "destructive" });
       }
@@ -253,6 +260,23 @@ export default function AddLeadPage() {
       toast({ title: "Failed to look up URL", variant: "destructive" });
     }
     setUrlLookupLoading(false);
+  }, [form, toast]);
+
+  const handleWrongLead = useCallback(() => {
+    const currentUrl = form.getValues("websiteUrl");
+    form.reset({
+      companyName: "",
+      websiteUrl: currentUrl || "",
+      contactName: "",
+      contactEmail: "",
+      contactPhone: "",
+      industry: "",
+      location: "",
+      notes: "",
+      status: "new",
+    });
+    setUrlLookupResult(null);
+    toast({ title: "Cleared pre-filled info — enter details manually or try a different URL" });
   }, [form, toast]);
 
   const handleNameSearch = useCallback(async (searchName: string) => {
@@ -305,7 +329,6 @@ export default function AddLeadPage() {
       setUrlLookupLoading(true);
       setUrlLookupResult(null);
       try {
-        // Use the normalized URL for scraping
         const normalizedUrl = normalizeUrl(result.url);
         const res = await apiRequest("POST", "/api/lookup-url", { url: normalizedUrl });
         const data: UrlLookupResult = await res.json();
@@ -319,15 +342,15 @@ export default function AddLeadPage() {
         if (data.contactPhone && !form.getValues("contactPhone")) form.setValue("contactPhone", data.contactPhone);
         if (data.location && !form.getValues("location")) form.setValue("location", data.location);
 
+        const sourceCount = data.sources?.length || 0;
         const fieldsFound = [
           data.contactEmail && "email",
           data.contactPhone && "phone",
           data.location && "location",
-          data.description && "description",
         ].filter(Boolean);
 
         if (fieldsFound.length > 0) {
-          toast({ title: `Scraped: found ${fieldsFound.join(", ")}` });
+          toast({ title: `Found ${fieldsFound.length} fields from ${sourceCount} source${sourceCount !== 1 ? 's' : ''}` });
         } else {
           toast({ title: `Selected: ${result.name}` });
         }
@@ -427,24 +450,70 @@ export default function AddLeadPage() {
                       </Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Optional: Works with Facebook pages, Instagram, Yelp listings, any business URL or domain name
+                      Paste any URL — we'll scrape it and search Yellow Pages, maps, and web for complete info
                     </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {urlLookupLoading && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border" data-testid="url-lookup-loading">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+                  <div className="text-xs text-muted-foreground">
+                    <p className="font-medium">Searching multiple sources...</p>
+                    <p>Scraping URL, web searches, Yellow Pages, maps data</p>
+                  </div>
+                </div>
+              )}
+
               {urlLookupResult && Object.keys(urlLookupResult).length > 0 && (
-                <div className="flex items-start gap-2 p-2.5 rounded-md bg-chart-2/10 border border-chart-2/20" data-testid="url-lookup-result">
-                  <CheckCircle2 className="w-4 h-4 text-chart-2 shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1 text-xs space-y-0.5">
-                    <p className="font-medium text-chart-2">Info extracted from URL</p>
-                    {urlLookupResult.companyName && <p>Name: <strong>{urlLookupResult.companyName}</strong></p>}
-                    {urlLookupResult.contactEmail && <p>Email: {urlLookupResult.contactEmail}</p>}
-                    {urlLookupResult.contactPhone && <p>Phone: {urlLookupResult.contactPhone}</p>}
-                    {urlLookupResult.location && <p>Location: {urlLookupResult.location}</p>}
-                    {urlLookupResult.description && (
-                      <p className="text-muted-foreground line-clamp-2">{urlLookupResult.description}</p>
+                <div className="rounded-md border overflow-hidden" data-testid="url-lookup-result">
+                  <div className="flex items-center justify-between gap-2 p-2.5 bg-chart-2/10 border-b border-chart-2/20">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {urlLookupResult.confidence === 'high' ? (
+                        <ShieldCheck className="w-4 h-4 text-chart-2 shrink-0" />
+                      ) : urlLookupResult.confidence === 'medium' ? (
+                        <Shield className="w-4 h-4 text-chart-4 shrink-0" />
+                      ) : (
+                        <ShieldAlert className="w-4 h-4 text-muted-foreground shrink-0" />
+                      )}
+                      <span className="text-xs font-medium text-chart-2">
+                        {urlLookupResult.confidence === 'high' ? 'High confidence match' :
+                         urlLookupResult.confidence === 'medium' ? 'Partial match' : 'Limited info found'}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleWrongLead}
+                      className="text-destructive shrink-0"
+                      data-testid="button-wrong-lead"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                      Wrong lead
+                    </Button>
+                  </div>
+                  <div className="p-2.5 space-y-1.5">
+                    <div className="text-xs space-y-0.5">
+                      {urlLookupResult.companyName && <p>Name: <strong>{urlLookupResult.companyName}</strong></p>}
+                      {urlLookupResult.contactEmail && <p>Email: {urlLookupResult.contactEmail}</p>}
+                      {urlLookupResult.contactPhone && <p>Phone: {urlLookupResult.contactPhone}</p>}
+                      {urlLookupResult.location && <p>Location: {urlLookupResult.location}</p>}
+                      {urlLookupResult.description && (
+                        <p className="text-muted-foreground line-clamp-2">{urlLookupResult.description}</p>
+                      )}
+                    </div>
+                    {urlLookupResult.sources && urlLookupResult.sources.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                        <span className="text-[10px] text-muted-foreground">Sources:</span>
+                        {urlLookupResult.sources.map((source, i) => (
+                          <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {source.replace(/-/g, ' ')}
+                          </Badge>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>

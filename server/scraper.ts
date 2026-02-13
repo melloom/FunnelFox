@@ -3586,9 +3586,150 @@ export async function scrapeUrlForBusinessInfo(inputUrl: string): Promise<{
     description: result.description?.substring(0, 100) + "..."
   });
 
-  // Add URL fingerprint to help identify if results are actually different
-  const urlFingerprint = new URL(fullUrl).hostname + new URL(fullUrl).pathname;
-  console.log(`[scrapeUrlForBusinessInfo] URL fingerprint: ${urlFingerprint}`);
+  return result;
+}
+
+export async function enhancedUrlLookup(inputUrl: string): Promise<{
+  companyName?: string;
+  websiteUrl?: string;
+  location?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  socialMedia?: string[];
+  description?: string;
+  sources: string[];
+  confidence: 'high' | 'medium' | 'low';
+}> {
+  console.log(`[enhancedUrlLookup] Starting enhanced lookup for: ${inputUrl}`);
+  const sources: string[] = [];
+
+  const directResult = await scrapeUrlForBusinessInfo(inputUrl);
+  if (directResult.companyName || directResult.contactEmail || directResult.contactPhone) {
+    sources.push("direct-scrape");
+  }
+
+  const result: typeof directResult & { sources: string[]; confidence: 'high' | 'medium' | 'low' } = {
+    ...directResult,
+    sources,
+    confidence: 'low',
+  };
+
+  const companyName = result.companyName;
+  if (!companyName || companyName.length < 2) {
+    result.confidence = result.contactPhone || result.contactEmail ? 'medium' : 'low';
+    return result;
+  }
+
+  const locationHint = result.location || "";
+
+  const enrichPromises: Promise<void>[] = [];
+
+  enrichPromises.push((async () => {
+    try {
+      const contactInfo = await enrichContactInfo(companyName, locationHint);
+      if (contactInfo.phone && !result.contactPhone) {
+        result.contactPhone = contactInfo.phone;
+        sources.push("web-search");
+      }
+      if (contactInfo.email && !result.contactEmail) {
+        result.contactEmail = contactInfo.email;
+        if (!sources.includes("web-search")) sources.push("web-search");
+      }
+    } catch (err) {
+      console.error("[enhancedUrlLookup] enrichContactInfo error:", err);
+    }
+  })());
+
+  enrichPromises.push((async () => {
+    try {
+      const ypInfo = await fetchYPContactInfo(companyName, locationHint);
+      if (ypInfo.phone && !result.contactPhone) {
+        result.contactPhone = ypInfo.phone;
+        sources.push("yellow-pages");
+      }
+      if (ypInfo.email && !result.contactEmail) {
+        result.contactEmail = ypInfo.email;
+        if (!sources.includes("yellow-pages")) sources.push("yellow-pages");
+      }
+    } catch (err) {
+      console.error("[enhancedUrlLookup] YP error:", err);
+    }
+  })());
+
+  enrichPromises.push((async () => {
+    try {
+      const osmResults = await searchOpenStreetMap(
+        companyName.split(/\s+/).slice(0, 3).join(" "),
+        locationHint || "United States",
+        5
+      );
+      for (const biz of osmResults) {
+        const bizNameNorm = biz.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const companyNorm = companyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (bizNameNorm.includes(companyNorm) || companyNorm.includes(bizNameNorm) || calculateSimilarity(bizNameNorm, companyNorm) > 0.7) {
+          if (biz.address && !result.location) {
+            result.location = biz.address;
+            sources.push("openstreetmap");
+          }
+          if (biz.phone && !result.contactPhone) {
+            result.contactPhone = biz.phone;
+            if (!sources.includes("openstreetmap")) sources.push("openstreetmap");
+          }
+          break;
+        }
+      }
+    } catch (err) {
+      console.error("[enhancedUrlLookup] OSM error:", err);
+    }
+  })());
+
+  enrichPromises.push((async () => {
+    try {
+      const query = `"${companyName}" ${locationHint} address location`;
+      const searchText = await ddgSearchText(query);
+      if (searchText && !result.location) {
+        const addressPatterns = [
+          /(\d+\s+[A-Z][a-z]+[\w\s]+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl)\b[^,]*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?,?\s*[A-Z]{2}\s*\d{5})/,
+          /(\d+\s+[A-Z][a-z]+[\w\s]+(?:St|Ave|Blvd|Rd|Dr|Ln|Way|Ct|Pl|Street|Avenue|Boulevard|Road|Drive)\b[^,]*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/,
+        ];
+        for (const pattern of addressPatterns) {
+          const match = searchText.match(pattern);
+          if (match && match[1]) {
+            result.location = match[1].trim().slice(0, 100);
+            if (!sources.includes("web-search")) sources.push("web-search");
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[enhancedUrlLookup] DDG address error:", err);
+    }
+  })());
+
+  await Promise.allSettled(enrichPromises);
+
+  result.sources = [...new Set(result.sources)];
+
+  let filledFields = 0;
+  if (result.companyName) filledFields++;
+  if (result.contactEmail) filledFields++;
+  if (result.contactPhone) filledFields++;
+  if (result.location) filledFields++;
+  if (result.websiteUrl) filledFields++;
+
+  if (filledFields >= 4) result.confidence = 'high';
+  else if (filledFields >= 2) result.confidence = 'medium';
+  else result.confidence = 'low';
+
+  console.log(`[enhancedUrlLookup] Final result for ${inputUrl}:`, {
+    companyName: result.companyName,
+    contactEmail: result.contactEmail,
+    contactPhone: result.contactPhone,
+    location: result.location,
+    websiteUrl: result.websiteUrl,
+    sources: result.sources,
+    confidence: result.confidence,
+  });
 
   return result;
 }
