@@ -418,6 +418,11 @@ export async function registerRoutes(
       const uniqueNewBusinesses = filteredBusinesses.slice(0, requestedMax);
       console.log(`[Discover] Requested ${requestedMax}, using ${uniqueNewBusinesses.length} unique for this search`);
 
+      // Duplicates don't count toward the limit - they were already filtered out of filteredBusinesses
+      if (uniqueNewBusinesses.length > 0) {
+        await incrementDiscoveryUsage(userId, uniqueNewBusinesses.length);
+      }
+
       const results = [];
       const BATCH_SIZE = 3;
 
