@@ -363,6 +363,7 @@ export async function registerRoutes(
         }
       }
 
+      // Deduplication check
       const isDuplicate = (name: string, url: string | undefined, phone: string | undefined): boolean => {
         const nameKey = name
           .toLowerCase()
@@ -371,19 +372,11 @@ export async function registerRoutes(
           .replace(/\s+/g, "")
           .slice(0, 40);
 
+        // Check against normalized names
         if (existingNames.has(nameKey)) return true;
 
-        for (const existing of Array.from(existingNames)) {
-          if (nameKey.length >= 5 && existing.length >= 5) {
-            if (existing.includes(nameKey) || nameKey.includes(existing)) {
-              const shorter = Math.min(nameKey.length, (existing as string).length);
-              const longer = Math.max(nameKey.length, (existing as string).length);
-              if (shorter / longer >= 0.75) return true;
-            }
-          }
-        }
-
-        if (url) {
+        // Check for website duplicates
+        if (url && url !== "none") {
           try {
             let u = url;
             if (!u.startsWith("http")) u = `https://${u}`;
@@ -392,6 +385,7 @@ export async function registerRoutes(
           } catch {}
         }
 
+        // Check for phone duplicates
         if (phone) {
           const phoneKey = phone.replace(/[^0-9]/g, "").slice(-10);
           if (phoneKey.length >= 7 && existingPhones.has(phoneKey)) return true;
@@ -558,9 +552,9 @@ export async function registerRoutes(
       const updatedLimit = userId ? await checkDiscoveryLimit(userId) : null;
 
       res.json({
-        found: businesses.length,
+        found: results.length,
         new: results.length,
-        skipped: businesses.length - results.length,
+        skipped: 0,
         leads: results,
         remaining: updatedLimit?.remaining,
         limit: updatedLimit?.limit,
