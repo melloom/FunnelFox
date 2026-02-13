@@ -4,7 +4,8 @@ export function isAggregatorName(name: string): boolean {
     "yellow pages", "yellowpages", "yelp", "tripadvisor", 
     "mapquest", "direct", "top 10", "best barbers in", 
     "barbers in", "near me", "results for", "directory",
-    "the real yellow pages", "business profile"
+    "the real yellow pages", "business profile",
+    "yellow book", "dexknows", "superpages"
   ];
   return directoryKeywords.some(kw => lowName.includes(kw));
 }

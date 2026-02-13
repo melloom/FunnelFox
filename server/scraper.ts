@@ -643,6 +643,7 @@ function processSearchResult(
   if (isExcludedDomain(domain)) return null;
   if (isAggregatorSite(domain)) return null;
   if (isListTitle(title, category)) return null;
+  if (isAggregatorName(title)) return null;
 
   const bizName = cleanBusinessName(title);
   if (!bizName || bizName.length < 3 || bizName.length > 80) return null;
