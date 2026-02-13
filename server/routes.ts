@@ -402,6 +402,7 @@ export async function registerRoutes(
 
       // Take only up to the requested number of unique results
       const uniqueNewBusinesses = newBusinesses.slice(0, requestedMax);
+      console.log(`[Discover] Requested ${requestedMax}, Found ${businesses.length} total, ${newBusinesses.length} new, using ${uniqueNewBusinesses.length} unique`);
 
       // Apply website filter
       let filteredBusinesses = uniqueNewBusinesses;

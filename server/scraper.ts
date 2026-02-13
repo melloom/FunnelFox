@@ -446,6 +446,11 @@ export async function searchBusinesses(
 
   const finalResults = dedupedList.slice(0, maxResults);
 
+  // Debug: Log if we are returning fewer results than requested despite finding more
+  if (finalResults.length < maxResults && dedupedList.length > finalResults.length) {
+    console.log(`[Scraper] Warning: finalResults truncated to ${finalResults.length} but dedupedList had ${dedupedList.length}`);
+  }
+
   searchCache.set(cacheKey, { results: finalResults, timestamp: Date.now() });
   pruneCache();
   console.log(`[Cache STORE] "${category}" in "${location}" p${page} — cached ${finalResults.length} results`);
