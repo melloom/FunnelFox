@@ -319,14 +319,21 @@ export async function registerRoutes(
 
       const searchPage = Math.max(1, Math.min(page || 1, 10));
       const searchStart = Date.now();
+      
+      // Request more results than needed to compensate for duplicates
+      const requestedMax = Math.min(maxResults || 10, planMaxResults);
+      const searchCount = Math.min(requestedMax * 2, 50); // Fetch up to 2x more to find uniques
+      
       const businesses = await searchBusinesses(
         category,
         location,
-        Math.min(maxResults || 10, planMaxResults),
+        searchCount,
         searchPage
       );
       const searchMs = Date.now() - searchStart;
-      const cached = searchMs < 500;
+      // Use the first domain from REPLIT_DOMAINS if available, fallback to host or default
+      const domains = process.env.REPLIT_DOMAINS?.split(",") || [];
+      const host = domains.find(d => !d.includes("replit.dev") && !d.includes("repl.co")) || domains[0] || process.env.REPLIT_DEV_DOMAIN || "funnelfox.org";
 
       const existingLeads = await storage.getLeads(userId);
       const existingDomains = new Set<string>();
@@ -365,8 +372,8 @@ export async function registerRoutes(
         for (const existing of Array.from(existingNames)) {
           if (nameKey.length >= 5 && existing.length >= 5) {
             if (existing.includes(nameKey) || nameKey.includes(existing)) {
-              const shorter = Math.min(nameKey.length, existing.length);
-              const longer = Math.max(nameKey.length, existing.length);
+              const shorter = Math.min(nameKey.length, (existing as string).length);
+              const longer = Math.max(nameKey.length, (existing as string).length);
               if (shorter / longer >= 0.75) return true;
             }
           }
@@ -389,29 +396,32 @@ export async function registerRoutes(
         return false;
       }
 
-      const newBusinesses = businesses.filter((biz) => {
+      const newBusinesses = businesses.filter((biz: any) => {
         return !isDuplicate(biz.name, biz.url, biz.phone);
       });
 
+      // Take only up to the requested number of unique results
+      const uniqueNewBusinesses = newBusinesses.slice(0, requestedMax);
+
       // Apply website filter
-      let filteredBusinesses = newBusinesses;
+      let filteredBusinesses = uniqueNewBusinesses;
       if (websiteFilter === "with-website") {
-        filteredBusinesses = newBusinesses.filter((b) => b.hasWebsite && b.url);
+        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => b.hasWebsite && b.url);
       } else if (websiteFilter === "no-website") {
-        filteredBusinesses = newBusinesses.filter((b) => !b.hasWebsite || !b.url);
+        filteredBusinesses = uniqueNewBusinesses.filter((b: any) => !b.hasWebsite || !b.url);
       }
 
       const results = [];
       const BATCH_SIZE = 3;
 
-      const withWebsite = filteredBusinesses.filter((b) => b.hasWebsite && b.url);
-      const withoutWebsite = filteredBusinesses.filter((b) => !b.hasWebsite || !b.url);
+      const withWebsite = filteredBusinesses.filter((b: any) => b.hasWebsite && b.url);
+      const withoutWebsite = filteredBusinesses.filter((b: any) => !b.hasWebsite || !b.url);
 
       const ENRICH_BATCH = 4;
       for (let ei = 0; ei < withoutWebsite.length; ei += ENRICH_BATCH) {
         const enrichBatch = withoutWebsite.slice(ei, ei + ENRICH_BATCH);
         const enrichResults = await Promise.allSettled(
-          enrichBatch.map(async (biz) => {
+          enrichBatch.map(async (biz: any) => {
             let bizPhone = biz.phone || null;
             let bizEmail = biz.email || null;
 
@@ -459,7 +469,7 @@ export async function registerRoutes(
       for (let i = 0; i < withWebsite.length; i += BATCH_SIZE) {
         const batch = withWebsite.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
-          batch.map(async (biz) => {
+          batch.map(async (biz: any) => {
             // Check if this user already has this lead
             const existingLead = await storage.findLeadByWebsiteForUser(
               biz.url || "none", 
@@ -537,7 +547,7 @@ export async function registerRoutes(
       res.json({
         found: businesses.length,
         new: results.length,
-        skipped: businesses.length - newBusinesses.length,
+        skipped: businesses.length - results.length,
         leads: results,
         cached,
         remaining: updatedLimit?.remaining,
