@@ -322,7 +322,7 @@ export async function registerRoutes(
       
       // Request more results than needed to compensate for duplicates
       const requestedMax = Math.min(maxResults || 10, planMaxResults);
-      const searchCount = Math.min(requestedMax * 2, 50); // Fetch up to 2x more to find uniques
+      const searchCount = Math.max(requestedMax * 3, 50); // Increased factor to 3x to find even more unique leads
       
       const businesses = await searchBusinesses(
         category,
