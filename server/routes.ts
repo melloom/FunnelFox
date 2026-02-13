@@ -363,7 +363,7 @@ export async function registerRoutes(
         }
       }
 
-      // Deduplication check - Refined to reduce false positives
+      // Deduplication check - Refined to prevent false positives when info is different
       const isDuplicate = (name: string, url: string | undefined, phone: string | undefined): boolean => {
         const nameKey = name
           .toLowerCase()
@@ -379,7 +379,6 @@ export async function registerRoutes(
             if (!u.startsWith("http")) u = `https://${u}`;
             const parsed = new URL(u);
             const domain = parsed.hostname.replace(/^www\./, "");
-            // Only dedupe if it's a real domain (not a social media platform alone)
             const isSocial = ["facebook.com", "instagram.com", "twitter.com", "linkedin.com", "yelp.com"].some(d => domain.includes(d));
             if (domain.length > 3 && !isSocial && existingDomains.has(domain)) return true;
           } catch {}
@@ -392,7 +391,24 @@ export async function registerRoutes(
         }
 
         // Check against normalized names - Only if the name is substantial enough to be unique
-        if (nameKey.length >= 10 && existingNames.has(nameKey)) return true;
+        // AND there is no conflicting info (like a different phone number)
+        if (nameKey.length >= 10 && existingNames.has(nameKey)) {
+          const potentialMatches = existingLeads.filter(l => {
+            const existingNameKey = l.companyName
+              .toLowerCase()
+              .replace(/[^a-z0-9\s]/g, "")
+              .replace(/\b(the|and|of|in|at|by|for|llc|inc|corp|co|ltd)\b/g, "")
+              .replace(/\s+/g, "")
+              .slice(0, 40);
+            return existingNameKey === nameKey;
+          });
+
+          for (const match of potentialMatches) {
+            // If the existing lead has different contact info, it's probably NOT a duplicate
+            const phoneMatch = !phone || !match.contactPhone || phone.replace(/[^0-9]/g, "").slice(-10) === match.contactPhone.replace(/[^0-9]/g, "").slice(-10);
+            if (phoneMatch) return true;
+          }
+        }
 
         return false;
       }

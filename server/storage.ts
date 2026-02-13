@@ -48,6 +48,7 @@ export interface IStorage {
   getSavedJobIds(userId: string): Promise<number[]>;
   // Helper method for lead deduplication
   findLeadByWebsiteForUser(websiteUrl: string, userId: string): Promise<Lead | null>;
+  findLeadByPhoneForUser(phone: string, userId: string): Promise<Lead | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -76,17 +77,70 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLead(lead: InsertLead): Promise<Lead> {
+    // Check for existing lead by website or phone to prevent duplicates during creation
+    if (lead.websiteUrl && lead.websiteUrl !== "none") {
+      const existing = await this.findLeadByWebsiteForUser(lead.websiteUrl, lead.userId);
+      if (existing) {
+        // Merge data into existing lead
+        const updateData: Partial<InsertLead> = {};
+        if (!existing.contactPhone && lead.contactPhone) updateData.contactPhone = lead.contactPhone;
+        if (!existing.contactEmail && lead.contactEmail) updateData.contactEmail = lead.contactEmail;
+        if (Object.keys(updateData).length > 0) {
+          await this.updateLead(existing.id, updateData);
+        }
+        return existing;
+      }
+    }
+    
+    if (lead.contactPhone) {
+      const existing = await this.findLeadByPhoneForUser(lead.contactPhone, lead.userId);
+      if (existing) {
+        // Merge data into existing lead
+        const updateData: Partial<InsertLead> = {};
+        if (!existing.websiteUrl || existing.websiteUrl === "none" && lead.websiteUrl && lead.websiteUrl !== "none") {
+          updateData.websiteUrl = lead.websiteUrl;
+        }
+        if (!existing.contactEmail && lead.contactEmail) updateData.contactEmail = lead.contactEmail;
+        if (Object.keys(updateData).length > 0) {
+          await this.updateLead(existing.id, updateData);
+        }
+        return existing;
+      }
+    }
+
     const [created] = await db.insert(leads).values(lead).returning();
     return created;
   }
 
   // Check if user already has a lead with this website URL
   async findLeadByWebsiteForUser(websiteUrl: string, userId: string): Promise<Lead | null> {
+    if (!websiteUrl || websiteUrl === "none") return null;
     const [lead] = await db.select()
       .from(leads)
       .where(and(eq(leads.websiteUrl, websiteUrl), eq(leads.userId, userId)))
       .limit(1);
     return lead || null;
+  }
+
+  async findLeadByPhoneForUser(phone: string, userId: string): Promise<Lead | null> {
+    if (!phone) return null;
+    const cleaned = phone.replace(/[^0-9]/g, "").slice(-10);
+    if (cleaned.length < 10) return null;
+    
+    // Using a pattern match to find the phone number in the database
+    const [lead] = await db.select()
+      .from(leads)
+      .where(and(
+        sql`${leads.contactPhone} IS NOT NULL`,
+        eq(leads.userId, userId)
+      ))
+      .limit(100); // Check a reasonable number of leads
+    
+    if (!lead) return null;
+    
+    // Precise filtering in JS for reliability
+    const allLeads = await db.select().from(leads).where(eq(leads.userId, userId));
+    return allLeads.find(l => l.contactPhone && l.contactPhone.replace(/[^0-9]/g, "").slice(-10) === cleaned) || null;
   }
 
   async updateLead(id: number, data: Partial<InsertLead>): Promise<Lead | undefined> {
