@@ -825,6 +825,20 @@ function PipelineLeadDetailDialog({
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t">
+            {lead.contactPhone && (
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                className="w-full sm:w-auto"
+                data-testid="button-call-lead"
+              >
+                <a href={`tel:${lead.contactPhone}`}>
+                  <Phone className="w-3.5 h-3.5 mr-1" />
+                  Call
+                </a>
+              </Button>
+            )}
             {lead.contactEmail && (
               <Button
                 size="sm"

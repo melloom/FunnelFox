@@ -71,9 +71,7 @@ import {
   Sheet,
   MoreVertical,
   FolderOpen,
-  Briefcase,
   User,
-  Edit2,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -304,41 +302,21 @@ function LeadDetailDialog({
     },
   });
 
-  const updateLeadField = async (field: string, value: string | string[]) => {
-    try {
+  const updateLeadMutation = useMutation({
+    mutationFn: async (data: Record<string, unknown>) => {
       if (!lead) return;
-      
-      // Optimistic update - update local cache immediately
-      queryClient.setQueryData(["/api/leads", lead.id], (old: Lead | undefined) => {
-        if (!old) return old;
-        return { ...old, [field]: value };
-      });
-      
-      // Also update the leads list cache
-      queryClient.setQueryData<Lead[]>(["/api/leads"], (old: Lead[] | undefined) => {
-        if (!old) return old;
-        return old.map(l => l.id === lead.id ? { ...l, [field]: value } : l);
-      });
-      
-      await apiRequest("PATCH", `/api/leads/${lead.id}`, { [field]: value });
-      
-      // Invalidate to ensure server state is in sync
+      await apiRequest("PATCH", `/api/leads/${lead.id}`, data);
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
-      
-      toast({ title: `${field} updated` });
-    } catch (error) {
-      // Revert optimistic update on error
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      if (lead) queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
-      
-      toast({ 
-        title: "Update failed", 
-        description: "Unable to update field. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead?.id] });
+      toast({ title: "Lead updated successfully" });
+      setEditingLead(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update lead", variant: "destructive" });
+    },
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -355,24 +333,32 @@ function LeadDetailDialog({
   const [notesValue, setNotesValue] = useState("");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
-  
-  // Editable field states
-  const [editingContactName, setEditingContactName] = useState(false);
-  const [contactNameValue, setContactNameValue] = useState("");
-  const [editingContactEmail, setEditingContactEmail] = useState(false);
-  const [contactEmailValue, setContactEmailValue] = useState("");
-  const [editingContactPhone, setEditingContactPhone] = useState(false);
-  const [contactPhoneValue, setContactPhoneValue] = useState("");
-  const [editingLocation, setEditingLocation] = useState(false);
-  const [locationValue, setLocationValue] = useState("");
-  const [editingCompanyName, setEditingCompanyName] = useState(false);
-  const [companyNameValue, setCompanyNameValue] = useState("");
-  const [editingIndustry, setEditingIndustry] = useState(false);
-  const [industryValue, setIndustryValue] = useState("");
-  const [editingWebsiteUrl, setEditingWebsiteUrl] = useState(false);
-  const [websiteUrlValue, setWebsiteUrlValue] = useState("");
-  const [editingSocialMedia, setEditingSocialMedia] = useState(false);
-  const [socialMediaValue, setSocialMediaValue] = useState("");
+  const [editingLead, setEditingLead] = useState(false);
+  const [editForm, setEditForm] = useState({
+    companyName: "",
+    websiteUrl: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+    location: "",
+    industry: "",
+    socialMedia: [] as string[],
+  });
+
+  useEffect(() => {
+    if (lead) {
+      setEditForm({
+        companyName: lead.companyName || "",
+        websiteUrl: lead.websiteUrl || "",
+        contactName: lead.contactName || "",
+        contactEmail: lead.contactEmail || "",
+        contactPhone: lead.contactPhone || "",
+        location: lead.location || "",
+        industry: lead.industry || "",
+        socialMedia: lead.socialMedia || [],
+      });
+    }
+  }, [lead]);
 
   if (!lead) return null;
 
@@ -399,34 +385,7 @@ function LeadDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Building2 className="w-5 h-5 text-primary shrink-0" />
-            {editingCompanyName ? (
-              <Input
-                value={companyNameValue}
-                onChange={(e) => setCompanyNameValue(e.target.value)}
-                onBlur={() => updateLeadField('companyName', companyNameValue)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    updateLeadField('companyName', companyNameValue);
-                    setEditingCompanyName(false);
-                  }
-                }}
-                placeholder="Company name"
-                className="text-lg font-semibold h-8"
-                data-testid="input-company-name"
-                autoFocus
-              />
-            ) : (
-              <button
-                onClick={() => {
-                  setCompanyNameValue(lead.companyName || '');
-                  setEditingCompanyName(true);
-                }}
-                className="break-words min-w-0 text-left bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-2 py-1 transition-colors"
-                data-testid="button-edit-company-name"
-              >
-                {lead.companyName}
-              </button>
-            )}
+            <span className="break-words min-w-0" data-testid="text-lead-company-name">{lead.companyName}</span>
           </DialogTitle>
           <DialogDescription className="max-sm:text-xs">Lead details and contact information</DialogDescription>
         </DialogHeader>
@@ -460,331 +419,76 @@ function LeadDetailDialog({
             </div>
           )}
 
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-              {editingCompanyName ? (
-                <Input
-                  value={companyNameValue}
-                  onChange={(e) => setCompanyNameValue(e.target.value)}
-                  onBlur={() => updateLeadField('companyName', companyNameValue)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      updateLeadField('companyName', companyNameValue);
-                      setEditingCompanyName(false);
-                    }
-                  }}
-                  placeholder="Company name"
-                  className="text-sm h-7"
-                  data-testid="input-company-name"
-                  autoFocus
-                />
-              ) : (
-                <button
-                  onClick={() => {
-                    setCompanyNameValue(lead.companyName || '');
-                    setEditingCompanyName(true);
-                  }}
-                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors font-medium"
-                  data-testid="button-edit-company-name"
-                >
-                  {lead.companyName}
-                </button>
-              )}
-            </div>
-
-            {!noWebsite ? (
-              <div className="flex items-center gap-2 text-sm">
+          <div className="space-y-2.5">
+            {!noWebsite && (
+              <div className="flex items-center gap-2 text-sm min-w-0">
                 <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-                {editingWebsiteUrl ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <Input
-                      value={websiteUrlValue}
-                      onChange={(e) => setWebsiteUrlValue(e.target.value)}
-                      onBlur={() => updateLeadField('websiteUrl', websiteUrlValue)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          updateLeadField('websiteUrl', websiteUrlValue);
-                          setEditingWebsiteUrl(false);
-                        }
-                      }}
-                      placeholder="Website URL"
-                      className="text-sm h-7 flex-1"
-                      data-testid="input-website-url"
-                      autoFocus
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditingWebsiteUrl(false)}
-                      className="h-7 px-2"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-1">
-                    <a
-                      href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary underline underline-offset-2 truncate flex-1"
-                      data-testid="link-lead-website"
-                    >
-                      {lead.websiteUrl}
-                    </a>
-                    <button
-                      onClick={() => {
-                        setWebsiteUrlValue(lead.websiteUrl || '');
-                        setEditingWebsiteUrl(true);
-                      }}
-                      className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-slate-50"
-                      data-testid="button-edit-website-url"
-                      title="Edit website URL"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm">
-                <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-                <button
-                  onClick={() => {
-                    setWebsiteUrlValue('');
-                    setEditingWebsiteUrl(true);
-                  }}
-                  className="text-muted-foreground italic hover:text-primary transition-colors p-1 rounded hover:bg-slate-50 text-xs"
-                  data-testid="button-add-website-url"
+                <a
+                  href={lead.websiteUrl.startsWith("http") ? lead.websiteUrl : `https://${lead.websiteUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2 truncate"
+                  data-testid="link-lead-website"
                 >
-                  Click to add website URL
-                </button>
+                  {lead.websiteUrl}
+                </a>
               </div>
             )}
-
-            {lead.industry ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
-                {editingIndustry ? (
-                  <Input
-                    value={industryValue}
-                    onChange={(e) => setIndustryValue(e.target.value)}
-                    onBlur={() => updateLeadField('industry', industryValue)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        updateLeadField('industry', industryValue);
-                        setEditingIndustry(false);
-                      }
-                    }}
-                    placeholder="Industry"
-                    className="text-sm h-7 max-w-[150px]"
-                    data-testid="input-industry"
-                    autoFocus
-                  />
-                ) : (
-                  <button
-                    onClick={() => {
-                      setIndustryValue(lead.industry || '');
-                      setEditingIndustry(true);
-                    }}
-                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
-                    data-testid="button-edit-industry"
-                  >
-                    <Badge variant="secondary" className="text-xs">{lead.industry}</Badge>
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm">
-                <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
-                <button
-                  onClick={() => {
-                    setIndustryValue('');
-                    setEditingIndustry(true);
-                  }}
-                  className="text-muted-foreground italic bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors text-xs"
-                  data-testid="button-add-industry"
-                >
-                  Click to add industry
-                </button>
-              </div>
-            )}
-
             <div className="flex items-center gap-2 text-sm">
               <User className="w-4 h-4 text-muted-foreground shrink-0" />
-              {editingContactName ? (
-                <Input
-                  value={contactNameValue}
-                  onChange={(e) => setContactNameValue(e.target.value)}
-                  onBlur={() => updateLeadField('contactName', contactNameValue)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      updateLeadField('contactName', contactNameValue);
-                      setEditingContactName(false);
-                    }
-                  }}
-                  placeholder="Contact name"
-                  className="text-sm h-7"
-                  data-testid="input-contact-name"
-                  autoFocus
-                />
-              ) : (
-                <button
-                  onClick={() => {
-                    setContactNameValue(lead.contactName || '');
-                    setEditingContactName(true);
-                  }}
-                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
-                  data-testid="button-edit-contact-name"
-                >
-                  {lead.contactName || <span className="text-muted-foreground italic">Click to add contact name</span>}
-                </button>
-              )}
+              <span data-testid="text-lead-contact-name">{lead.contactName || <span className="text-muted-foreground italic">Not found</span>}</span>
             </div>
-
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-sm min-w-0">
               <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-              {editingContactEmail ? (
-                <Input
-                  value={contactEmailValue}
-                  onChange={(e) => setContactEmailValue(e.target.value)}
-                  onBlur={() => updateLeadField('contactEmail', contactEmailValue)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      updateLeadField('contactEmail', contactEmailValue);
-                      setEditingContactEmail(false);
-                    }
-                  }}
-                  placeholder="Email address"
-                  className="text-sm h-7"
-                  data-testid="input-contact-email"
-                  autoFocus
-                />
-              ) : lead.contactEmail ? (
+              {lead.contactEmail ? (
                 <>
                   <button
-                    onClick={() => {
-                      setContactEmailValue(lead.contactEmail || '');
-                      setEditingContactEmail(true);
-                    }}
-                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
-                    data-testid="button-edit-contact-email"
+                    onClick={() => setEmailDialogOpen(true)}
+                    className="text-primary underline underline-offset-2 truncate text-left bg-transparent border-0 cursor-pointer p-0 flex-1"
+                    data-testid="link-lead-contact-email"
                   >
                     {lead.contactEmail}
                   </button>
                   <CopyButton value={lead.contactEmail} label="Email" />
                 </>
               ) : (
-                <button
-                  onClick={() => {
-                    setContactEmailValue('');
-                    setEditingContactEmail(true);
-                  }}
-                  className="text-muted-foreground italic bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
-                  data-testid="button-add-contact-email"
-                >
-                  Click to add email
-                </button>
+                <span className="text-muted-foreground italic">Not found</span>
               )}
             </div>
-
             <div className="flex items-center gap-2 text-sm">
               <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-              {editingContactPhone ? (
-                <Input
-                  value={contactPhoneValue}
-                  onChange={(e) => setContactPhoneValue(e.target.value)}
-                  onBlur={() => updateLeadField('contactPhone', contactPhoneValue)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      updateLeadField('contactPhone', contactPhoneValue);
-                      setEditingContactPhone(false);
-                    }
-                  }}
-                  placeholder="Phone number"
-                  className="text-sm h-7"
-                  data-testid="input-contact-phone"
-                  autoFocus
-                />
-              ) : lead.contactPhone ? (
+              {lead.contactPhone ? (
                 <>
-                  <button
-                    onClick={() => {
-                      setContactPhoneValue(lead.contactPhone || '');
-                      setEditingContactPhone(true);
-                    }}
-                    className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
-                    data-testid="button-edit-contact-phone"
-                  >
+                  <a href={`tel:${lead.contactPhone}`} className="text-primary underline underline-offset-2 flex-1" data-testid="link-lead-contact-phone">
                     {lead.contactPhone}
-                  </button>
+                  </a>
                   <CopyButton value={lead.contactPhone} label="Phone" />
                 </>
               ) : (
-                <button
-                  onClick={() => {
-                    setContactPhoneValue('');
-                    setEditingContactPhone(true);
-                  }}
-                  className="text-muted-foreground italic bg-transparent border-0 cursor-pointer p-0 hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
-                  data-testid="button-add-contact-phone"
-                >
-                  Click to add phone
-                </button>
+                <span className="text-muted-foreground italic">Not found</span>
               )}
             </div>
-
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-              {editingLocation ? (
-                <Input
-                  value={locationValue}
-                  onChange={(e) => setLocationValue(e.target.value)}
-                  onBlur={() => updateLeadField('location', locationValue)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      updateLeadField('location', locationValue);
-                      setEditingLocation(false);
-                    }
-                  }}
-                  placeholder="Location"
-                  className="text-sm h-7"
-                  data-testid="input-location"
-                  autoFocus
-                />
-              ) : (
-                <button
-                  onClick={() => {
-                    setLocationValue(lead.location || '');
-                    setEditingLocation(true);
-                  }}
-                  className="text-primary underline underline-offset-2 text-left bg-transparent border-0 cursor-pointer p-0 flex-1 truncate hover:bg-slate-50 rounded px-1 py-0.5 transition-colors"
-                  data-testid="button-edit-location"
-                >
-                  {lead.location || <span className="text-muted-foreground italic">Click to add location</span>}
-                </button>
-              )}
+              <span data-testid="text-lead-location">{lead.location || <span className="text-muted-foreground italic">Not found</span>}</span>
             </div>
           </div>
 
-          {lead.socialMedia && lead.socialMedia.length > 0 ? (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditingLead(true)}
+              className="text-xs"
+              data-testid="button-edit-lead-info"
+            >
+              Edit Lead Info
+            </Button>
+          </div>
+
+          {lead.socialMedia && lead.socialMedia.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-muted-foreground">Social Media</p>
-                <button
-                  onClick={() => {
-                    setSocialMediaValue(lead.socialMedia ? lead.socialMedia.join('\n') : '');
-                    setEditingSocialMedia(true);
-                  }}
-                  className="text-muted-foreground hover:text-primary transition-colors p-1 rounded hover:bg-slate-50"
-                  data-testid="button-edit-social-media"
-                  title="Edit social media links"
-                >
-                  <Edit2 className="w-3 h-3" />
-                </button>
-              </div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Social Media</p>
               <div className="space-y-2">
                 {parseSocialMedia(lead.socialMedia).map(({ platform, url }) => {
                   const Icon = SOCIAL_ICONS[platform];
@@ -805,57 +509,6 @@ function LeadDetailDialog({
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm">
-              <div className="flex items-center gap-2 flex-1">
-                <p className="text-xs font-medium text-muted-foreground">Social Media</p>
-                <button
-                  onClick={() => {
-                    setSocialMediaValue('');
-                    setEditingSocialMedia(true);
-                  }}
-                  className="text-muted-foreground italic hover:text-primary transition-colors p-1 rounded hover:bg-slate-50 text-xs"
-                  data-testid="button-add-social-media"
-                >
-                  Click to add social media links
-                </button>
-              </div>
-            </div>
-          )}
-
-          {editingSocialMedia && (
-            <div className="space-y-2 p-3 border rounded-md bg-muted/30">
-              <p className="text-xs font-medium text-muted-foreground">Edit Social Media Links</p>
-              <Textarea
-                value={socialMediaValue}
-                onChange={(e) => setSocialMediaValue(e.target.value)}
-                placeholder="Enter social media URLs (one per line)&#10;Example:&#10;https://instagram.com/joespizza&#10;https://facebook.com/joespizza"
-                className="text-sm min-h-[80px]"
-                data-testid="input-social-media"
-              />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    const urls = socialMediaValue.split('\n').filter(url => url.trim()).map(url => url.trim());
-                    updateLeadField('socialMedia', urls);
-                    setEditingSocialMedia(false);
-                  }}
-                  disabled={!socialMediaValue.trim()}
-                  data-testid="button-save-social-media"
-                >
-                  Save
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditingSocialMedia(false)}
-                  data-testid="button-cancel-social-media"
-                >
-                  Cancel
-                </Button>
               </div>
             </div>
           )}
@@ -1139,6 +792,20 @@ function LeadDetailDialog({
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t">
+            {lead.contactPhone && (
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                className="w-full sm:w-auto"
+                data-testid="button-call-lead"
+              >
+                <a href={`tel:${lead.contactPhone}`}>
+                  <Phone className="w-3.5 h-3.5 mr-1" />
+                  Call
+                </a>
+              </Button>
+            )}
             {lead.contactEmail && (
               <Button
                 size="sm"
@@ -1173,6 +840,141 @@ function LeadDetailDialog({
         onClose={() => setEmailDialogOpen(false)}
       />
     )}
+    <Dialog open={editingLead} onOpenChange={setEditingLead}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Lead Information</DialogTitle>
+          <DialogDescription>
+            Update all lead information including contact details and business info
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div>
+            <label className="text-sm font-medium">Company Name</label>
+            <Input
+              value={editForm.companyName}
+              onChange={(e) => setEditForm(prev => ({ ...prev, companyName: e.target.value }))}
+              placeholder="Enter company name"
+              data-testid="input-edit-company-name"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Website URL</label>
+            <Input
+              value={editForm.websiteUrl}
+              onChange={(e) => setEditForm(prev => ({ ...prev, websiteUrl: e.target.value }))}
+              placeholder="Enter website URL"
+              data-testid="input-edit-website-url"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Contact Name</label>
+            <Input
+              value={editForm.contactName}
+              onChange={(e) => setEditForm(prev => ({ ...prev, contactName: e.target.value }))}
+              placeholder="Enter contact name"
+              data-testid="input-edit-contact-name"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Contact Email</label>
+            <Input
+              value={editForm.contactEmail}
+              onChange={(e) => setEditForm(prev => ({ ...prev, contactEmail: e.target.value }))}
+              placeholder="Enter contact email"
+              type="email"
+              data-testid="input-edit-contact-email"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Contact Phone</label>
+            <Input
+              value={editForm.contactPhone}
+              onChange={(e) => setEditForm(prev => ({ ...prev, contactPhone: e.target.value }))}
+              placeholder="Enter contact phone"
+              data-testid="input-edit-contact-phone"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Industry</label>
+            <Input
+              value={editForm.industry}
+              onChange={(e) => setEditForm(prev => ({ ...prev, industry: e.target.value }))}
+              placeholder="Enter industry"
+              data-testid="input-edit-industry"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Address/Location</label>
+            <Input
+              value={editForm.location}
+              onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
+              placeholder="Enter address or location"
+              data-testid="input-edit-location"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Social Media</label>
+            <div className="space-y-2">
+              {editForm.socialMedia.map((social, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    value={social}
+                    onChange={(e) => {
+                      const newSocial = [...editForm.socialMedia];
+                      newSocial[index] = e.target.value;
+                      setEditForm(prev => ({ ...prev, socialMedia: newSocial }));
+                    }}
+                    placeholder="platform:url (e.g., facebook:https://...)"
+                    data-testid={`input-edit-social-${index}`}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newSocial = editForm.socialMedia.filter((_, i) => i !== index);
+                      setEditForm(prev => ({ ...prev, socialMedia: newSocial }));
+                    }}
+                    data-testid={`button-remove-social-${index}`}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditForm(prev => ({ ...prev, socialMedia: [...prev.socialMedia, ""] }))}
+                data-testid="button-add-social-media"
+              >
+                Add Social Media
+              </Button>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingLead(false)} data-testid="button-cancel-edit-lead">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateLeadMutation.mutate({
+                companyName: editForm.companyName || undefined,
+                websiteUrl: editForm.websiteUrl || undefined,
+                contactName: editForm.contactName || undefined,
+                contactEmail: editForm.contactEmail || undefined,
+                contactPhone: editForm.contactPhone || undefined,
+                location: editForm.location || undefined,
+                industry: editForm.industry || undefined,
+                socialMedia: editForm.socialMedia.filter(s => s.trim()),
+              })}
+              disabled={updateLeadMutation.isPending}
+              data-testid="button-save-edit-lead"
+            >
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
