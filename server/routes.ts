@@ -549,7 +549,6 @@ export async function registerRoutes(
         new: results.length,
         skipped: businesses.length - results.length,
         leads: results,
-        cached,
         remaining: updatedLimit?.remaining,
         limit: updatedLimit?.limit,
         page: searchPage,
