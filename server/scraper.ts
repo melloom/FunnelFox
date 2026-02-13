@@ -2286,6 +2286,9 @@ function isAggregatorSite(domain: string): boolean {
     "guide.michelin.com", "michelin.com",
     "timeout.com", "eater.com", "infatuation.com", "thrillist.com",
     "google.com/maps", "maps.google.com", "google.com/search",
+    "bing.com/maps", "bing.com/search", "duckduckgo.com/maps",
+    "waze.com", "apple.com/maps", "transitapp.com", "moovit.com",
+    "mapquest.com/directions", "directions.com",
   ];
   return aggregators.some((ex) => domain.includes(ex));
 }
@@ -2302,6 +2305,8 @@ function isExcludedDomain(domain: string): boolean {
     "medium.com", "wordpress.com", "blogspot.com",
     "stitcher.com", "spotify.com", "soundcloud.com",
     "github.com", "gitlab.com", "bitbucket.org",
+    "googleads.g.doubleclick.net", "ad.doubleclick.net",
+    "maps.google.com", "google.com/maps", "news.google.com",
   ];
   if (domain.endsWith(".gov")) return true;
   return excluded.some((ex) => domain.includes(ex));
