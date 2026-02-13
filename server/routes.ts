@@ -375,10 +375,13 @@ export async function registerRoutes(
         // Check for website duplicates - Most reliable
         if (url && url !== "none") {
           try {
-            let u = url;
+            let u = url.trim().toLowerCase();
             if (!u.startsWith("http")) u = `https://${u}`;
-            const domain = new URL(u).hostname.replace(/^www\./, "");
-            if (domain.length > 3 && existingDomains.has(domain)) return true;
+            const parsed = new URL(u);
+            const domain = parsed.hostname.replace(/^www\./, "");
+            // Only dedupe if it's a real domain (not a social media platform alone)
+            const isSocial = ["facebook.com", "instagram.com", "twitter.com", "linkedin.com", "yelp.com"].some(d => domain.includes(d));
+            if (domain.length > 3 && !isSocial && existingDomains.has(domain)) return true;
           } catch {}
         }
 

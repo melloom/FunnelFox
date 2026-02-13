@@ -3192,9 +3192,10 @@ export async function analyzeWebsite(targetUrl: string, businessName?: string, l
 
 function extractDomain(url: string): string | null {
   try {
-    let fullUrl = url;
+    let fullUrl = url.trim();
     if (!fullUrl.startsWith("http")) fullUrl = `https://${fullUrl}`;
-    return new URL(fullUrl).hostname.replace(/^www\./, "");
+    const domain = new URL(fullUrl).hostname.replace(/^www\./, "").toLowerCase();
+    return domain.length > 3 ? domain : null;
   } catch {
     return null;
   }
@@ -3202,12 +3203,13 @@ function extractDomain(url: string): string | null {
 
 function normalizeUrl(url: string): string {
   try {
-    let fullUrl = url;
+    let fullUrl = url.trim();
     if (!fullUrl.startsWith("http")) fullUrl = `https://${fullUrl}`;
     const parsed = new URL(fullUrl);
-    return `${parsed.protocol}//${parsed.hostname}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+    // Remove query params and standardizing trailing slash
+    return `${parsed.protocol}//${parsed.hostname.replace(/^www\./, "").toLowerCase()}${parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/$/, "")}`;
   } catch {
-    return url;
+    return url.trim().toLowerCase();
   }
 }
 
