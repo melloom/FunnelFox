@@ -2273,7 +2273,7 @@ function isAggregatorSite(domain: string): boolean {
     "bestprosintown.com", "marylandrecommendations.com",
     "booksy.com", "thecut.co", "vagaro.com", "styleseat.com",
     "fresha.com", "schedulicity.com", "genbook.com",
-    "expertise.com", "therealyellowpages.com",
+    "expertise.com", "therealyellowpages.com", "yellowpage.com",
     "bark.com", "houzz.com", "care.com", "taskrabbit.com",
     "handy.com", "porch.com", "buildzoom.com", "fixr.com",
     "healthgrades.com", "zocdoc.com", "vitals.com",
@@ -2291,6 +2291,17 @@ function isAggregatorSite(domain: string): boolean {
     "mapquest.com/directions", "directions.com",
   ];
   return aggregators.some((ex) => domain.includes(ex));
+}
+
+function isAggregatorName(name: string): boolean {
+  const lowName = name.toLowerCase();
+  const directoryKeywords = [
+    "yellow pages", "yellowpages", "yelp", "tripadvisor", 
+    "mapquest", "direct", "top 10", "best barbers in", 
+    "barbers in", "near me", "results for", "directory",
+    "the real yellow pages", "business profile"
+  ];
+  return directoryKeywords.some(kw => lowName.includes(kw));
 }
 
 function isExcludedDomain(domain: string): boolean {
