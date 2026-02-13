@@ -284,7 +284,7 @@ export default function SubscriptionPage() {
                   Leads This Month
                 </div>
                 <span className="text-sm text-muted-foreground" data-testid="text-discovery-usage">
-                  {subscription?.monthlyDiscoveriesUsed || 0} / {subscription?.discoveryLimit === 999 ? "Unlimited" : subscription?.discoveryLimit || 25}
+                  {subscription?.monthlyDiscoveriesUsed || 0} / {subscription?.discoveryLimit === 999 ? "Unlimited" : subscription?.discoveryLimit || 100}
                 </span>
               </div>
               <Progress value={subscription?.discoveryLimit === 999 ? 5 : discoveryPercent} className="h-2" />
@@ -300,7 +300,7 @@ export default function SubscriptionPage() {
                   Saved Leads
                 </div>
                 <span className="text-sm text-muted-foreground" data-testid="text-lead-usage">
-                  {subscription?.totalLeads || 0} / {subscription?.leadLimit === null ? "Unlimited" : subscription?.leadLimit || 25}
+                  {subscription?.totalLeads || 0} / {subscription?.leadLimit === null ? "Unlimited" : subscription?.leadLimit || 100}
                 </span>
               </div>
               {subscription?.leadLimit ? (

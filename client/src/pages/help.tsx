@@ -55,7 +55,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: "What's included in the Free plan?",
-    answer: "The Free plan includes up to 25 leads per month, up to 25 saved leads, basic website analysis, and full pipeline management. Limits reset on the first of each month.",
+    answer: "The Free plan includes up to 100 leads per month, up to 100 saved leads, basic website analysis, and full pipeline management. Limits reset on the first of each month.",
   },
   {
     question: "What's included in the Pro plan?",
@@ -309,8 +309,8 @@ export default function HelpPage() {
                   <p className="text-sm font-medium">Free Plan</p>
                 </div>
                 <ul className="text-sm text-muted-foreground space-y-1 pl-6">
-                  <li>25 leads per month</li>
-                  <li>25 saved leads maximum</li>
+                  <li>100 leads per month</li>
+                  <li>100 saved leads maximum</li>
                   <li>Basic website analysis</li>
                   <li>Full pipeline management</li>
                 </ul>

@@ -414,7 +414,7 @@ export default function LandingPage() {
                   </h2>
                 </div>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  25 free leads per month, multi-platform job scraping, and project management. 
+                  100 free leads per month, multi-platform job scraping, and project management. 
                   No credit card needed. Start landing clients today.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

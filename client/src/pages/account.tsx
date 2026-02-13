@@ -301,14 +301,14 @@ export default function AccountPage() {
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm">Saved Leads</span>
                     <span className="text-sm text-muted-foreground">
-                      {subscription.leadCount} / {isPro ? "Unlimited" : (subscription.leadLimit ?? 25)}
+                      {subscription.leadCount} / {isPro ? "Unlimited" : (subscription.leadLimit ?? 100)}
                     </span>
                   </div>
                   {!isPro && (
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${Math.min(100, ((subscription.leadCount || 0) / (subscription.leadLimit || 25)) * 100)}%` }}
+                        style={{ width: `${Math.min(100, ((subscription.leadCount || 0) / (subscription.leadLimit || 100)) * 100)}%` }}
                       />
                     </div>
                   )}

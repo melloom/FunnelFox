@@ -66,7 +66,7 @@ export default function TermsPage() {
             <section className="space-y-2">
               <h2 className="text-base font-semibold">5. Usage Limits</h2>
               <p>
-                Each plan includes specific usage limits for leads and saved leads. Free plan users are limited to 25 leads per month and 25 saved leads. Pro plan users receive 300 leads per month and unlimited saved leads.
+                Each plan includes specific usage limits for leads and saved leads. Free plan users are limited to 100 leads per month and 100 saved leads. Pro plan users receive 300 leads per month and unlimited saved leads.
               </p>
               <p>
                 Discovery counts reset on the first day of each calendar month. We reserve the right to modify usage limits with reasonable notice.
