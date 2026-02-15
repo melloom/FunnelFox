@@ -277,14 +277,15 @@ export async function setupAuth(app: Express) {
       }
 
       const [user] = await db.select().from(users).where(
-        and(
-          eq(users.emailVerificationToken, token),
-          gt(users.emailVerificationExpiry, new Date())
-        )
+        eq(users.emailVerificationToken, token)
       );
 
       if (!user) {
-        return res.status(400).json({ message: "Invalid or expired verification link. Please request a new one." });
+        return res.status(400).json({ message: "Invalid verification link. Please request a new one." });
+      }
+
+      if (user.emailVerificationExpiry && user.emailVerificationExpiry < new Date()) {
+        return res.status(400).json({ message: "Verification link has expired. Please request a new one." });
       }
 
       await db.update(users).set({

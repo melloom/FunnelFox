@@ -2,18 +2,39 @@ import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle2, XCircle, Mail } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Mail, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import foxLogo from "@assets/fox_1770439380079.png";
 
 export default function VerifyEmailPage() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [resending, setResending] = useState(false);
+  const [emailForResend, setEmailForResend] = useState("");
 
   const token = new URLSearchParams(searchString).get("token");
+
+  const handleResend = async () => {
+    if (!emailForResend) {
+      toast({ title: "Email required", description: "Please enter your email to resend verification.", variant: "destructive" });
+      return;
+    }
+    setResending(true);
+    try {
+      await apiRequest("POST", "/api/auth/resend-verification", { email: emailForResend });
+      toast({ title: "Verification email sent", description: "Check your inbox for a new verification link." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to resend verification email.", variant: "destructive" });
+    } finally {
+      setResending(false);
+    }
+  };
 
   useEffect(() => {
     if (!token) {
@@ -85,7 +106,31 @@ export default function VerifyEmailPage() {
                   <p className="font-medium">Verification failed</p>
                   <p className="text-xs text-muted-foreground">{message}</p>
                 </div>
-                <div className="w-full space-y-2 mt-2">
+
+                {message.toLowerCase().includes("expired") && (
+                  <div className="w-full space-y-3 pt-2">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Resend Link</p>
+                      <input
+                        type="email"
+                        placeholder="Enter your email"
+                        className="w-full px-3 py-2 text-sm rounded-md border bg-background"
+                        value={emailForResend}
+                        onChange={(e) => setEmailForResend(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={handleResend} 
+                      disabled={resending || !emailForResend}
+                    >
+                      {resending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                      Resend Verification
+                    </Button>
+                  </div>
+                )}
+
+                <div className="w-full space-y-2 mt-2 border-t pt-4">
                   <Button variant="outline" className="w-full" onClick={() => setLocation("/auth")} data-testid="button-go-to-auth">
                     <Mail className="w-4 h-4 mr-2" />
                     Back to sign in
