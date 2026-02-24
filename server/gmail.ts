@@ -17,6 +17,10 @@ function getTransporter() {
       user: smtpUser,
       pass: smtpPass,
     },
+    tls: {
+      rejectUnauthorized: false,
+      minVersion: 'TLSv1.2'
+    },
     connectionTimeout: 10000,
     socketTimeout: 10000,
   });
@@ -84,23 +88,30 @@ function buildHtmlEmail(body: string, fromName?: string): string {
 }
 
 export async function sendEmail(to: string, subject: string, body: string, fromName?: string): Promise<{ messageId: string; threadId: string }> {
+  console.log(`[Email] Attempting to send email to ${to} with subject: ${subject}`);
   const transporter = getTransporter();
   const senderName = fromName || smtpFromName;
   const htmlContent = buildHtmlEmail(body, senderName);
   const textContent = body + (senderName ? `\n\nBest regards,\n${senderName}` : '');
 
-  const info = await transporter.sendMail({
-    from: `"${senderName}" <${smtpFromEmail}>`,
-    to,
-    subject,
-    text: textContent,
-    html: htmlContent,
-  });
+  try {
+    const info = await transporter.sendMail({
+      from: `"${senderName}" <${smtpFromEmail}>`,
+      to,
+      subject,
+      text: textContent,
+      html: htmlContent,
+    });
 
-  return {
-    messageId: info.messageId || '',
-    threadId: '',
-  };
+    console.log(`[Email] Successfully sent email to ${to}. MessageId: ${info.messageId}`);
+    return {
+      messageId: info.messageId || '',
+      threadId: '',
+    };
+  } catch (error: any) {
+    console.error(`[Email] Error sending email to ${to}:`, error);
+    throw error;
+  }
 }
 
 export async function isGmailConnected(): Promise<boolean> {

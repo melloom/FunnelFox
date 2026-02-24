@@ -82,7 +82,7 @@ export async function setupAuth(app: Express) {
     try {
       const data = registerSchema.parse(req.body);
 
-      const existing = await authStorage.getUserByEmail(data.email);
+      const existing = await authStorage.getUserByEmail(data.email.toLowerCase().trim());
       if (existing) {
         return res.status(400).json({ message: "An account with this email already exists" });
       }
@@ -93,7 +93,7 @@ export async function setupAuth(app: Express) {
       const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       const user = await authStorage.createUser({
-        email: data.email,
+        email: data.email.toLowerCase().trim(),
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName || null,
@@ -138,7 +138,7 @@ export async function setupAuth(app: Express) {
     try {
       const data = loginSchema.parse(req.body);
 
-      const user = await authStorage.getUserByEmail(data.email);
+      const user = await authStorage.getUserByEmail(data.email.toLowerCase().trim());
       if (!user) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
@@ -230,7 +230,7 @@ export async function setupAuth(app: Express) {
         const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
         user = await authStorage.createUser({
-          email,
+          email: email.toLowerCase().trim(),
           password: hashedPassword,
           firstName,
           lastName,
@@ -317,7 +317,7 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ message: "A valid email address is required" });
       }
 
-      const user = await authStorage.getUserByEmail(email);
+      const user = await authStorage.getUserByEmail(email.toLowerCase().trim());
 
       res.json({ message: "If an account with that email exists and is unverified, a new verification link has been sent." });
 
@@ -367,7 +367,7 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ message: "A valid email address is required" });
       }
 
-      const user = await authStorage.getUserByEmail(email);
+      const user = await authStorage.getUserByEmail(email.toLowerCase().trim());
 
       res.json({ message: "If an account with that email exists, a password reset link has been sent." });
 
