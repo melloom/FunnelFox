@@ -49,6 +49,7 @@ import {
   SearchCode,
   Eye,
   Shield,
+  MessageSquare,
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiTiktok, SiLinkedin, SiYoutube, SiPinterest } from "react-icons/si";
 import type { Lead } from "@shared/schema";
@@ -56,6 +57,7 @@ import { PIPELINE_STAGES } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplateDialog } from "@/components/email-template-dialog";
+import { SMSTemplateDialog } from "@/components/sms-template-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { calculateLeadScore, getScoreColor } from "@/lib/lead-scoring";
@@ -418,6 +420,7 @@ function PipelineLeadDetailDialog({
   });
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
   const [editingLead, setEditingLead] = useState(false);
@@ -450,6 +453,7 @@ function PipelineLeadDetailDialog({
     }
     setEditingNotes(false);
     setEmailDialogOpen(false);
+    setSmsDialogOpen(false);
     setEditingLead(false);
   }, [lead?.id, open]);
 
@@ -868,6 +872,18 @@ function PipelineLeadDetailDialog({
                 Email Lead
               </Button>
             )}
+            {lead.contactPhone && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSmsDialogOpen(true)}
+                className="w-full sm:w-auto"
+                data-testid="button-pipeline-sms-lead"
+              >
+                <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                Text Lead
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -885,10 +901,18 @@ function PipelineLeadDetailDialog({
     </Dialog>
     {lead.contactEmail && (
       <EmailTemplateDialog
-        key={lead.id}
+        key={`email-${lead.id}`}
         lead={lead}
         open={emailDialogOpen}
         onClose={() => setEmailDialogOpen(false)}
+      />
+    )}
+    {lead.contactPhone && (
+      <SMSTemplateDialog
+        key={`sms-${lead.id}`}
+        lead={lead}
+        open={smsDialogOpen}
+        onClose={() => setSmsDialogOpen(false)}
       />
     )}
     <Dialog open={editingLead} onOpenChange={setEditingLead}>

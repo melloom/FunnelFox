@@ -41,6 +41,7 @@ import {
   Trash2,
   Star,
   Send,
+  MessageSquare,
   Download,
   ArrowRight,
   ArrowLeft,
@@ -80,6 +81,7 @@ import type { Activity } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplateDialog } from "@/components/email-template-dialog";
+import { SMSTemplateDialog } from "@/components/sms-template-dialog";
 import { calculateLeadScore, getScoreColor } from "@/lib/lead-scoring";
 
 const STAGE_TEXT_COLORS: Record<string, string> = {
@@ -343,6 +345,7 @@ function LeadDetailDialog({
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [editingLead, setEditingLead] = useState(false);
   const [editForm, setEditForm] = useState<{
@@ -384,6 +387,7 @@ function LeadDetailDialog({
     setEditingNotes(false);
     setShowTimeline(false);
     setEmailDialogOpen(false);
+    setSmsDialogOpen(false);
     setEditingLead(false);
   }, [lead?.id, open]);
 
@@ -844,6 +848,18 @@ function LeadDetailDialog({
                 Email Lead
               </Button>
             )}
+            {lead.contactPhone && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSmsDialogOpen(true)}
+                className="w-full sm:w-auto"
+                data-testid="button-sms-lead"
+              >
+                <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                Text Lead
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -861,10 +877,18 @@ function LeadDetailDialog({
     </Dialog>
     {lead.contactEmail && (
       <EmailTemplateDialog
-        key={lead.id}
+        key={`email-${lead.id}`}
         lead={lead}
         open={emailDialogOpen}
         onClose={() => setEmailDialogOpen(false)}
+      />
+    )}
+    {lead.contactPhone && (
+      <SMSTemplateDialog
+        key={`sms-${lead.id}`}
+        lead={lead}
+        open={smsDialogOpen}
+        onClose={() => setSmsDialogOpen(false)}
       />
     )}
     <Dialog open={editingLead} onOpenChange={setEditingLead}>
