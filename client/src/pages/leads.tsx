@@ -295,9 +295,20 @@ function LeadDetailDialog({
     mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
       await apiRequest("PATCH", `/api/leads/${id}`, { notes });
     },
+    onMutate: async ({ id, notes }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/leads"] });
+      const prev = queryClient.getQueryData<Lead[]>(["/api/leads"]);
+      if (prev) {
+        queryClient.setQueryData<Lead[]>(["/api/leads"], prev.map(l => l.id === id ? { ...l, notes } : l));
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) queryClient.setQueryData(["/api/leads"], context.prev);
+      toast({ title: "Failed to save notes", variant: "destructive" });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead?.id] });
       toast({ title: "Notes updated" });
     },
   });
@@ -331,15 +342,50 @@ function LeadDetailDialog({
 
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [editingLead, setEditingLead] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    companyName: string;
+    websiteUrl: string;
+    contactName: string;
+    contactEmail: string;
+    contactPhone: string;
+    location: string;
+    industry: string;
+    socialMedia: string[];
+  }>({
+    companyName: "",
+    websiteUrl: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+    location: "",
+    industry: "",
+    socialMedia: [],
+  });
 
   useEffect(() => {
-    if (lead) {
+    if (lead && open) {
       setNotesValue(lead.notes || "");
+      setEditForm({
+        companyName: lead.companyName || "",
+        websiteUrl: lead.websiteUrl || "",
+        contactName: lead.contactName || "",
+        contactEmail: lead.contactEmail || "",
+        contactPhone: lead.contactPhone || "",
+        location: lead.location || "",
+        industry: lead.industry || "",
+        socialMedia: lead.socialMedia || [],
+      });
     } else {
       setNotesValue("");
     }
     setEditingNotes(false);
-  }, [lead?.id]);
+    setShowTimeline(false);
+    setEmailDialogOpen(false);
+    setEditingLead(false);
+  }, [lead?.id, open]);
 
   if (!lead) return null;
 
@@ -1580,7 +1626,7 @@ ${dataRows}
       )}
 
       <LeadDetailDialog
-        lead={selectedLead}
+        lead={selectedLead ? (leads.find(l => l.id === selectedLead.id) || selectedLead) : null}
         open={!!selectedLead}
         onClose={() => setSelectedLead(null)}
       />
