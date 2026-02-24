@@ -331,34 +331,15 @@ function LeadDetailDialog({
 
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState("");
-  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
-  const [editingLead, setEditingLead] = useState(false);
-  const [editForm, setEditForm] = useState({
-    companyName: "",
-    websiteUrl: "",
-    contactName: "",
-    contactEmail: "",
-    contactPhone: "",
-    location: "",
-    industry: "",
-    socialMedia: [] as string[],
-  });
 
   useEffect(() => {
     if (lead) {
-      setEditForm({
-        companyName: lead.companyName || "",
-        websiteUrl: lead.websiteUrl || "",
-        contactName: lead.contactName || "",
-        contactEmail: lead.contactEmail || "",
-        contactPhone: lead.contactPhone || "",
-        location: lead.location || "",
-        industry: lead.industry || "",
-        socialMedia: lead.socialMedia || [],
-      });
+      setNotesValue(lead.notes || "");
+    } else {
+      setNotesValue("");
     }
-  }, [lead]);
+    setEditingNotes(false);
+  }, [lead?.id]);
 
   if (!lead) return null;
 
